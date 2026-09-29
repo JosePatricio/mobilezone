@@ -1,0 +1,198 @@
+"""Repository interfaces (ports). Implementations live in the infrastructure layer."""
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from contextlib import contextmanager
+from datetime import date
+from typing import Generic, Iterator, TypeVar
+
+from app.domain.entities import (
+    Brand,
+    Category,
+    DeviceModel,
+    Permission,
+    Product,
+    Role,
+    Sale,
+    SparePart,
+    StockMovement,
+    User,
+    WorkOrder,
+)
+from app.domain.value_objects.enums import SaleStatus, UserType
+from app.domain.value_objects.pagination import Page, PageRequest
+
+T = TypeVar("T")
+
+
+class Repository(ABC, Generic[T]):
+    @abstractmethod
+    def add(self, entity: T) -> T: ...
+
+    @abstractmethod
+    def get(self, entity_id: int) -> T | None: ...
+
+    @abstractmethod
+    def delete(self, entity: T) -> None: ...
+
+
+class UserRepository(Repository[User]):
+    @abstractmethod
+    def get_by_email(self, email: str) -> User | None: ...
+
+    @abstractmethod
+    def list(
+        self,
+        page: PageRequest,
+        *,
+        search: str | None = None,
+        tipo_usuario: list[UserType] | None = None,
+        estado: bool | None = None,
+        rol_id: int | None = None,
+    ) -> Page[User]: ...
+
+
+class RoleRepository(Repository[Role]):
+    @abstractmethod
+    def get_by_nombre(self, nombre: str) -> Role | None: ...
+
+    @abstractmethod
+    def list(self, page: PageRequest, *, search: str | None = None, estado: bool | None = None) -> Page[Role]: ...
+
+
+class PermissionRepository(Repository[Permission]):
+    @abstractmethod
+    def list_all(self) -> list[Permission]: ...
+
+    @abstractmethod
+    def get_many(self, ids: list[int]) -> list[Permission]: ...
+
+    @abstractmethod
+    def get_by_codes(self, codes: list[str]) -> list[Permission]: ...
+
+
+class CategoryRepository(Repository[Category]):
+    @abstractmethod
+    def get_by_nombre(self, nombre: str) -> Category | None: ...
+
+    @abstractmethod
+    def list(self, page: PageRequest, *, search: str | None = None, estado: bool | None = None) -> Page[Category]: ...
+
+
+class ProductRepository(Repository[Product]):
+    @abstractmethod
+    def get_for_update(self, product_id: int) -> Product | None:
+        """Load a product locking its row (``SELECT ... FOR UPDATE`` where supported)."""
+
+    @abstractmethod
+    def list(
+        self,
+        page: PageRequest,
+        *,
+        search: str | None = None,
+        category_id: int | None = None,
+        estado: bool | None = None,
+    ) -> Page[Product]: ...
+
+
+class StockMovementRepository(ABC):
+    @abstractmethod
+    def add(self, movement: StockMovement) -> StockMovement: ...
+
+    @abstractmethod
+    def list_by_product(self, product_id: int, page: PageRequest) -> Page[StockMovement]: ...
+
+
+class SaleRepository(Repository[Sale]):
+    @abstractmethod
+    def list(
+        self,
+        page: PageRequest,
+        *,
+        user_id: int | None = None,
+        estado: SaleStatus | None = None,
+        fecha_desde: date | None = None,
+        fecha_hasta: date | None = None,
+    ) -> Page[Sale]: ...
+
+
+class BrandRepository(Repository[Brand]):
+    @abstractmethod
+    def get_by_nombre(self, nombre: str) -> Brand | None: ...
+
+    @abstractmethod
+    def list(self, page: PageRequest, *, search: str | None = None, estado: bool | None = None) -> Page[Brand]: ...
+
+
+class DeviceModelRepository(Repository[DeviceModel]):
+    @abstractmethod
+    def get_by_brand_and_nombre(self, brand_id: int, nombre: str) -> DeviceModel | None: ...
+
+    @abstractmethod
+    def list(
+        self,
+        page: PageRequest,
+        *,
+        search: str | None = None,
+        brand_id: int | None = None,
+        estado: bool | None = None,
+    ) -> Page[DeviceModel]: ...
+
+
+class SparePartRepository(Repository[SparePart]):
+    @abstractmethod
+    def list(self, page: PageRequest, *, search: str | None = None, estado: bool | None = None) -> Page[SparePart]: ...
+
+
+class WorkOrderRepository(Repository[WorkOrder]):
+    @abstractmethod
+    def get_by_num_orden(self, num_orden: int) -> WorkOrder | None: ...
+
+    @abstractmethod
+    def list(
+        self,
+        page: PageRequest,
+        *,
+        num_orden: int | None = None,
+        cliente: str | None = None,
+        cliente_id: int | None = None,
+        tecnico_id: int | None = None,
+        estado: int | None = None,
+        fecha_desde: date | None = None,
+        fecha_hasta: date | None = None,
+    ) -> Page[WorkOrder]: ...
+
+
+class UnitOfWork(ABC):
+    """Transaction boundary shared by all repositories of one operation."""
+
+    users: UserRepository
+    roles: RoleRepository
+    permissions: PermissionRepository
+    categories: CategoryRepository
+    products: ProductRepository
+    stock_movements: StockMovementRepository
+    sales: SaleRepository
+    brands: BrandRepository
+    models: DeviceModelRepository
+    spare_parts: SparePartRepository
+    work_orders: WorkOrderRepository
+
+    @abstractmethod
+    def flush(self) -> None: ...
+
+    @abstractmethod
+    def commit(self) -> None: ...
+
+    @abstractmethod
+    def rollback(self) -> None: ...
+
+    @contextmanager
+    def transaction(self) -> Iterator["UnitOfWork"]:
+        """Commit on success, ROLLBACK on any error."""
+        try:
+            yield self
+            self.commit()
+        except BaseException:
+            self.rollback()
+            raise

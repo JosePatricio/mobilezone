@@ -1,0 +1,5 @@
+# Keep Linux line endings for files executed inside the containers
+* text=auto
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.conf text eol=lf

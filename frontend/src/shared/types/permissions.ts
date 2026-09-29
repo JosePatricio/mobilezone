@@ -1,0 +1,47 @@
+/**
+ * Permission codes. They mirror the backend catalog (app/domain/value_objects/permissions.py).
+ * The UI only uses them to hide what the user cannot do; the backend always enforces them.
+ */
+export const PERMISSIONS = {
+  USERS_VIEW: 'users.view',
+  USERS_CREATE: 'users.create',
+  USERS_UPDATE: 'users.update',
+  ROLES_VIEW: 'roles.view',
+  ROLES_MANAGE: 'roles.manage',
+  PERMISSIONS_VIEW: 'permissions.view',
+  CATEGORIES_VIEW: 'categories.view',
+  CATEGORIES_CREATE: 'categories.create',
+  CATEGORIES_UPDATE: 'categories.update',
+  CATEGORIES_DELETE: 'categories.delete',
+  PRODUCTS_VIEW: 'products.view',
+  PRODUCTS_CREATE: 'products.create',
+  PRODUCTS_UPDATE: 'products.update',
+  PRODUCTS_DELETE: 'products.delete',
+  PRODUCTS_STOCK: 'products.stock',
+  SALES_VIEW: 'sales.view',
+  SALES_CREATE: 'sales.create',
+  SALES_CANCEL: 'sales.cancel',
+  CLIENTS_VIEW: 'clients.view',
+  CLIENTS_CREATE: 'clients.create',
+  CLIENTS_UPDATE: 'clients.update',
+  BRANDS_VIEW: 'brands.view',
+  BRANDS_CREATE: 'brands.create',
+  BRANDS_UPDATE: 'brands.update',
+  BRANDS_DELETE: 'brands.delete',
+  MODELS_VIEW: 'models.view',
+  MODELS_CREATE: 'models.create',
+  MODELS_UPDATE: 'models.update',
+  MODELS_DELETE: 'models.delete',
+  WORK_ORDERS_VIEW: 'work_orders.view',
+  WORK_ORDERS_CREATE: 'work_orders.create',
+  WORK_ORDERS_UPDATE: 'work_orders.update',
+  WORK_ORDERS_ASSIGN_TECHNICIAN: 'work_orders.assign_technician',
+  WORK_ORDERS_SPARE_PARTS_ADD: 'work_orders.spare_parts.add',
+  WORK_ORDERS_SPARE_PARTS_REMOVE: 'work_orders.spare_parts.remove',
+  SPARE_PARTS_VIEW: 'spare_parts.view',
+  SPARE_PARTS_CREATE: 'spare_parts.create',
+  SPARE_PARTS_UPDATE: 'spare_parts.update',
+  SPARE_PARTS_DELETE: 'spare_parts.delete',
+} as const;
+
+export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

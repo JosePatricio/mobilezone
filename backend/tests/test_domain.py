@@ -1,0 +1,138 @@
+"""Pure domain tests: entities and business rules, no database."""
+from __future__ import annotations
+
+from decimal import Decimal
+
+import pytest
+
+from app.domain.entities import Permission, Product, Role, Sale, User, WorkOrder, WorkOrderSparePart, calculate_balance
+from app.domain.exceptions import ConflictError, InsufficientStockError, ValidationError
+from app.domain.value_objects.enums import SaleStatus, UserType, WorkOrderStatus
+from app.domain.value_objects.money import to_money
+
+
+def make_product(stock: int = 10, precio: str = "10.00") -> Product:
+    return Product(category_id=1, nombre="Pantalla", precio=Decimal(precio), stock=stock, id=1)
+
+
+class TestProduct:
+    def test_decrease_stock(self):
+        product = make_product(stock=10)
+        product.decrease_stock(3)
+        assert product.stock == 7
+
+    def test_decrease_stock_insufficient_raises_and_keeps_stock(self):
+        product = make_product(stock=2)
+        with pytest.raises(InsufficientStockError) as exc:
+            product.decrease_stock(3)
+        assert exc.value.code == "INSUFFICIENT_STOCK"
+        assert product.stock == 2
+
+    def test_stock_can_reach_zero(self):
+        product = make_product(stock=3)
+        product.decrease_stock(3)
+        assert product.stock == 0
+
+    @pytest.mark.parametrize("cantidad", [0, -1])
+    def test_invalid_quantity(self, cantidad):
+        with pytest.raises(ValidationError):
+            make_product().decrease_stock(cantidad)
+
+    def test_negative_initial_stock_rejected(self):
+        with pytest.raises(ValidationError):
+            make_product(stock=-1)
+
+    def test_negative_price_rejected(self):
+        with pytest.raises(ValidationError):
+            make_product(precio="-1")
+
+    def test_price_is_normalized_to_two_decimals(self):
+        assert make_product(precio="10.005").precio == Decimal("10.01")
+
+    def test_adjust_stock(self):
+        product = make_product(stock=5)
+        product.adjust_stock(5)
+        product.adjust_stock(-8)
+        assert product.stock == 2
+        with pytest.raises(InsufficientStockError):
+            product.adjust_stock(-3)
+
+
+class TestSale:
+    def test_total_and_historical_price(self):
+        sale = Sale(user_id=1)
+        sale.add_line(product_id=1, cantidad=2, precio_unitario=Decimal("10.00"))
+        sale.add_line(product_id=2, cantidad=1, precio_unitario=Decimal("25.00"))
+        assert [d.subtotal for d in sale.details] == [Decimal("20.00"), Decimal("25.00")]
+        assert sale.total == Decimal("45.00")
+
+    def test_cancel_twice_rejected(self):
+        sale = Sale(user_id=1)
+        sale.cancel()
+        assert sale.estado == SaleStatus.ANULADA
+        with pytest.raises(ConflictError):
+            sale.cancel()
+
+
+class TestWorkOrderBalance:
+    def test_balance(self):
+        assert calculate_balance(Decimal("100"), Decimal("30"))[2] == Decimal("70.00")
+
+    def test_negative_values_rejected(self):
+        with pytest.raises(ValidationError):
+            calculate_balance(Decimal("-1"), Decimal("0"))
+        with pytest.raises(ValidationError):
+            calculate_balance(Decimal("10"), Decimal("-1"))
+
+    def test_advance_greater_than_budget_rejected(self):
+        with pytest.raises(ValidationError) as exc:
+            calculate_balance(Decimal("10"), Decimal("11"))
+        assert exc.value.code == "ADVANCE_EXCEEDS_BUDGET"
+
+    def test_work_order_computes_saldo(self):
+        order = WorkOrder(
+            user_id=1, cliente_id=2, marca_id=1, modelo_id=1, presupuesto=Decimal("100"), anticipo=Decimal("30")
+        )
+        assert order.saldo == Decimal("70.00")
+        order.set_amounts(Decimal("150"), Decimal("50"))
+        assert order.saldo == Decimal("100.00")
+
+    def test_status_is_centralized(self):
+        order = WorkOrder(user_id=1, cliente_id=2, marca_id=1, modelo_id=1)
+        order.change_status(2)
+        assert order.status == WorkOrderStatus.ESTADO_2
+        with pytest.raises(ValidationError):
+            order.change_status(3)
+
+    def test_spare_parts_total(self):
+        order = WorkOrder(user_id=1, cliente_id=2, marca_id=1, modelo_id=1)
+        order.add_spare_part(WorkOrderSparePart(spare_part_id=1, technician_id=3, cantidad=2, precio=Decimal("10")))
+        assert order.spare_parts_total == Decimal("20.00")
+
+
+class TestUser:
+    def test_permissions_come_from_active_role(self):
+        role = Role(nombre="tecnico", permissions=[Permission(codigo="a.view"), Permission(codigo="a.create")])
+        user = User(nombre="Ana", apellido="Paz", email="ANA@X.COM", tipo_usuario=UserType.TECNICO)
+        user.role = role  # type: ignore[attr-defined]
+        assert user.email == "ana@x.com"
+        assert role.nombre == "TECNICO"
+        assert user.has_permission("a.view")
+        role.deactivate()
+        assert not user.has_permission("a.view")
+
+    def test_inactive_user_has_no_permissions(self):
+        user = User(nombre="A", apellido="B", email="a@b.c", tipo_usuario=UserType.ADMIN, estado=False)
+        user.role = Role(nombre="ADMIN", permissions=[Permission(codigo="x")])  # type: ignore[attr-defined]
+        assert user.permissions == set()
+
+    def test_blank_name_rejected(self):
+        with pytest.raises(ValidationError):
+            User(nombre="  ", apellido="B", email="a@b.c", tipo_usuario=UserType.USUARIO)
+
+
+def test_to_money_rejects_garbage():
+    with pytest.raises(ValidationError):
+        to_money("abc")
+    with pytest.raises(ValidationError):
+        to_money(float("nan"))

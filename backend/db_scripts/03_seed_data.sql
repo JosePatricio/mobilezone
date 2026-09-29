@@ -1,0 +1,94 @@
+-- =============================================================================
+-- MobileZone — 03. Initial data: permission catalog, default roles, admin user
+-- Idempotent: can be run several times. Equivalent to
+--   python -m app.infrastructure.database.seed
+-- (the Python seed reads the admin credentials from .env; prefer it when possible).
+-- Permission codes mirror app/domain/value_objects/permissions.py.
+-- =============================================================================
+
+SET NAMES utf8mb4;
+
+START TRANSACTION;
+
+-- Permission catalog --------------------------------------------------------
+INSERT INTO permissions (codigo, descripcion) VALUES
+    ('users.view', 'Ver usuarios'),
+    ('users.create', 'Crear usuarios'),
+    ('users.update', 'Editar y activar/desactivar usuarios'),
+    ('roles.view', 'Ver roles'),
+    ('roles.manage', 'Crear, editar roles y asignar permisos'),
+    ('permissions.view', 'Ver permisos'),
+    ('categories.view', 'Ver categorías'),
+    ('categories.create', 'Crear categorías'),
+    ('categories.update', 'Editar y activar/desactivar categorías'),
+    ('categories.delete', 'Eliminar categorías'),
+    ('products.view', 'Ver productos y stock'),
+    ('products.create', 'Crear productos'),
+    ('products.update', 'Editar y activar/desactivar productos'),
+    ('products.delete', 'Eliminar productos'),
+    ('products.stock', 'Ajustar stock de productos'),
+    ('sales.view', 'Ver ventas'),
+    ('sales.create', 'Registrar ventas'),
+    ('sales.cancel', 'Anular ventas'),
+    ('clients.view', 'Ver clientes'),
+    ('clients.create', 'Crear clientes'),
+    ('clients.update', 'Editar clientes'),
+    ('brands.view', 'Ver marcas'),
+    ('brands.create', 'Crear marcas'),
+    ('brands.update', 'Editar y activar/desactivar marcas'),
+    ('brands.delete', 'Eliminar marcas'),
+    ('models.view', 'Ver modelos'),
+    ('models.create', 'Crear modelos'),
+    ('models.update', 'Editar y activar/desactivar modelos'),
+    ('models.delete', 'Eliminar modelos'),
+    ('work_orders.view', 'Ver órdenes de trabajo'),
+    ('work_orders.create', 'Crear órdenes de trabajo'),
+    ('work_orders.update', 'Editar órdenes de trabajo y cambiar su estado'),
+    ('work_orders.assign_technician', 'Asignar técnico a órdenes de trabajo'),
+    ('work_orders.spare_parts.add', 'Registrar repuestos en órdenes'),
+    ('work_orders.spare_parts.remove', 'Quitar repuestos de órdenes'),
+    ('spare_parts.view', 'Ver repuestos'),
+    ('spare_parts.create', 'Crear repuestos'),
+    ('spare_parts.update', 'Editar y activar/desactivar repuestos'),
+    ('spare_parts.delete', 'Eliminar repuestos')
+ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion);
+
+-- Default roles (definitive roles are pending) ------------------------------
+INSERT IGNORE INTO roles (nombre, descripcion) VALUES
+    ('ADMIN', 'Rol admin (por defecto)'),
+    ('USUARIO', 'Rol usuario (por defecto)'),
+    ('TECNICO', 'Rol tecnico (por defecto)');
+
+-- ADMIN always gets every permission
+INSERT IGNORE INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.nombre = 'ADMIN';
+
+-- USUARIO
+INSERT IGNORE INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.codigo IN (
+    'categories.view', 'products.view', 'sales.view',
+    'sales.create', 'clients.view', 'clients.create',
+    'clients.update', 'brands.view', 'models.view',
+    'work_orders.view', 'work_orders.create', 'work_orders.update',
+    'work_orders.assign_technician', 'spare_parts.view'
+) WHERE r.nombre = 'USUARIO';
+
+-- TECNICO
+INSERT IGNORE INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id FROM roles r JOIN permissions p ON p.codigo IN (
+    'products.view', 'clients.view', 'clients.create',
+    'brands.view', 'models.view', 'work_orders.view',
+    'work_orders.create', 'work_orders.update', 'work_orders.spare_parts.add',
+    'work_orders.spare_parts.remove', 'spare_parts.view'
+) WHERE r.nombre = 'TECNICO';
+
+-- Initial administrator -----------------------------------------------------
+-- email: admin@example.com / password: Admin12345  (bcrypt hash below)
+-- CHANGE THIS PASSWORD right after the first login.
+INSERT IGNORE INTO users (nombre, apellido, email, password, tipo_usuario, rol_id, estado)
+SELECT 'Administrador', 'Sistema', 'admin@example.com',
+       '$2b$12$dy4h4.6gNd9gXnejvB/lW.OKjSSPgFBdhPt/XoolOkK0tR6qc2Nt6',
+       'ADMIN', r.id, 1
+FROM roles r WHERE r.nombre = 'ADMIN';
+
+COMMIT;
