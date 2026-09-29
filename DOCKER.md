@@ -1,12 +1,15 @@
 # Run MobileZone with Docker on Ubuntu
 
-## 1. Push the code to git (Windows PC)
+This setup runs next to an existing **nginx** (ports 80/443) and **Spring Boot** (port 8080) on the same server:
 
-Create an empty private repository (GitHub/GitLab), then in PowerShell:
+- MobileZone listens only on `127.0.0.1:8081`, so it is not reachable from the internet directly.
+- The existing nginx forwards a domain (or a public port) to it.
+- The backend (8000) and MySQL (3306) run inside Docker and are not published, so they don't clash with anything on the server.
+
+## 1. Push the code to git (Windows PC)
 
 ```powershell
 cd C:\Development\Python\mobilezone
-git init
 git add .
 git status
 ```
@@ -14,11 +17,13 @@ git status
 Confirm that no `.env`, `.venv`, `node_modules` or `dist` files are listed, then:
 
 ```powershell
-git commit -m "MobileZone with Docker"
+git commit -m "Update"
 git branch -M main
-git remote add origin https://github.com/<your-user>/mobilezone.git
+git remote add origin git@github.com:JosePatricio/mobilezone.git
 git push -u origin main
 ```
+
+Skip `git remote add` if you already added it.
 
 ## 2. Install Docker and git (Ubuntu server, once)
 
@@ -46,13 +51,25 @@ docker compose version
 ```bash
 sudo mkdir -p /opt/mobilezone
 sudo chown $USER:$USER /opt/mobilezone
-git clone https://github.com/<your-user>/mobilezone.git /opt/mobilezone
+git clone git@github.com:JosePatricio/mobilezone.git /opt/mobilezone
 cd /opt/mobilezone
 ```
 
-For a private repository, git asks for a username and password. Use a GitHub personal access token as the password.
+The `git@github.com:` URL needs an SSH key on the server that is added to GitHub (deploy key or account key).
 
-## 4. Create the `.env` file
+## 4. Check the ports are free
+
+```bash
+sudo ss -tlnp | grep -E ':(8081|8082)\b'
+```
+
+If nothing is printed, both ports are free. If a port is taken, use another free port in the next steps (for example 8091 / 8092).
+
+- **8081** is the local port for MobileZone.
+- **8082** is the public port, used only with option B in step 8.
+- Do **not** use 80, 443 or 8080. Your nginx and Spring Boot use them.
+
+## 5. Create the `.env` file
 
 ```bash
 cp .env.docker.example .env
@@ -68,14 +85,17 @@ nano .env
 Set these values. Use only letters and digits in the passwords.
 
 ```ini
-APP_PORT=80
+APP_PORT=127.0.0.1:8081
 MYSQL_ROOT_PASSWORD=<strong root password>
 DB_PASSWORD=<strong app password>
 JWT_SECRET_KEY=<the random string you copied>
-CORS_ORIGINS=["http://<server-ip>"]
+CORS_ORIGINS=["http://mobilezone.yourdomain.com"]
 ADMIN_EMAIL=<your email>
 ADMIN_PASSWORD=<admin password>
 ```
+
+- Keep the `127.0.0.1:` in `APP_PORT`. Ports published by Docker bypass `ufw`, and without it port 8081 would be open to the internet.
+- `CORS_ORIGINS` is the address you will open in the browser. Use `["http://<server-ip>:8082"]` if you choose option B in step 8.
 
 Save with `Ctrl+O` and `Enter`, then exit with `Ctrl+X`. Then protect the file:
 
@@ -83,7 +103,7 @@ Save with `Ctrl+O` and `Enter`, then exit with `Ctrl+X`. Then protect the file:
 chmod 600 .env
 ```
 
-## 5. Build and start
+## 6. Build and start
 
 ```bash
 docker compose up -d --build
@@ -91,7 +111,7 @@ docker compose up -d --build
 
 The first build takes about 3–5 minutes.
 
-## 6. Check that it is running
+## 7. Check that it is running
 
 ```bash
 docker compose ps
@@ -106,20 +126,97 @@ docker compose logs -f backend
 Wait for `Uvicorn running on http://0.0.0.0:8000`, then press `Ctrl+C` to stop following the log. Check the API:
 
 ```bash
-curl http://localhost/health
+curl http://127.0.0.1:8081/health
 ```
 
 The expected output is `{"status":"ok"}`.
 
-## 7. Open the firewall
+## 8. Connect your existing nginx
+
+Create the site file:
 
 ```bash
-sudo ufw allow OpenSSH
-sudo ufw allow 80/tcp
-sudo ufw enable
+sudo nano /etc/nginx/sites-available/mobilezone
 ```
 
-Open `http://<server-ip>/` in a browser and log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+Paste **one** of the two options.
+
+### Option A: domain or subdomain (recommended)
+
+First point `mobilezone.yourdomain.com` to the server IP in your DNS (an `A` record). Then paste:
+
+```nginx
+server {
+    listen 80;
+    server_name mobilezone.yourdomain.com;
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Option B: no domain, a separate public port
+
+```nginx
+server {
+    listen 8082;
+    server_name _;
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+With option B, open the port in the firewall:
+
+```bash
+sudo ufw allow 8082/tcp
+```
+
+Serving MobileZone under a path of your current site (like `yoursite.com/mobilezone`) will **not** work. The app must be at the root of its own domain or port.
+
+### Enable the site
+
+```bash
+sudo ln -s /etc/nginx/sites-available/mobilezone /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+`nginx -t` must print `syntax is ok` and `test is successful` before you reload. Your Spring Boot site keeps working as before.
+
+### HTTPS (option A only)
+
+If you already use certbot on this server:
+
+```bash
+sudo certbot --nginx -d mobilezone.yourdomain.com
+```
+
+Then change `.env` to use `CORS_ORIGINS=["https://mobilezone.yourdomain.com"]` and apply it:
+
+```bash
+docker compose up -d
+```
+
+## 9. Open the app
+
+- Option A: `http://mobilezone.yourdomain.com` (or `https://` after certbot)
+- Option B: `http://<server-ip>:8082`
+
+Log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 
 ---
 
@@ -134,7 +231,7 @@ docker compose up -d --build
 docker image prune -f
 ```
 
-The data is kept, and database migrations run automatically.
+The data is kept, and database migrations run automatically. The nginx site does not need changes.
 
 ## Common commands (run from `/opt/mobilezone`)
 
@@ -170,6 +267,10 @@ Do **not** run `docker compose down -v`. It deletes the database volume and all 
 
 ## If something fails
 
-- **`port is already allocated`:** another web server is using port 80. Set `APP_PORT=8080` in `.env`, run `docker compose up -d`, and open `http://<server-ip>:8080`. Also run `sudo ufw allow 8080/tcp`.
+- **`port is already allocated` / `address already in use`:** port 8081 is taken. Pick a free port with `sudo ss -tlnp`, set `APP_PORT=127.0.0.1:<port>` in `.env`, update `proxy_pass` in `/etc/nginx/sites-available/mobilezone`, then run `docker compose up -d` and `sudo systemctl reload nginx`.
+- **`502 Bad Gateway` from nginx:** the containers are not running, or `proxy_pass` points to the wrong port. Check `docker compose ps` and `curl http://127.0.0.1:8081/health`.
+- **Browser shows your Spring Boot site instead of MobileZone:** `server_name` does not match the domain you opened, or the DNS record is missing. Run `sudo nginx -T | grep server_name` to see all configured names.
+- **`nginx -t` fails with `duplicate listen` or a conflicting server name:** another site already uses that `server_name` or port. Choose another subdomain (option A) or port (option B).
+- **Login fails with a network error:** `CORS_ORIGINS` in `.env` does not match the address in the browser. Fix it, then run `docker compose up -d`.
 - **`Access denied for user 'mobilezone'`:** the passwords in `.env` were changed after the first start. Put the original passwords back in `.env`. If the server has no data yet, you can instead run `docker compose down -v && docker compose up -d --build`.
-- **`set ... in .env`:** the `.env` file is missing or a value is empty. Repeat step 4.
+- **`set ... in .env`:** the `.env` file is missing or a value is empty. Repeat step 5.
