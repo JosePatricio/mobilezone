@@ -4,24 +4,34 @@ export interface Product extends Timestamps {
   id: Id;
   category_id: Id;
   category: NamedRef;
+  /** Product code */
+  sku: string;
   nombre: string;
   descripcion: string | null;
-  precio: Money;
+  /** PVP: the price used in sales */
+  precio_venta: Money;
+  /** Acquisition cost */
+  precio_costo: Money;
+  /** Wholesale price */
+  precio_mayor: Money;
   stock: number;
+  /** null = show the default image */
+  imagen_url: string | null;
   estado: boolean;
 }
 
-export interface CreateProductRequest {
+/** Create / update. There is no stock field: new products start at 0 and stock
+ *  changes only through sales and audited adjustments. */
+export interface ProductRequest {
   category_id: Id;
+  sku: string;
   nombre: string;
   descripcion: string | null;
-  precio: Money;
-  stock: number;
+  precio_venta: Money;
+  precio_costo: Money;
+  precio_mayor: Money;
   estado: boolean;
 }
-
-/** Stock is not editable here: it changes through sales and audited adjustments. */
-export type UpdateProductRequest = Omit<CreateProductRequest, 'stock'>;
 
 export interface ProductStock {
   product_id: Id;

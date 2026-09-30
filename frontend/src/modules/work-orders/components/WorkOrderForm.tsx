@@ -7,6 +7,7 @@ import { BRANDS_KEY, brandApi } from '@/modules/brands/services/brandApi';
 import { ClientSelect } from '@/modules/clients/components/ClientSelect';
 import { MODELS_KEY, modelApi } from '@/modules/models/services/modelApi';
 import { userApi } from '@/modules/users/services/userApi';
+import { hasRole, SYSTEM_ROLES } from '@/modules/users/types';
 import { Button, Card, Checkbox, DatePicker, Input, MoneyInput, Select, Textarea } from '@/shared/components';
 import { useOptions } from '@/shared/hooks/useCrud';
 import { getErrorMessage } from '@/shared/services/apiError';
@@ -50,7 +51,7 @@ interface Props {
 export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
   const { user, hasPermission } = useAuth();
   const canAssign = hasPermission(P.WORK_ORDERS_ASSIGN_TECHNICIAN);
-  const isTechnician = user?.tipo_usuario === 'TECNICO';
+  const isTechnician = hasRole(user, SYSTEM_ROLES.TECNICO);
   const { statuses } = useWorkOrderStatuses();
   const [serverError, setServerError] = useState<string | null>(null);
 

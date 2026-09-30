@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from datetime import date
 
-from app.application.dto import SaleItemData
+from app.application.dto import ConfirmSaleData
 from app.application.use_cases.base import UseCase
 from app.domain.entities import Sale, StockMovement, User
 from app.domain.exceptions import AuthenticationError, NotFoundError, ValidationError
@@ -17,9 +17,12 @@ class ConfirmSaleUseCase(UseCase):
     Steps (BACKEND_SPEC §21): validate user → validate products → validate
     stock → create sale → create details → discount stock → commit.
     Any failure rolls the whole transaction back.
+
+    The sale is a factura or a comprobante; ``cliente_id`` None = consumidor final.
     """
 
-    def execute(self, items: list[SaleItemData], actor: User) -> Sale:
+    def execute(self, data: ConfirmSaleData, actor: User) -> Sale:
+        items = data.items
         if not actor.estado:
             raise AuthenticationError("El usuario se encuentra inactivo.", code="USER_INACTIVE")
         if not items:
@@ -33,7 +36,9 @@ class ConfirmSaleUseCase(UseCase):
             quantities[item.product_id] = quantities.get(item.product_id, 0) + item.cantidad
 
         with self.uow.transaction():
-            sale = Sale(user_id=actor.id)  # type: ignore[arg-type]
+            if data.cliente_id is not None:
+                self._validate_client(data.cliente_id)
+            sale = Sale(user_id=actor.id, factura=data.factura, cliente_id=data.cliente_id)  # type: ignore[arg-type]
             movements: list[StockMovement] = []
             # Lock rows in a deterministic order to avoid deadlocks.
             for product_id in sorted(quantities):
@@ -52,7 +57,7 @@ class ConfirmSaleUseCase(UseCase):
                         details={"product_id": product_id},
                     )
                 product.decrease_stock(cantidad)  # raises INSUFFICIENT_STOCK
-                sale.add_line(product_id, cantidad, product.precio)
+                sale.add_line(product_id, cantidad, product.precio_venta)  # PVP
                 movements.append(
                     StockMovement(
                         product_id=product_id,
@@ -68,6 +73,13 @@ class ConfirmSaleUseCase(UseCase):
                 movement.referencia = f"VENTA#{sale.id}"
                 self.uow.stock_movements.add(movement)
         return sale
+
+    def _validate_client(self, cliente_id: int) -> None:
+        client = self.uow.users.get(cliente_id)
+        if client is None or not client.is_client:
+            raise ValidationError("El cliente seleccionado no existe.", code="INVALID_CLIENT")
+        if not client.estado:
+            raise ValidationError("El cliente seleccionado está inactivo.", code="CLIENT_INACTIVE")
 
 
 class CancelSaleUseCase(UseCase):

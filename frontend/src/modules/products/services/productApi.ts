@@ -1,21 +1,15 @@
 import { createCrudApi } from '@/shared/services/crudApi';
 import { http } from '@/shared/services/httpClient';
+import { deleteImage, uploadImage } from '@/shared/services/uploads';
 import type { Id, Page } from '@/shared/types/api';
-import type {
-  CreateProductRequest,
-  Product,
-  ProductStock,
-  StockAdjustmentRequest,
-  StockMovement,
-  UpdateProductRequest,
-} from '../types';
+import type { Product, ProductRequest, ProductStock, StockAdjustmentRequest, StockMovement } from '../types';
 
 export const PRODUCTS_KEY = 'products';
 
-const crud = createCrudApi<Product, CreateProductRequest | UpdateProductRequest>('/products');
-
 export const productApi = {
-  ...crud,
+  ...createCrudApi<Product, ProductRequest>('/products'),
+  uploadImage: (id: Id, file: File) => uploadImage<Product>(`/products/${id}/image`, file),
+  removeImage: (id: Id) => deleteImage<Product>(`/products/${id}/image`),
   getStock: (id: Id) => http.get<ProductStock>(`/products/${id}/stock`).then((r) => r.data),
   adjustStock: (id: Id, body: StockAdjustmentRequest) =>
     http.patch<ProductStock>(`/products/${id}/stock`, body).then((r) => r.data),

@@ -51,24 +51,27 @@ CREATE TABLE role_permissions (
 -- Users (internal users and clients share this table)
 -- -----------------------------------------------------------------------------
 CREATE TABLE users (
-    id           INTEGER      NOT NULL AUTO_INCREMENT,
-    nombre       VARCHAR(100) NOT NULL,
-    apellido     VARCHAR(100) NOT NULL,
-    email        VARCHAR(255) NOT NULL,
-    password     VARCHAR(255)          COMMENT 'bcrypt hash; NULL for clients without login',
-    tipo_usuario VARCHAR(30)  NOT NULL COMMENT 'ADMIN | USUARIO | TECNICO | CLIENTE',
-    rol_id       INTEGER,
-    estado       BOOL         NOT NULL DEFAULT 1,
-    created_at   DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    updated_at   DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    id             INTEGER      NOT NULL AUTO_INCREMENT,
+    nombre         VARCHAR(100) NOT NULL,
+    apellido       VARCHAR(100) NOT NULL,
+    email          VARCHAR(255) NOT NULL,
+    password       VARCHAR(255)          COMMENT 'bcrypt hash; NULL for clients (no login)',
+    identificacion VARCHAR(13)           COMMENT 'cedula (10 digits) or RUC (13 digits)',
+    celular        VARCHAR(20),
+    ciudad         VARCHAR(100),
+    foto           VARCHAR(255)          COMMENT 'relative path of the uploaded photo; NULL = default avatar',
+    rol_id         INTEGER      NOT NULL COMMENT 'the role defines the kind of user (ADMIN, VENDEDOR, TECNICO, CLIENTE, ...)',
+    estado         BOOL         NOT NULL DEFAULT 1,
+    created_at     DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at     DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT pk_users PRIMARY KEY (id),
     CONSTRAINT uq_users_email UNIQUE (email),
+    CONSTRAINT uq_users_identificacion UNIQUE (identificacion),
     CONSTRAINT fk_users_rol_id_roles FOREIGN KEY (rol_id) REFERENCES roles (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE INDEX ix_users_nombre_apellido ON users (nombre, apellido);
 CREATE INDEX ix_users_rol_id ON users (rol_id);
-CREATE INDEX ix_users_tipo_usuario ON users (tipo_usuario);
 
 -- -----------------------------------------------------------------------------
 -- Categories and products
@@ -85,18 +88,23 @@ CREATE TABLE categories (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE products (
-    id          INTEGER       NOT NULL AUTO_INCREMENT,
-    category_id INTEGER       NOT NULL,
-    nombre      VARCHAR(150)  NOT NULL,
-    descripcion TEXT,
-    precio      DECIMAL(12,2) NOT NULL,
-    stock       INTEGER       NOT NULL DEFAULT 0,
-    estado      BOOL          NOT NULL DEFAULT 1,
-    created_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    updated_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    id           INTEGER       NOT NULL AUTO_INCREMENT,
+    category_id  INTEGER       NOT NULL,
+    sku          VARCHAR(50)   NOT NULL COMMENT 'product code (uppercase, no spaces)',
+    nombre       VARCHAR(150)  NOT NULL,
+    descripcion  TEXT,
+    precio_venta DECIMAL(12,2) NOT NULL COMMENT 'PVP, used in sales',
+    precio_costo DECIMAL(12,2) NOT NULL COMMENT 'acquisition cost',
+    precio_mayor DECIMAL(12,2) NOT NULL COMMENT 'wholesale price',
+    stock        INTEGER       NOT NULL DEFAULT 0,
+    imagen       VARCHAR(255)           COMMENT 'relative path of the uploaded image; NULL = default image',
+    estado       BOOL          NOT NULL DEFAULT 1,
+    created_at   DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at   DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT pk_products PRIMARY KEY (id),
+    CONSTRAINT uq_products_sku UNIQUE (sku),
     CONSTRAINT ck_products_stock_non_negative CHECK (stock >= 0),
-    CONSTRAINT ck_products_precio_non_negative CHECK (precio >= 0),
+    CONSTRAINT ck_products_precios_non_negative CHECK (precio_venta >= 0 AND precio_costo >= 0 AND precio_mayor >= 0),
     CONSTRAINT fk_products_category_id_categories FOREIGN KEY (category_id) REFERENCES categories (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -130,12 +138,16 @@ CREATE TABLE sales (
     fecha      DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     total      DECIMAL(12,2) NOT NULL,
     estado     VARCHAR(30)   NOT NULL COMMENT 'CONFIRMADA | ANULADA',
+    factura    BOOL          NOT NULL DEFAULT 0 COMMENT '1 = factura, 0 = comprobante de venta',
+    cliente_id INTEGER                COMMENT 'client (role CLIENTE); NULL = consumidor final',
     created_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT pk_sales PRIMARY KEY (id),
-    CONSTRAINT fk_sales_user_id_users FOREIGN KEY (user_id) REFERENCES users (id)
+    CONSTRAINT fk_sales_user_id_users FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_sales_cliente_id_users FOREIGN KEY (cliente_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE INDEX ix_sales_cliente_id ON sales (cliente_id);
 CREATE INDEX ix_sales_fecha ON sales (fecha);
 CREATE INDEX ix_sales_user_id ON sales (user_id);
 

@@ -41,16 +41,34 @@ class RoleUseCases(CrudUseCases[Role]):
             self.uow.roles.add(role)
         return role
 
+    @staticmethod
+    def _protect_system_role(role: Role, message: str) -> None:
+        if role.is_system:
+            raise ValidationError(message, code="SYSTEM_ROLE_PROTECTED")
+
     def update(self, role_id: int, data: RoleData) -> Role:
         with self.uow.transaction():
             role = self.get(role_id)
             normalized = Role(nombre=data.nombre, descripcion=data.descripcion)
+            if role.is_system and normalized.nombre != role.nombre:
+                self._protect_system_role(role, "Los roles del sistema no se pueden renombrar.")
+            if role.is_system and not data.estado:
+                self._protect_system_role(role, "Los roles del sistema no se pueden desactivar.")
             self._ensure_unique(normalized.nombre, current_id=role.id)
             role.nombre, role.descripcion = normalized.nombre, normalized.descripcion
             role.estado = data.estado
             if data.permission_ids is not None:
                 role.set_permissions(self._resolve_permissions(data.permission_ids))
         return role
+
+    def set_status(self, entity_id: int, estado: bool) -> Role:
+        if not estado:
+            self._protect_system_role(self.get(entity_id), "Los roles del sistema no se pueden desactivar.")
+        return super().set_status(entity_id, estado)
+
+    def delete(self, entity_id: int) -> None:
+        self._protect_system_role(self.get(entity_id), "Los roles del sistema no se pueden eliminar.")
+        super().delete(entity_id)
 
     def set_permissions(self, role_id: int, permission_ids: list[int]) -> Role:
         with self.uow.transaction():

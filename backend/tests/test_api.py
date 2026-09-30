@@ -1,7 +1,7 @@
 """HTTP endpoint tests: authentication, authorization, error format and main flows."""
 from __future__ import annotations
 
-from app.domain.value_objects.enums import UserType
+from app.domain.value_objects.enums import SystemRole
 from tests.conftest import PASSWORD, auth_headers
 
 API = "/api/v1"
@@ -37,13 +37,13 @@ class TestAuth:
         assert response.json()["error"]["code"] == "INVALID_TOKEN"
 
     def test_inactive_user_cannot_login(self, client, factory):
-        user = factory.user(UserType.USUARIO, estado=False)
+        user = factory.user(SystemRole.VENDEDOR, estado=False)
         response = client.post(f"{API}/auth/login", json={"email": user.email, "password": PASSWORD})
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "USER_INACTIVE"
 
     def test_client_without_password_cannot_login(self, client, factory):
-        c = factory.user(UserType.CLIENTE)
+        c = factory.user(SystemRole.CLIENTE)
         response = client.post(f"{API}/auth/login", json={"email": c.email, "password": PASSWORD})
         assert response.status_code == 401
 
@@ -51,14 +51,14 @@ class TestAuth:
 # --------------------------------------------------------- authorization
 class TestAuthorization:
     def test_insufficient_permission(self, client, factory):
-        tech = factory.user(UserType.TECNICO)
+        tech = factory.user(SystemRole.TECNICO)
         headers = auth_headers(client, tech.email)
         response = client.post(f"{API}/categories", json={"nombre": "X"}, headers=headers)
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "FORBIDDEN"
 
     def test_permission_granted(self, client, factory):
-        tech = factory.user(UserType.TECNICO)
+        tech = factory.user(SystemRole.TECNICO)
         headers = auth_headers(client, tech.email)
         assert client.get(f"{API}/products", headers=headers).status_code == 200
 
@@ -129,15 +129,26 @@ class TestProducts:
         category = factory.category()
         created = client.post(
             f"{API}/products",
-            json={"category_id": category.id, "nombre": "Cargador", "precio": "12.50", "stock": 4},
+            json={
+                "category_id": category.id,
+                "sku": "cargador-usbc",
+                "nombre": "Cargador",
+                "precio_venta": "12.50",
+                "precio_costo": "7.00",
+                "precio_mayor": "10.00",
+            },
             headers=admin_headers,
         )
         assert created.status_code == 201, created.text
         pid = created.json()["id"]
         assert created.json()["category"]["nombre"] == category.nombre
 
+        assert created.json()["sku"] == "CARGADOR-USBC"
+        assert created.json()["imagen_url"] is None
         stock = client.get(f"{API}/products/{pid}/stock", headers=admin_headers).json()
-        assert stock["stock"] == 4
+        assert stock["stock"] == 0  # new products always start with stock 0
+
+        client.patch(f"{API}/products/{pid}/stock", json={"cantidad": 4, "motivo": "compra"}, headers=admin_headers)
 
         adjusted = client.patch(
             f"{API}/products/{pid}/stock", json={"cantidad": -5, "motivo": "rotura"}, headers=admin_headers
@@ -155,7 +166,14 @@ class TestProducts:
         category = factory.category()
         response = client.post(
             f"{API}/products",
-            json={"category_id": category.id, "nombre": "X", "precio": "-1"},
+            json={
+                "category_id": category.id,
+                "sku": "X1",
+                "nombre": "X",
+                "precio_venta": "-1",
+                "precio_costo": "0",
+                "precio_mayor": "0",
+            },
             headers=admin_headers,
         )
         assert response.status_code == 422
@@ -173,7 +191,7 @@ class TestProducts:
 # ---------------------------------------------------------------- sales
 class TestSales:
     def test_sale_flow(self, client, factory):
-        seller = factory.user(UserType.USUARIO)
+        seller = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, seller.email)
         a = factory.product(precio="10.00", stock=10)
         b = factory.product(precio="25.00", stock=1)
@@ -198,7 +216,7 @@ class TestSales:
         assert response.json()["error"]["code"] == "INSUFFICIENT_STOCK"
 
     def test_cancel_requires_permission(self, client, factory, admin_headers):
-        seller = factory.user(UserType.USUARIO)
+        seller = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, seller.email)
         product = factory.product(stock=2)
         sale = client.post(
@@ -216,7 +234,7 @@ class TestSales:
 # ---------------------------------------------------------- work orders
 class TestWorkOrders:
     def _payload(self, factory, **overrides):
-        client_user = factory.user(UserType.CLIENTE)
+        client_user = factory.user(SystemRole.CLIENTE)
         brand, model = factory.brand_and_model()
         payload = {
             "cliente_id": client_user.id,
@@ -232,7 +250,7 @@ class TestWorkOrders:
         return payload
 
     def test_create_as_technician(self, client, factory):
-        tech = factory.user(UserType.TECNICO)
+        tech = factory.user(SystemRole.TECNICO)
         headers = auth_headers(client, tech.email)
         response = client.post(f"{API}/work-orders", json=self._payload(factory), headers=headers)
         assert response.status_code == 201, response.text
@@ -246,7 +264,7 @@ class TestWorkOrders:
         assert by_number.json()["id"] == order["id"]
 
     def test_saldo_cannot_be_forced_by_client(self, client, factory):
-        tech = factory.user(UserType.TECNICO)
+        tech = factory.user(SystemRole.TECNICO)
         headers = auth_headers(client, tech.email)
         response = client.post(
             f"{API}/work-orders", json=self._payload(factory, saldo="1.00"), headers=headers
@@ -254,7 +272,7 @@ class TestWorkOrders:
         assert response.status_code == 422  # extra fields are forbidden
 
     def test_advance_exceeding_budget(self, client, factory):
-        tech = factory.user(UserType.TECNICO)
+        tech = factory.user(SystemRole.TECNICO)
         headers = auth_headers(client, tech.email)
         response = client.post(
             f"{API}/work-orders", json=self._payload(factory, anticipo="200.00"), headers=headers
@@ -263,13 +281,13 @@ class TestWorkOrders:
         assert response.json()["error"]["code"] == "ADVANCE_EXCEEDS_BUDGET"
 
     def test_invalid_status(self, client, factory):
-        tech = factory.user(UserType.TECNICO)
+        tech = factory.user(SystemRole.TECNICO)
         headers = auth_headers(client, tech.email)
         response = client.post(f"{API}/work-orders", json=self._payload(factory, estado=5), headers=headers)
         assert response.status_code == 422
 
     def test_spare_parts_and_filters(self, client, factory):
-        tech = factory.user(UserType.TECNICO)
+        tech = factory.user(SystemRole.TECNICO)
         headers = auth_headers(client, tech.email)
         order = client.post(f"{API}/work-orders", json=self._payload(factory), headers=headers).json()
         part = factory.spare_part(precio="85.00")
@@ -320,8 +338,10 @@ class TestUsersAndRoles:
                 "apellido": "Nico",
                 "email": "tec@x.com",
                 "password": "Password123",
-                "tipo_usuario": "TECNICO",
                 "rol_id": role.id,
+                "identificacion": "1712345678",
+                "celular": "0991234567",
+                "ciudad": "Quito",
             },
             headers=admin_headers,
         )
@@ -329,7 +349,7 @@ class TestUsersAndRoles:
         assert "password" not in response.json()
         assert auth_headers(client, "tec@x.com", "Password123")
 
-    def test_duplicate_email(self, client, admin_headers, settings):
+    def test_duplicate_email(self, client, admin_headers, settings, uow):
         response = client.post(
             f"{API}/users",
             json={
@@ -337,7 +357,7 @@ class TestUsersAndRoles:
                 "apellido": "B",
                 "email": settings.admin_email,
                 "password": "Password123",
-                "tipo_usuario": "USUARIO",
+                "rol_id": uow.roles.get_by_nombre("VENDEDOR").id,
             },
             headers=admin_headers,
         )
@@ -360,16 +380,18 @@ class TestUsersAndRoles:
         assert len(role.json()["permissions"]) == 1
 
     def test_clients_endpoint(self, client, admin_headers, factory):
-        factory.user(UserType.CLIENTE)
-        factory.user(UserType.TECNICO)
+        factory.user(SystemRole.CLIENTE)
+        factory.user(SystemRole.TECNICO)
         body = client.get(f"{API}/clients", headers=admin_headers).json()
         assert body["total"] == 1
         created = client.post(
-            f"{API}/clients", json={"nombre": "Juan", "apellido": "Pérez", "email": "juan@x.com"}, headers=admin_headers
+            f"{API}/clients",
+            json={"nombre": "Juan", "apellido": "Pérez", "email": "juan@x.com", "identificacion": "0102030405"},
+            headers=admin_headers,
         )
         assert created.status_code == 201
 
     def test_technicians_endpoint(self, client, admin_headers, factory):
-        tech = factory.user(UserType.TECNICO)
+        tech = factory.user(SystemRole.TECNICO)
         body = client.get(f"{API}/users/technicians", headers=admin_headers).json()
         assert [t["id"] for t in body] == [tech.id]

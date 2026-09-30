@@ -10,3 +10,13 @@ export { SearchInput, DatePicker, MoneyInput } from './Inputs';
 export { Loading, EmptyState, ErrorState, StatusBadge, PageHeader, Card } from './States';
 export { ToastProvider, useToast } from './Toast';
 export { DataList } from './DataList';
+export { SearchIcon, UserIcon, ImageIcon } from './Icons';
+export {
+  Avatar,
+  ProductThumb,
+  ImageField,
+  NO_IMAGE_CHANGE,
+  DEFAULT_AVATAR,
+  DEFAULT_PRODUCT_IMAGE,
+  type ImageSelection,
+} from './Images';

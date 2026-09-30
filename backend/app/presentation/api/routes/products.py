@@ -2,26 +2,26 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Response, UploadFile, status
 
-from app.application.dto import CreateProductData, StockAdjustmentData, UpdateProductData
+from app.application.dto import ProductData, StockAdjustmentData
 from app.application.use_cases.products import ProductUseCases, UpdateProductStockUseCase
 from app.domain.entities import Product, User
 from app.domain.value_objects.permissions import Perm
-from app.presentation.api.dependencies import PageDep, UowDep, require_permissions
+from app.presentation.api.dependencies import PageDep, StorageDep, UowDep, read_upload, require_permissions
 from app.presentation.api.schemas.common import PageResponse, StatusUpdateRequest
 from app.presentation.api.schemas.products import (
-    CreateProductRequest,
+    ProductRequest,
     ProductResponse,
     ProductStockResponse,
     StockAdjustmentRequest,
     StockMovementResponse,
-    UpdateProductRequest,
 )
 
 router = APIRouter(prefix="/products", tags=["products"])
 
 CanView = Annotated[User, Depends(require_permissions(Perm.PRODUCTS_VIEW))]
+CanUpdate = Annotated[User, Depends(require_permissions(Perm.PRODUCTS_UPDATE))]
 
 
 def _stock(product: Product) -> ProductStockResponse:
@@ -48,23 +48,31 @@ def get_product(product_id: int, uow: UowDep, _: CanView):
 
 @router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 def create_product(
-    body: CreateProductRequest,
+    body: ProductRequest,
     uow: UowDep,
-    actor: Annotated[User, Depends(require_permissions(Perm.PRODUCTS_CREATE))],
+    _: Annotated[User, Depends(require_permissions(Perm.PRODUCTS_CREATE))],
 ):
-    product = ProductUseCases(uow).create(CreateProductData(**body.model_dump()), actor)
+    """Creates the product with stock 0 (load stock with PATCH /products/{id}/stock)."""
+    product = ProductUseCases(uow).create(ProductData(**body.model_dump()))
     return ProductResponse.model_validate(product)
 
 
 @router.put("/{product_id}", response_model=ProductResponse)
-def update_product(
-    product_id: int,
-    body: UpdateProductRequest,
-    uow: UowDep,
-    _: Annotated[User, Depends(require_permissions(Perm.PRODUCTS_UPDATE))],
-):
-    product = ProductUseCases(uow).update(product_id, UpdateProductData(**body.model_dump()))
+def update_product(product_id: int, body: ProductRequest, uow: UowDep, _: CanUpdate):
+    product = ProductUseCases(uow).update(product_id, ProductData(**body.model_dump()))
     return ProductResponse.model_validate(product)
+
+
+@router.put("/{product_id}/image", response_model=ProductResponse)
+def upload_product_image(product_id: int, file: UploadFile, uow: UowDep, storage: StorageDep, _: CanUpdate):
+    """Uploads the product image (JPG, PNG or WEBP, max 2 MB). Without image the client shows a default one."""
+    content = read_upload(file)
+    return ProductResponse.model_validate(ProductUseCases(uow, storage).set_image(product_id, content))
+
+
+@router.delete("/{product_id}/image", response_model=ProductResponse)
+def delete_product_image(product_id: int, uow: UowDep, storage: StorageDep, _: CanUpdate):
+    return ProductResponse.model_validate(ProductUseCases(uow, storage).set_image(product_id, None))
 
 
 @router.patch("/{product_id}/status", response_model=ProductResponse)
@@ -79,9 +87,9 @@ def set_product_status(
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_product(
-    product_id: int, uow: UowDep, _: Annotated[User, Depends(require_permissions(Perm.PRODUCTS_DELETE))]
+    product_id: int, uow: UowDep, storage: StorageDep, _: Annotated[User, Depends(require_permissions(Perm.PRODUCTS_DELETE))]
 ) -> Response:
-    ProductUseCases(uow).delete(product_id)
+    ProductUseCases(uow, storage).delete(product_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

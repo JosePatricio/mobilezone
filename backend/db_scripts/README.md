@@ -9,6 +9,7 @@ constraints), InnoDB and `utf8mb4`. The scripts avoid MySQL-only syntax so they 
 | `02_create_tables.sql` | All tables, primary/foreign keys, unique and check constraints, indexes |
 | `03_seed_data.sql` | Permission catalog, default roles (ADMIN / USUARIO / TECNICO), admin user — idempotent |
 | `99_drop_tables.sql` | Drops every table (destructive) |
+| `upgrades/002_productos_usuarios_ventas.sql` | Upgrades a database created with the previous version (run once, after a backup) |
 
 ## Option A — Alembic + Python seed (recommended)
 
@@ -28,6 +29,16 @@ mysql -u mobilezone -p mobilezone < db_scripts/03_seed_data.sql
 ```
 
 The SQL seed creates `admin@example.com` / `Admin12345`: change that password after the first login.
+
+## Upgrading an existing database
+
+`02_create_tables.sql` always holds the **current** full schema (new installations). Databases created with an older
+version are upgraded with the scripts in `upgrades/`, in order (Alembic runs them too: revision 0002 executes
+`upgrades/002_productos_usuarios_ventas.sql`; revision 0001 runs the frozen copy in `migrations/sql/`).
+
+Upgrade 002: role replaces `users.tipo_usuario` (USUARIO → VENDEDOR, new CLIENTE role), new user fields
+(identificacion, celular, ciudad, foto), products (sku, precio → precio_venta, precio_costo, precio_mayor, imagen) and
+sales (factura, cliente_id). DDL is not transactional in MySQL/MariaDB: **take a backup first**.
 
 ## Keeping things in sync
 

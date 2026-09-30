@@ -4,6 +4,7 @@
 !.env.example
 !.env.docker.example
 backend/.env
+backend/media/
 frontend/.env
 frontend/.env.local
 *.pem

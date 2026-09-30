@@ -5,14 +5,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.application.dto import SaleItemData
+from app.application.dto import ConfirmSaleData, SaleItemData
 from app.application.use_cases.sales import CancelSaleUseCase, ConfirmSaleUseCase, SaleQueries
+from app.application.use_cases.users import ClientUseCases
 from app.domain.entities import User
 from app.domain.value_objects.enums import SaleStatus
 from app.domain.value_objects.permissions import Perm
 from app.presentation.api.dependencies import PageDep, UowDep, require_permissions
 from app.presentation.api.schemas.common import PageResponse
 from app.presentation.api.schemas.sales import CreateSaleRequest, SaleResponse
+from app.presentation.api.schemas.users import ClientResponse
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
@@ -33,6 +35,16 @@ def list_sales(
     return PageResponse[SaleResponse].from_page(result, SaleResponse)
 
 
+@router.get("/customers/lookup", response_model=ClientResponse)
+def lookup_customer(
+    identificacion: str,
+    uow: UowDep,
+    _: Annotated[User, Depends(require_permissions(Perm.SALES_CREATE))],
+):
+    """Finds an active client by cedula / RUC for the sale (sellers do not need the Clientes module)."""
+    return ClientResponse.model_validate(ClientUseCases(uow).find_by_identificacion(identificacion))
+
+
 @router.get("/{sale_id}", response_model=SaleResponse)
 def get_sale(sale_id: int, uow: UowDep, _: CanView):
     return SaleResponse.model_validate(SaleQueries(uow).get(sale_id))
@@ -45,7 +57,8 @@ def confirm_sale(
     actor: Annotated[User, Depends(require_permissions(Perm.SALES_CREATE))],
 ):
     items = [SaleItemData(product_id=i.product_id, cantidad=i.cantidad) for i in body.items]
-    return SaleResponse.model_validate(ConfirmSaleUseCase(uow).execute(items, actor))
+    data = ConfirmSaleData(items=items, factura=body.factura, cliente_id=body.cliente_id)
+    return SaleResponse.model_validate(ConfirmSaleUseCase(uow).execute(data, actor))
 
 
 @router.post("/{sale_id}/cancel", response_model=SaleResponse)

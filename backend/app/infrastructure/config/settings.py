@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     test_database_url: str | None = None
     database_echo: bool = False
 
+    # Uploaded files (product images, user photos). Served by the API under media_url.
+    media_dir: str = "media"
+    # Public prefix of uploaded files. Use an absolute URL (https://api.example.com/media)
+    # when the frontend is served from another origin.
+    media_url: str = "/media"
+
     jwt_secret_key: str = Field(default="change-me-in-production-please-use-a-long-random-value", min_length=32)
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60

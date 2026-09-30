@@ -2,12 +2,23 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePermission } from '@/modules/auth/components/Can';
 import { PRODUCTS_KEY } from '@/modules/products/services/productApi';
-import { Button, Card, ErrorState, Loading, PageHeader, StatusBadge, useConfirm, useToast } from '@/shared/components';
+import {
+  Button,
+  Card,
+  ErrorState,
+  Loading,
+  PageHeader,
+  ProductThumb,
+  StatusBadge,
+  useConfirm,
+  useToast,
+} from '@/shared/components';
 import { getErrorMessage } from '@/shared/services/apiError';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatDateTime, fullName } from '@/shared/utils/format';
 import { formatMoney } from '@/shared/utils/money';
 import { SALES_KEY, saleApi } from '../services/saleApi';
+import { customerLabel, documentLabel } from '../types';
 
 export function SaleDetailPage() {
   const id = Number(useParams().id);
@@ -47,7 +58,7 @@ export function SaleDetailPage() {
   return (
     <>
       <PageHeader
-        title={`Venta #${sale.id}`}
+        title={`${documentLabel(sale.factura)} · Venta #${sale.id}`}
         actions={
           <>
             <Link to="/sales" className="btn btn-secondary btn-md">
@@ -65,6 +76,13 @@ export function SaleDetailPage() {
         <dl className="detail-list detail-inline">
           <dt>Fecha</dt>
           <dd>{formatDateTime(sale.fecha)}</dd>
+          <dt>Documento</dt>
+          <dd>{documentLabel(sale.factura)}</dd>
+          <dt>Cliente</dt>
+          <dd>
+            {customerLabel(sale.cliente)}
+            {sale.cliente?.identificacion && <small className="muted"> · {sale.cliente.identificacion}</small>}
+          </dd>
           <dt>Vendedor</dt>
           <dd>{fullName(sale.user)}</dd>
           <dt>Estado</dt>
@@ -90,7 +108,15 @@ export function SaleDetailPage() {
             <tbody>
               {sale.details.map((d) => (
                 <tr key={d.id}>
-                  <td data-label="Producto">{d.product.nombre}</td>
+                  <td data-label="Producto">
+                    <div className="cell-with-image">
+                      <ProductThumb src={d.product.imagen_url} alt={d.product.nombre} size="sm" />
+                      <div>
+                        <strong>{d.product.nombre}</strong>
+                        <small className="muted">{d.product.sku}</small>
+                      </div>
+                    </div>
+                  </td>
                   <td data-label="Cantidad" className="text-right">
                     {d.cantidad}
                   </td>

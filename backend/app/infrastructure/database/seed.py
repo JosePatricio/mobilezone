@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 
 from app.application.services.security import PasswordHasher
 from app.domain.entities import Permission, Role, User
-from app.domain.value_objects.enums import UserType
 from app.domain.value_objects.permissions import DEFAULT_ROLES, PERMISSION_CATALOG
 from app.infrastructure.config.settings import Settings, get_settings
 from app.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
@@ -34,8 +33,9 @@ def seed(session: Session, settings: Settings, hasher: PasswordHasher) -> None:
                 role = Role(nombre=nombre, descripcion=f"Rol {nombre.lower()} (por defecto)")
                 uow.roles.add(role)
                 role.set_permissions([existing[c] for c in codes])
-            elif nombre == "ADMIN":
-                # Keep the admin role complete when new permissions are added to the catalog.
+            elif nombre == "ADMIN" or not role.permissions:
+                # ADMIN is kept complete when the catalog grows; a system role without
+                # permissions (e.g. created empty by an upgrade script) gets its defaults.
                 role.set_permissions([existing[c] for c in codes])
         uow.flush()
 
@@ -46,7 +46,6 @@ def seed(session: Session, settings: Settings, hasher: PasswordHasher) -> None:
                     nombre=settings.admin_nombre,
                     apellido=settings.admin_apellido,
                     email=settings.admin_email,
-                    tipo_usuario=UserType.ADMIN,
                     password=hasher.hash(settings.admin_password),
                     rol_id=admin_role.id if admin_role else None,
                 )

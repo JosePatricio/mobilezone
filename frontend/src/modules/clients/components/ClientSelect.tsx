@@ -15,7 +15,8 @@ interface Props {
   label?: string;
 }
 
-const describe = (c: Pick<Client, 'nombre' | 'apellido' | 'email'>) => `${c.nombre} ${c.apellido} — ${c.email}`;
+const describe = (c: Pick<Client, 'nombre' | 'apellido' | 'email'> & { identificacion?: string | null }) =>
+  `${c.nombre} ${c.apellido} — ${c.identificacion ?? c.email}`;
 
 /** Searchable client picker showing "Nombre Apellido — email". */
 export function ClientSelect({ value, onChange, error, label = 'Cliente' }: Props) {
@@ -83,7 +84,9 @@ export function ClientSelect({ value, onChange, error, label = 'Cliente' }: Prop
                     <strong>
                       {c.nombre} {c.apellido}
                     </strong>
-                    <small className="muted">{c.email}</small>
+                    <small className="muted">
+                      {c.identificacion ?? '—'} · {c.email}
+                    </small>
                   </button>
                 </li>
               ))}
@@ -106,6 +109,7 @@ export function ClientSelect({ value, onChange, error, label = 'Cliente' }: Prop
       {creating && (
         <ClientFormModal
           client={null}
+          withPhoto={false}
           onClose={() => setCreating(false)}
           onSubmit={async (body) => {
             const created = await clientApi.create(body);

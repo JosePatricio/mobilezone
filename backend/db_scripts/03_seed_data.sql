@@ -1,5 +1,5 @@
 -- =============================================================================
--- MobileZone — 03. Initial data: permission catalog, default roles, admin user
+-- MobileZone — 03. Initial data: permission catalog, system roles, admin user
 -- Idempotent: can be run several times. Equivalent to
 --   python -m app.infrastructure.database.seed
 -- (the Python seed reads the admin credentials from .env; prefer it when possible).
@@ -53,25 +53,22 @@ INSERT INTO permissions (codigo, descripcion) VALUES
     ('spare_parts.delete', 'Eliminar repuestos')
 ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion);
 
--- Default roles (definitive roles are pending) ------------------------------
+-- System roles (the role defines the kind of user) ---------------------------
 INSERT IGNORE INTO roles (nombre, descripcion) VALUES
     ('ADMIN', 'Rol admin (por defecto)'),
-    ('USUARIO', 'Rol usuario (por defecto)'),
-    ('TECNICO', 'Rol tecnico (por defecto)');
+    ('VENDEDOR', 'Rol vendedor (por defecto)'),
+    ('TECNICO', 'Rol tecnico (por defecto)'),
+    ('CLIENTE', 'Rol cliente (por defecto)');
 
 -- ADMIN always gets every permission
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.nombre = 'ADMIN';
 
--- USUARIO
+-- VENDEDOR
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p ON p.codigo IN (
-    'categories.view', 'products.view', 'sales.view',
-    'sales.create', 'clients.view', 'clients.create',
-    'clients.update', 'brands.view', 'models.view',
-    'work_orders.view', 'work_orders.create', 'work_orders.update',
-    'work_orders.assign_technician', 'spare_parts.view'
-) WHERE r.nombre = 'USUARIO';
+    'products.view', 'sales.view', 'sales.create'
+) WHERE r.nombre = 'VENDEDOR';
 
 -- TECNICO
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
@@ -82,13 +79,15 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.codigo IN (
     'work_orders.spare_parts.remove', 'spare_parts.view'
 ) WHERE r.nombre = 'TECNICO';
 
+-- CLIENTE: no permissions (clients do not log in)
+
 -- Initial administrator -----------------------------------------------------
 -- email: admin@example.com / password: Admin12345  (bcrypt hash below)
 -- CHANGE THIS PASSWORD right after the first login.
-INSERT IGNORE INTO users (nombre, apellido, email, password, tipo_usuario, rol_id, estado)
+INSERT IGNORE INTO users (nombre, apellido, email, password, rol_id, estado)
 SELECT 'Administrador', 'Sistema', 'admin@example.com',
        '$2b$12$dy4h4.6gNd9gXnejvB/lW.OKjSSPgFBdhPt/XoolOkK0tR6qc2Nt6',
-       'ADMIN', r.id, 1
+       r.id, 1
 FROM roles r WHERE r.nombre = 'ADMIN';
 
 COMMIT;

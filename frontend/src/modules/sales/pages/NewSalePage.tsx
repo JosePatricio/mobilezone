@@ -6,19 +6,29 @@ import { Button, Card, EmptyState, PageHeader, useConfirm, useToast } from '@/sh
 import { toApiError, getErrorMessage } from '@/shared/services/apiError';
 import { formatMoney, fromCents } from '@/shared/utils/money';
 import { ProductPicker } from '../components/ProductPicker';
+import { SaleDocumentFields } from '../components/SaleDocumentFields';
 import { canConfirm, cartReducer, cartTotal, lineExceedsStock, lineSubtotalCents } from '../hooks/saleCart';
 import { SALES_KEY, saleApi } from '../services/saleApi';
+import { customerLabel, documentLabel, type SaleCustomer } from '../types';
 
 export function NewSalePage() {
   const [lines, dispatch] = useReducer(cartReducer, []);
   const [error, setError] = useState<string | null>(null);
+  const [factura, setFactura] = useState(false);
+  /** null = consumidor final */
+  const [customer, setCustomer] = useState<SaleCustomer | null>(null);
   const navigate = useNavigate();
   const confirm = useConfirm();
   const toast = useToast();
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: () => saleApi.confirm({ items: lines.map((l) => ({ product_id: l.productId, cantidad: l.cantidad })) }),
+    mutationFn: () =>
+      saleApi.confirm({
+        items: lines.map((l) => ({ product_id: l.productId, cantidad: l.cantidad })),
+        factura,
+        cliente_id: customer?.id ?? null,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [SALES_KEY] });
       queryClient.invalidateQueries({ queryKey: [PRODUCTS_KEY] });
@@ -33,7 +43,8 @@ export function NewSalePage() {
       title: 'Confirmar venta',
       message: (
         <>
-          Se registrará una venta de <strong>{lines.length}</strong> producto(s) por un total de{' '}
+          Se registrará una <strong>{documentLabel(factura).toLowerCase()}</strong> a nombre de{' '}
+          <strong>{customerLabel(customer)}</strong> con <strong>{lines.length}</strong> producto(s) por un total de{' '}
           <strong>{formatMoney(total)}</strong>. ¿Desea continuar?
         </>
       ),
@@ -61,10 +72,20 @@ export function NewSalePage() {
     <>
       <PageHeader title="Nueva venta" />
       <Card>
+        <SaleDocumentFields
+          factura={factura}
+          onFacturaChange={setFactura}
+          customer={customer}
+          onCustomerChange={setCustomer}
+        />
         <ProductPicker
           onSelect={(p) => {
             setError(null);
-            dispatch({ type: 'add', product: p });
+            // Sales always use the PVP (precio de venta).
+            dispatch({
+              type: 'add',
+              product: { id: p.id, nombre: p.nombre, precio: p.precio_venta, stock: p.stock },
+            });
           }}
         />
       </Card>

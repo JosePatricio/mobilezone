@@ -41,7 +41,7 @@ from app.domain.entities import (
     WorkOrderSparePart,
 )
 from app.domain.entities.base import utcnow
-from app.domain.value_objects.enums import SaleStatus, StockMovementType, UserType
+from app.domain.value_objects.enums import SaleStatus, StockMovementType
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -118,9 +118,12 @@ users_table = Table(
     Column("nombre", String(100), nullable=False),
     Column("apellido", String(100), nullable=False),
     Column("email", String(255), nullable=False, unique=True),
-    Column("password", String(255)),  # bcrypt hash; NULL for clients without login
-    Column("tipo_usuario", _str_enum(UserType), nullable=False, index=True),
-    Column("rol_id", ForeignKey("roles.id"), index=True),
+    Column("password", String(255)),  # bcrypt hash; NULL for clients (no login)
+    Column("identificacion", String(13), unique=True),  # cédula (10) / RUC (13)
+    Column("celular", String(20)),
+    Column("ciudad", String(100)),
+    Column("foto", String(255)),  # relative path in the media storage
+    Column("rol_id", ForeignKey("roles.id"), nullable=False, index=True),  # the role defines the user kind
     Column("estado", Boolean, nullable=False, default=True, server_default=TRUE),
     *_timestamps(),
 )
@@ -140,14 +143,18 @@ products_table = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("category_id", ForeignKey("categories.id"), nullable=False, index=True),
+    Column("sku", String(50), nullable=False, unique=True),
     Column("nombre", String(150), nullable=False, index=True),
     Column("descripcion", Text),
-    Column("precio", MONEY, nullable=False),
+    Column("precio_venta", MONEY, nullable=False),  # PVP
+    Column("precio_costo", MONEY, nullable=False),  # acquisition cost
+    Column("precio_mayor", MONEY, nullable=False),  # wholesale
+    Column("imagen", String(255)),  # relative path in the media storage
     Column("stock", Integer, nullable=False, default=0, server_default=FALSE),
     Column("estado", Boolean, nullable=False, default=True, server_default=TRUE),
     *_timestamps(),
     CheckConstraint("stock >= 0", name="stock_non_negative"),
-    CheckConstraint("precio >= 0", name="precio_non_negative"),
+    CheckConstraint("precio_venta >= 0 AND precio_costo >= 0 AND precio_mayor >= 0", name="precios_non_negative"),
 )
 
 stock_movements_table = Table(
@@ -172,6 +179,8 @@ sales_table = Table(
     Column("fecha", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)"), index=True),
     Column("total", MONEY, nullable=False),
     Column("estado", _str_enum(SaleStatus), nullable=False),
+    Column("factura", Boolean, nullable=False, default=False, server_default=FALSE),  # 1 factura / 0 comprobante
+    Column("cliente_id", ForeignKey("users.id"), index=True),  # NULL = consumidor final
     *_timestamps(),
 )
 
@@ -305,7 +314,8 @@ def start_mappers() -> None:
             "details": relationship(
                 SaleDetail, lazy="selectin", cascade="all, delete-orphan", order_by=sale_details_table.c.id
             ),
-            "user": relationship(User, lazy="joined"),
+            "user": relationship(User, foreign_keys=[sales_table.c.user_id], lazy="joined"),
+            "cliente": relationship(User, foreign_keys=[sales_table.c.cliente_id], lazy="joined"),
         },
     )
     mapper_registry.map_imperatively(Brand, brands_table)

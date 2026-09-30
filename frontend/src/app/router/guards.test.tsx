@@ -60,4 +60,10 @@ describe('navigation', () => {
     const labels = visibleNavigation(auth.hasAnyPermission).flatMap((g) => g.items.map((i) => i.label));
     expect(labels).toEqual(['Dashboard', 'Órdenes']);
   });
+
+  it('shows Ventas first; a seller only sees Ventas and Productos', () => {
+    const seller = fakeAuth({ permissionCodes: ['products.view', 'sales.view', 'sales.create'] });
+    const labels = visibleNavigation(seller.hasAnyPermission).flatMap((g) => g.items.map((i) => i.label));
+    expect(labels).toEqual(['Ventas', 'Dashboard', 'Productos']);
+  });
 });

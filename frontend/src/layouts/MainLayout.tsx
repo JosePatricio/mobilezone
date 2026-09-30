@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { visibleNavigation } from '@/app/router/navigation';
 import { useAuth } from '@/app/store/AuthProvider';
-import { USER_TYPE_LABELS } from '@/modules/users/types';
-import { useConfirm } from '@/shared/components';
+import { Avatar, useConfirm } from '@/shared/components';
 import { fullName } from '@/shared/utils/format';
 
 export function MainLayout() {
@@ -40,11 +39,10 @@ export function MainLayout() {
           <span>MobileZone</span>
         </div>
         <div className="app-user">
+          <Avatar src={user?.foto_url} alt={fullName(user)} size="sm" />
           <div className="app-user-info">
             <strong>{fullName(user)}</strong>
-            <small className="muted">
-              {user ? (user.role?.nombre ?? USER_TYPE_LABELS[user.tipo_usuario]) : ''}
-            </small>
+            <small className="muted">{user?.role?.nombre ?? ''}</small>
           </div>
           <button type="button" className="btn btn-ghost btn-sm" onClick={onLogout}>
             Salir

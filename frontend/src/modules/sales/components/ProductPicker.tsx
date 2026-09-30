@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PRODUCTS_KEY, productApi } from '@/modules/products/services/productApi';
 import type { Product } from '@/modules/products/types';
+import { ProductThumb } from '@/shared/components';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { formatMoney } from '@/shared/utils/money';
 
@@ -26,7 +27,7 @@ export function ProductPicker({ onSelect }: { onSelect: (product: Product) => vo
       <input
         id={id}
         className="input"
-        placeholder="Nombre del producto…"
+        placeholder="Nombre o SKU del producto…"
         value={search}
         autoComplete="off"
         role="combobox"
@@ -55,10 +56,15 @@ export function ProductPicker({ onSelect }: { onSelect: (product: Product) => vo
                     setSearch('');
                   }}
                 >
-                  <strong>{p.nombre}</strong>
-                  <small className={noStock ? 'text-danger' : 'muted'}>
-                    {formatMoney(p.precio)} · Stock disponible: {p.stock}
-                  </small>
+                  <span className="picker-option">
+                    <ProductThumb src={p.imagen_url} alt={p.nombre} size="sm" />
+                    <span>
+                      <strong>{p.nombre}</strong>
+                      <small className={noStock ? 'text-danger' : 'muted'}>
+                        {p.sku} · PVP {formatMoney(p.precio_venta)} · Stock disponible: {p.stock}
+                      </small>
+                    </span>
+                  </span>
                 </button>
               </li>
             );

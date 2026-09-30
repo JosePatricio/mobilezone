@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.infrastructure.config.settings import Settings, get_settings
 from app.infrastructure.database.session import build_engine, build_session_factory
 from app.infrastructure.security.jwt_tokens import JwtTokenService
 from app.infrastructure.security.passwords import BcryptPasswordHasher
+from app.infrastructure.storage.local import LocalFileStorage
 from app.presentation.api.routes import auth, catalog, products, roles, sales, users, work_orders
+from app.presentation.api.schemas.common import configure_media_url
 from app.presentation.middleware.errors import register_error_handlers
 
 API_PREFIX = "/api/v1"
@@ -29,6 +33,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.token_service = JwtTokenService(
         settings.jwt_secret_key, settings.jwt_algorithm, settings.access_token_expire_minutes
     )
+    media_dir = Path(settings.media_dir)
+    media_dir.mkdir(parents=True, exist_ok=True)
+    app.state.file_storage = LocalFileStorage(media_dir)
+    configure_media_url(settings.media_url)
 
     app.add_middleware(
         CORSMiddleware,
@@ -56,6 +64,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ):
         api.include_router(router)
     app.include_router(api)
+
+    # Uploaded images (products, user photos).
+    app.mount("/media", StaticFiles(directory=media_dir), name="media")
 
     @app.get("/health", tags=["health"])
     def health() -> dict:

@@ -14,13 +14,14 @@ export interface NavGroup {
 
 /** Sidebar menu. Items are filtered by the permissions of the current user. */
 export const NAVIGATION: NavGroup[] = [
+  // Ventas is the first menu entry.
+  { items: [{ to: '/sales', label: 'Ventas', permissions: [P.SALES_VIEW, P.SALES_CREATE] }] },
   { items: [{ to: '/', label: 'Dashboard', permissions: [] }] },
   {
     label: 'Comercial',
     items: [
       { to: '/products', label: 'Productos', permissions: [P.PRODUCTS_VIEW] },
       { to: '/categories', label: 'Categorías', permissions: [P.CATEGORIES_VIEW] },
-      { to: '/sales', label: 'Ventas', permissions: [P.SALES_VIEW, P.SALES_CREATE] },
     ],
   },
   {

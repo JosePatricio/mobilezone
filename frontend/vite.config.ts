@@ -13,6 +13,8 @@ export default defineConfig({
     proxy: {
       // During development the API is reached through the Vite proxy (no CORS issues).
       '/api': { target: 'http://localhost:8000', changeOrigin: true },
+      // Uploaded images served by the API.
+      '/media': { target: 'http://localhost:8000', changeOrigin: true },
     },
   },
   test: {

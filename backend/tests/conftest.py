@@ -21,7 +21,7 @@ from sqlalchemy.engine import make_url
 
 from app.domain.entities import Brand, Category, DeviceModel, Product, SparePart, User
 from app.domain.repositories import UnitOfWork
-from app.domain.value_objects.enums import UserType
+from app.domain.value_objects.enums import SystemRole
 from app.infrastructure.config.settings import Settings
 from app.infrastructure.database.seed import seed
 from app.infrastructure.database.sql_scripts import CREATE_TABLES, DROP_TABLES, run_script
@@ -62,9 +62,10 @@ def truncate_all(engine: Engine) -> None:
 
 
 @pytest.fixture
-def settings(mysql_engine: Engine) -> Settings:
+def settings(mysql_engine: Engine, tmp_path) -> Settings:
     return Settings(
         _env_file=None,
+        media_dir=str(tmp_path / "media"),
         database_url=mysql_engine.url.render_as_string(hide_password=False),
         bcrypt_rounds=4,
         jwt_secret_key="test-secret-key-that-is-long-enough-1234567890",
@@ -111,17 +112,19 @@ class Factory:
         self._seq += 1
         return self._seq
 
-    def user(self, tipo: UserType = UserType.USUARIO, role: str | None = None, estado: bool = True) -> User:
+    def user(self, role: SystemRole = SystemRole.VENDEDOR, estado: bool = True) -> User:
+        """A user with the given system role; clients get a cedula and no password."""
         n = self._next()
-        role_entity = self.uow.roles.get_by_nombre(role or tipo.value) if tipo != UserType.CLIENTE else None
+        role_entity = self.uow.roles.get_by_nombre(role.value)
+        is_client = role == SystemRole.CLIENTE
         with self.uow.transaction():
             user = User(
                 nombre=f"Nombre{n}",
                 apellido=f"Apellido{n}",
-                email=f"{tipo.value.lower()}{n}@example.com",
-                tipo_usuario=tipo,
-                password=self.hasher.hash(PASSWORD) if tipo != UserType.CLIENTE else None,
-                rol_id=role_entity.id if role_entity else None,
+                email=f"{role.value.lower()}{n}@example.com",
+                rol_id=role_entity.id,
+                password=None if is_client else self.hasher.hash(PASSWORD),
+                identificacion=f"{1700000000 + n}" if is_client else None,
                 estado=estado,
             )
             self.uow.users.add(user)
@@ -134,10 +137,19 @@ class Factory:
         return category
 
     def product(self, precio: str = "10.00", stock: int = 10, category: Category | None = None, **kw) -> Product:
+        """``precio`` is the PVP (precio_venta)."""
         category = category or self.category()
+        n = self._next()
         with self.uow.transaction():
             product = Product(
-                category_id=category.id, nombre=f"Producto {self._next()}", precio=Decimal(precio), stock=stock, **kw
+                category_id=category.id,
+                sku=f"SKU-{n}",
+                nombre=f"Producto {n}",
+                precio_venta=Decimal(precio),
+                precio_costo=Decimal(precio) / 2,
+                precio_mayor=Decimal(precio) * Decimal("0.9"),
+                stock=stock,
+                **kw,
             )
             self.uow.products.add(product)
         return product

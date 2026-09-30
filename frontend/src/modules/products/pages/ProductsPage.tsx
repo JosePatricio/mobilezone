@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePermission } from '@/modules/auth/components/Can';
 import { CATEGORIES_KEY, categoryApi } from '@/modules/categories/services/categoryApi';
 import {
   Button,
   DataList,
   PageHeader,
+  ProductThumb,
   SearchInput,
   Select,
   STATUS_FILTER_OPTIONS,
@@ -17,6 +19,7 @@ import { useCrudList, useCrudMutations, useOptions } from '@/shared/hooks/useCru
 import { useListParams } from '@/shared/hooks/useListParams';
 import { useStatusToggle } from '@/shared/hooks/useStatusToggle';
 import { getErrorMessage } from '@/shared/services/apiError';
+import { applyImageSelection } from '@/shared/services/uploads';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatMoney, toCents } from '@/shared/utils/money';
 import { ProductFormModal } from '../components/ProductFormModal';
@@ -29,13 +32,18 @@ export function ProductsPage() {
   const canUpdate = usePermission(P.PRODUCTS_UPDATE);
   const canDelete = usePermission(P.PRODUCTS_DELETE);
   const canAdjust = usePermission(P.PRODUCTS_STOCK);
+  // The seller (VENDEDOR) has no access to Categorías: the filter is hidden for them.
+  const canViewCategories = usePermission(P.CATEGORIES_VIEW);
+  // Acquisition cost is only shown to users who manage products.
+  const canSeeCost = canCreate || canUpdate;
   const list = useListParams<{ category_id: string; estado: string }>({ category_id: '', estado: '' });
   const query = useCrudList(PRODUCTS_KEY, productApi, list.params);
-  const categories = useOptions(CATEGORIES_KEY, categoryApi);
+  const categories = useOptions(CATEGORIES_KEY, categoryApi, {}, canViewCategories);
   const mutations = useCrudMutations(PRODUCTS_KEY, productApi);
   const toggleStatus = useStatusToggle(mutations.setStatus, 'el producto');
   const confirm = useConfirm();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Product | null | undefined>(undefined);
   const [stockOf, setStockOf] = useState<Product | null>(null);
   const categoryOptions = (categories.data ?? []).map((c) => ({ value: c.id, label: c.nombre }));
@@ -57,10 +65,47 @@ export function ProductsPage() {
   };
 
   const columns: Column<Product>[] = [
-    { key: 'id', header: 'ID', render: (r) => r.id, sortValue: (r) => r.id },
-    { key: 'nombre', header: 'Nombre', render: (r) => r.nombre, sortValue: (r) => r.nombre.toLowerCase() },
+    {
+      key: 'nombre',
+      header: 'Producto',
+      sortValue: (r) => r.nombre.toLowerCase(),
+      render: (r) => (
+        <div className="cell-with-image">
+          <ProductThumb src={r.imagen_url} alt={r.nombre} size="sm" />
+          <div>
+            <strong>{r.nombre}</strong>
+            <small className="muted">{r.sku}</small>
+          </div>
+        </div>
+      ),
+    },
+    { key: 'sku', header: 'SKU', render: (r) => <code>{r.sku}</code>, sortValue: (r) => r.sku },
     { key: 'categoria', header: 'Categoría', render: (r) => r.category.nombre, sortValue: (r) => r.category.nombre },
-    { key: 'precio', header: 'Precio', align: 'right', render: (r) => formatMoney(r.precio), sortValue: (r) => toCents(r.precio) },
+    {
+      key: 'pvp',
+      header: 'PVP',
+      align: 'right',
+      render: (r) => formatMoney(r.precio_venta),
+      sortValue: (r) => toCents(r.precio_venta),
+    },
+    {
+      key: 'mayor',
+      header: 'Por mayor',
+      align: 'right',
+      render: (r) => formatMoney(r.precio_mayor),
+      sortValue: (r) => toCents(r.precio_mayor),
+    },
+    ...(canSeeCost
+      ? [
+          {
+            key: 'costo',
+            header: 'Costo',
+            align: 'right' as const,
+            render: (r: Product) => formatMoney(r.precio_costo),
+            sortValue: (r: Product) => toCents(r.precio_costo),
+          },
+        ]
+      : []),
     {
       key: 'stock',
       header: 'Stock',
@@ -105,14 +150,16 @@ export function ProductsPage() {
         actions={canCreate && <Button onClick={() => setEditing(null)}>Nuevo producto</Button>}
       />
       <div className="toolbar">
-        <SearchInput value={list.search} onChange={list.setSearch} placeholder="Buscar producto…" />
-        <Select
-          aria-label="Filtrar por categoría"
-          value={list.filters.category_id}
-          onChange={(e) => list.setFilter('category_id', e.target.value)}
-          options={categoryOptions}
-          placeholder="Todas las categorías"
-        />
+        <SearchInput value={list.search} onChange={list.setSearch} placeholder="Buscar por nombre o SKU…" />
+        {canViewCategories && (
+          <Select
+            aria-label="Filtrar por categoría"
+            value={list.filters.category_id}
+            onChange={(e) => list.setFilter('category_id', e.target.value)}
+            options={categoryOptions}
+            placeholder="Todas las categorías"
+          />
+        )}
         <Select
           aria-label="Filtrar por estado"
           value={list.filters.estado}
@@ -128,9 +175,16 @@ export function ProductsPage() {
           product={editing}
           categoryOptions={categoryOptions}
           onClose={() => setEditing(undefined)}
-          onSubmit={async ({ stock, ...rest }) => {
-            if (editing) await mutations.update.mutateAsync({ id: editing.id, body: rest });
-            else await mutations.create.mutateAsync({ ...rest, stock });
+          onSubmit={async (body, image) => {
+            const saved = editing
+              ? await mutations.update.mutateAsync({ id: editing.id, body })
+              : await mutations.create.mutateAsync(body);
+            await applyImageSelection(
+              image,
+              (file) => productApi.uploadImage(saved.id, file),
+              () => productApi.removeImage(saved.id),
+            );
+            await queryClient.invalidateQueries({ queryKey: [PRODUCTS_KEY] });
             toast.success(editing ? 'Cambios guardados.' : 'Producto creado.');
             setEditing(undefined);
           }}

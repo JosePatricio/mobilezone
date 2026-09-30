@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { usePermission } from '@/modules/auth/components/Can';
 import {
+  Avatar,
   Button,
   DataList,
   PageHeader,
@@ -14,6 +16,7 @@ import {
 import { useCrudList, useCrudMutations } from '@/shared/hooks/useCrud';
 import { useListParams } from '@/shared/hooks/useListParams';
 import { useStatusToggle } from '@/shared/hooks/useStatusToggle';
+import { applyImageSelection } from '@/shared/services/uploads';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { ClientFormModal } from '../components/ClientFormModal';
 import { CLIENTS_KEY, clientApi } from '../services/clientApi';
@@ -27,17 +30,29 @@ export function ClientsPage() {
   const mutations = useCrudMutations(CLIENTS_KEY, clientApi);
   const toggleStatus = useStatusToggle(mutations.setStatus, 'el cliente');
   const toast = useToast();
+  const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Client | null | undefined>(undefined);
 
   const columns: Column<Client>[] = [
-    { key: 'id', header: 'ID', render: (r) => r.id, sortValue: (r) => r.id },
     {
       key: 'nombre',
-      header: 'Nombre',
-      render: (r) => `${r.nombre} ${r.apellido}`,
+      header: 'Cliente',
       sortValue: (r) => `${r.nombre} ${r.apellido}`.toLowerCase(),
+      render: (r) => (
+        <div className="cell-with-image">
+          <Avatar src={r.foto_url} alt={`${r.nombre} ${r.apellido}`} size="sm" />
+          <div>
+            <strong>
+              {r.nombre} {r.apellido}
+            </strong>
+            <small className="muted">{r.email}</small>
+          </div>
+        </div>
+      ),
     },
-    { key: 'email', header: 'Email', render: (r) => r.email },
+    { key: 'identificacion', header: 'Cédula / RUC', render: (r) => r.identificacion ?? '—' },
+    { key: 'celular', header: 'Celular', render: (r) => r.celular ?? '—' },
+    { key: 'ciudad', header: 'Ciudad', render: (r) => r.ciudad ?? '—', sortValue: (r) => r.ciudad ?? '' },
     { key: 'estado', header: 'Estado', render: (r) => <StatusBadge active={r.estado} /> },
     {
       key: 'acciones',
@@ -61,7 +76,7 @@ export function ClientsPage() {
     <>
       <PageHeader title="Clientes" actions={canCreate && <Button onClick={() => setEditing(null)}>Nuevo cliente</Button>} />
       <div className="toolbar">
-        <SearchInput value={list.search} onChange={list.setSearch} placeholder="Buscar por nombre o email…" />
+        <SearchInput value={list.search} onChange={list.setSearch} placeholder="Buscar por nombre, email o cédula…" />
         <Select
           aria-label="Filtrar por estado"
           value={list.filters.estado}
@@ -76,9 +91,16 @@ export function ClientsPage() {
         <ClientFormModal
           client={editing}
           onClose={() => setEditing(undefined)}
-          onSubmit={async (body) => {
-            if (editing) await mutations.update.mutateAsync({ id: editing.id, body });
-            else await mutations.create.mutateAsync(body);
+          onSubmit={async (body, image) => {
+            const saved = editing
+              ? await mutations.update.mutateAsync({ id: editing.id, body })
+              : await mutations.create.mutateAsync(body);
+            await applyImageSelection(
+              image,
+              (file) => clientApi.uploadPhoto(saved.id, file),
+              () => clientApi.removePhoto(saved.id),
+            );
+            await queryClient.invalidateQueries({ queryKey: [CLIENTS_KEY] });
             toast.success(editing ? 'Cambios guardados.' : 'Cliente creado.');
             setEditing(undefined);
           }}

@@ -16,6 +16,20 @@ LongName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1,
 Description = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=2000)]
 
 
+_media_url_prefix = "/media"
+
+
+def configure_media_url(prefix: str) -> None:
+    """Called once by the app factory with ``settings.media_url``."""
+    global _media_url_prefix
+    _media_url_prefix = prefix.rstrip("/")
+
+
+def media_url(path: str | None) -> str | None:
+    """Public URL of a stored file; None means the client shows its default image."""
+    return f"{_media_url_prefix}/{path}" if path else None
+
+
 class Schema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

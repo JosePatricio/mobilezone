@@ -8,8 +8,6 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
-from app.domain.value_objects.enums import UserType
-
 
 @dataclass(frozen=True)
 class CatalogData:
@@ -29,22 +27,16 @@ class DeviceModelData:
 
 
 @dataclass(frozen=True)
-class CreateProductData:
-    category_id: int
-    nombre: str
-    precio: Decimal
-    stock: int = 0
-    descripcion: str | None = None
-    estado: bool = True
-
-
-@dataclass(frozen=True)
-class UpdateProductData:
-    """Stock is intentionally excluded: it changes only through audited operations."""
+class ProductData:
+    """Create / update data. Stock is excluded: new products start at 0 and stock
+    changes only through sales and audited adjustments."""
 
     category_id: int
+    sku: str
     nombre: str
-    precio: Decimal
+    precio_venta: Decimal
+    precio_costo: Decimal
+    precio_mayor: Decimal
     descripcion: str | None = None
     estado: bool = True
 
@@ -62,6 +54,13 @@ class SaleItemData:
 
 
 @dataclass(frozen=True)
+class ConfirmSaleData:
+    items: list[SaleItemData]
+    factura: bool = False  # True = factura, False = comprobante de venta
+    cliente_id: int | None = None  # None = consumidor final
+
+
+@dataclass(frozen=True)
 class SparePartData:
     tipo: str
     precio: Decimal
@@ -71,25 +70,18 @@ class SparePartData:
 
 
 @dataclass(frozen=True)
-class CreateUserData:
+class UserData:
+    """Create / update data. The role defines the kind of user (no separate user type)."""
+
     nombre: str
     apellido: str
     email: str
-    tipo_usuario: UserType
-    password: str | None = None
-    rol_id: int | None = None
+    rol_id: int
+    password: str | None = None  # on update, None keeps the current password
+    identificacion: str | None = None
+    celular: str | None = None
+    ciudad: str | None = None
     estado: bool = True
-
-
-@dataclass(frozen=True)
-class UpdateUserData:
-    nombre: str
-    apellido: str
-    email: str
-    tipo_usuario: UserType
-    rol_id: int | None = None
-    estado: bool = True
-    password: str | None = None  # None keeps the current password
 
 
 @dataclass(frozen=True)
@@ -97,6 +89,9 @@ class ClientData:
     nombre: str
     apellido: str
     email: str
+    identificacion: str
+    celular: str | None = None
+    ciudad: str | None = None
     estado: bool = True
 
 

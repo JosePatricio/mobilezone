@@ -7,12 +7,21 @@ import pytest
 
 from app.domain.entities import Permission, Product, Role, Sale, User, WorkOrder, WorkOrderSparePart, calculate_balance
 from app.domain.exceptions import ConflictError, InsufficientStockError, ValidationError
-from app.domain.value_objects.enums import SaleStatus, UserType, WorkOrderStatus
+from app.domain.value_objects.enums import SaleStatus, WorkOrderStatus
 from app.domain.value_objects.money import to_money
 
 
 def make_product(stock: int = 10, precio: str = "10.00") -> Product:
-    return Product(category_id=1, nombre="Pantalla", precio=Decimal(precio), stock=stock, id=1)
+    return Product(
+        category_id=1,
+        sku="pan-01",
+        nombre="Pantalla",
+        precio_venta=Decimal(precio),
+        precio_costo=Decimal("5"),
+        precio_mayor=Decimal("8"),
+        stock=stock,
+        id=1,
+    )
 
 
 class TestProduct:
@@ -47,7 +56,12 @@ class TestProduct:
             make_product(precio="-1")
 
     def test_price_is_normalized_to_two_decimals(self):
-        assert make_product(precio="10.005").precio == Decimal("10.01")
+        assert make_product(precio="10.005").precio_venta == Decimal("10.01")
+
+    def test_sku_is_normalized_and_validated(self):
+        assert make_product().sku == "PAN-01"
+        with pytest.raises(ValidationError):
+            Product(category_id=1, sku="con espacio", nombre="X", precio_venta=Decimal("1"))
 
     def test_adjust_stock(self):
         product = make_product(stock=5)
@@ -113,7 +127,7 @@ class TestWorkOrderBalance:
 class TestUser:
     def test_permissions_come_from_active_role(self):
         role = Role(nombre="tecnico", permissions=[Permission(codigo="a.view"), Permission(codigo="a.create")])
-        user = User(nombre="Ana", apellido="Paz", email="ANA@X.COM", tipo_usuario=UserType.TECNICO)
+        user = User(nombre="Ana", apellido="Paz", email="ANA@X.COM", rol_id=1)
         user.role = role  # type: ignore[attr-defined]
         assert user.email == "ana@x.com"
         assert role.nombre == "TECNICO"
@@ -122,13 +136,13 @@ class TestUser:
         assert not user.has_permission("a.view")
 
     def test_inactive_user_has_no_permissions(self):
-        user = User(nombre="A", apellido="B", email="a@b.c", tipo_usuario=UserType.ADMIN, estado=False)
+        user = User(nombre="A", apellido="B", email="a@b.c", rol_id=1, estado=False)
         user.role = Role(nombre="ADMIN", permissions=[Permission(codigo="x")])  # type: ignore[attr-defined]
         assert user.permissions == set()
 
     def test_blank_name_rejected(self):
         with pytest.raises(ValidationError):
-            User(nombre="  ", apellido="B", email="a@b.c", tipo_usuario=UserType.USUARIO)
+            User(nombre="  ", apellido="B", email="a@b.c", rol_id=1)
 
 
 def test_to_money_rejects_garbage():

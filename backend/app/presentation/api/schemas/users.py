@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import EmailStr, Field
+from pydantic import EmailStr, Field, StringConstraints, computed_field
 
-from app.domain.value_objects.enums import UserType
-from app.presentation.api.schemas.common import Name, RequestSchema, Schema
+from app.presentation.api.schemas.common import Name, RequestSchema, Schema, media_url
+
+Identificacion = Annotated[
+    str, StringConstraints(strip_whitespace=True, pattern=r"^\d{10}(\d{3})?$"), Field(description="Cédula (10) o RUC (13)")
+]
+Celular = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=20)]
+Ciudad = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=100)]
 
 
 class LoginRequest(RequestSchema):
@@ -25,16 +31,27 @@ class UserSummary(Schema):
     email: str
 
 
-class UserResponse(Schema):
-    """Never includes the password hash."""
+class _WithPhoto(Schema):
+    foto: str | None = Field(default=None, exclude=True)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def foto_url(self) -> str | None:
+        return media_url(self.foto)
+
+
+class UserResponse(_WithPhoto):
+    """Never includes the password hash. The role defines the kind of user."""
 
     id: int
     nombre: str
     apellido: str
     email: str
-    tipo_usuario: UserType
-    rol_id: int | None
-    role: RoleSummary | None = None
+    identificacion: str | None
+    celular: str | None
+    ciudad: str | None
+    rol_id: int
+    role: RoleSummary
     estado: bool
     created_at: datetime
     updated_at: datetime
@@ -53,23 +70,20 @@ class TokenResponse(Schema):
     permissions: list[str]
 
 
-class CreateUserRequest(RequestSchema):
+class UserRequest(RequestSchema):
     nombre: Name
     apellido: Name
     email: EmailStr
-    password: str | None = Field(default=None, min_length=8, max_length=128)
-    tipo_usuario: UserType
-    rol_id: int | None = None
-    estado: bool = True
-
-
-class UpdateUserRequest(RequestSchema):
-    nombre: Name
-    apellido: Name
-    email: EmailStr
-    password: str | None = Field(default=None, min_length=8, max_length=128, description="Vacío = no cambiar")
-    tipo_usuario: UserType
-    rol_id: int | None = None
+    password: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=128,
+        description="Obligatoria al crear (salvo rol CLIENTE). Al editar, vacío = no cambiar.",
+    )
+    rol_id: int
+    identificacion: Identificacion | None = None
+    celular: Celular = None
+    ciudad: Ciudad = None
     estado: bool = True
 
 
@@ -77,14 +91,27 @@ class ClientRequest(RequestSchema):
     nombre: Name
     apellido: Name
     email: EmailStr
+    identificacion: Identificacion
+    celular: Celular = None
+    ciudad: Ciudad = None
     estado: bool = True
 
 
-class ClientResponse(Schema):
+class ClientSummary(Schema):
+    id: int
+    nombre: str
+    apellido: str
+    identificacion: str | None
+
+
+class ClientResponse(_WithPhoto):
     id: int
     nombre: str
     apellido: str
     email: str
+    identificacion: str | None
+    celular: str | None
+    ciudad: str | None
     estado: bool
     created_at: datetime
     updated_at: datetime

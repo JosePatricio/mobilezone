@@ -21,7 +21,7 @@ from app.domain.entities import (
     User,
     WorkOrder,
 )
-from app.domain.value_objects.enums import SaleStatus, UserType
+from app.domain.value_objects.enums import SaleStatus
 from app.domain.value_objects.pagination import Page, PageRequest
 from app.infrastructure.database.tables import (
     brands_table,
@@ -77,17 +77,25 @@ class SqlAlchemyUserRepository(SqlAlchemyRepository[User], ports.UserRepository)
     def get_by_email(self, email: str) -> User | None:
         return self.session.scalars(select(User).where(func.lower(users_table.c.email) == email.lower())).first()
 
-    def list(self, page, *, search=None, tipo_usuario: list[UserType] | None = None, estado=None, rol_id=None):
+    def get_by_identificacion(self, identificacion: str) -> User | None:
+        return self.session.scalars(select(User).where(users_table.c.identificacion == identificacion)).first()
+
+    def list(self, page, *, search=None, roles: list[str] | None = None, estado=None, rol_id=None):
         c = users_table.c
         stmt = select(User)
         if search:
             pattern = _like(search)
             full_name = func.lower(c.nombre + " " + c.apellido)
             stmt = stmt.where(
-                or_(full_name.like(pattern, escape="\\"), func.lower(c.email).like(pattern, escape="\\"))
+                or_(
+                    full_name.like(pattern, escape="\\"),
+                    func.lower(c.email).like(pattern, escape="\\"),
+                    c.identificacion.like(pattern, escape="\\"),
+                )
             )
-        if tipo_usuario:
-            stmt = stmt.where(c.tipo_usuario.in_(tipo_usuario))
+        if roles:
+            role_ids = select(roles_table.c.id).where(roles_table.c.nombre.in_(roles))
+            stmt = stmt.where(c.rol_id.in_(role_ids))
         if estado is not None:
             stmt = stmt.where(c.estado == estado)
         if rol_id is not None:
@@ -148,6 +156,9 @@ class SqlAlchemyCategoryRepository(SqlAlchemyRepository[Category], ports.Categor
 class SqlAlchemyProductRepository(SqlAlchemyRepository[Product], ports.ProductRepository):
     entity = Product
 
+    def get_by_sku(self, sku: str) -> Product | None:
+        return self.session.scalars(select(Product).where(products_table.c.sku == sku.strip().upper())).first()
+
     def get_for_update(self, product_id: int) -> Product | None:
         stmt = select(Product).where(products_table.c.id == product_id).with_for_update(of=products_table)
         # populate_existing refreshes an already loaded instance with the locked row values.
@@ -161,6 +172,7 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository[Product], ports.ProductRe
             stmt = stmt.where(
                 or_(
                     func.lower(c.nombre).like(pattern, escape="\\"),
+                    func.lower(c.sku).like(pattern, escape="\\"),
                     func.lower(func.coalesce(c.descripcion, "")).like(pattern, escape="\\"),
                 )
             )

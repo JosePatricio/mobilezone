@@ -60,12 +60,12 @@ Estado de servidor con TanStack Query, formularios con react-hook-form + zod.
 | Módulo | Endpoints |
 |---|---|
 | auth | `POST /auth/login`, `GET /auth/me` (`POST /auth/token` para Swagger) |
-| users | CRUD + `PATCH /{id}/status`, `GET /users/technicians` |
-| clients | CRUD + status (usuarios con `tipo_usuario = CLIENTE`) |
+| users | CRUD + `PATCH /{id}/status`, `PUT/DELETE /{id}/photo`, `GET /users/technicians` (filtro `rol_id`) |
+| clients | CRUD + status + `PUT/DELETE /{id}/photo` (usuarios con rol `CLIENTE`) |
 | roles / permissions | CRUD roles, `PUT /roles/{id}/permissions`, `POST/DELETE /roles/{id}/permissions/{pid}`, `GET /permissions` |
 | categories, brands, models, spare-parts | `GET`, `GET /{id}`, `POST`, `PUT /{id}`, `PATCH /{id}/status`, `DELETE /{id}` (409 si tiene registros asociados) |
-| products | CRUD + `GET/PATCH /{id}/stock`, `GET /{id}/stock-movements` |
-| sales | `GET`, `GET /{id}`, `POST` (confirmar), `POST /{id}/cancel` |
+| products | CRUD (SKU, PVP, costo, por mayor) + `PUT/DELETE /{id}/image`, `GET/PATCH /{id}/stock`, `GET /{id}/stock-movements` |
+| sales | `GET`, `GET /{id}`, `POST` (confirmar: `factura`, `cliente_id`), `POST /{id}/cancel`, `GET /customers/lookup?identificacion=` |
 | work-orders | CRUD, `PATCH /{id}/status`, `GET /by-number/{n}`, `GET /statuses`, `POST /calculate-balance`, `POST/DELETE /{id}/spare-parts` |
 
 Listados paginados: `?page=&size=` (máx. 100) → `{items, total, page, size, pages}`. Montos como string decimal (`"10.50"`).
@@ -77,8 +77,12 @@ Todas están centralizadas para cambiarlas fácilmente:
 | Pendiente | Decisión provisional | Dónde |
 |---|---|---|
 | Base de datos | MySQL 8 / MariaDB 10.4+ (InnoDB, utf8mb4) con PyMySQL; DDL en `backend/db_scripts` | `db_scripts/`, `tables.py` |
-| Tipos de usuario | `ADMIN`, `USUARIO`, `TECNICO` + `CLIENTE` (clientes en la misma tabla); VARCHAR, ampliable | `domain/value_objects/enums.py` |
-| Roles y permisos | Catálogo `<modulo>.<accion>`; roles por defecto ADMIN / USUARIO / TECNICO | `domain/value_objects/permissions.py` |
+| Tipo de usuario | Eliminado: el **rol** define el tipo. Roles del sistema `ADMIN`, `VENDEDOR`, `TECNICO`, `CLIENTE` (no se pueden renombrar, desactivar ni eliminar); se pueden crear roles adicionales | `SystemRole` en `domain/value_objects/enums.py` |
+| Roles y permisos | Catálogo `<modulo>.<accion>`; VENDEDOR solo accede a Ventas y Productos; CLIENTE sin permisos (no inicia sesión) | `domain/value_objects/permissions.py` |
+| Usuarios | Cédula (10 dígitos) o RUC (13) única, celular, ciudad y foto (avatar por defecto) | `domain/entities/user.py` |
+| Productos | SKU único (mayúsculas, sin espacios); PVP, costo y precio por mayor; la venta usa el PVP; imagen (imagen por defecto); se crean con stock 0 | `domain/entities/product.py` |
+| Ventas | Comprobante o factura; cliente buscado por cédula/RUC o "Consumidor final" (sin cliente) | `ConfirmSaleUseCase` |
+| Imágenes | JPG/PNG/WEBP ≤ 2 MB validadas por contenido; guardadas en `backend/media` y servidas en `/media` | `infrastructure/storage/local.py` |
 | Estados 0/1/2 de orden | Etiquetas "Recibida / En proceso / Finalizada", expuestas por `GET /work-orders/statuses` | `WORK_ORDER_STATUS_LABELS` |
 | Login de clientes | Los clientes no tienen contraseña y no pueden iniciar sesión | `LoginUseCase` |
 | Anticipo > presupuesto | Se rechaza (`ADVANCE_EXCEEDS_BUDGET`); el saldo lo calcula siempre el backend | `domain/entities/work_order.py` |
@@ -141,7 +145,7 @@ JWT_SECRET_KEY=<valor aleatorio largo>
 Registre el esquema en Alembic (solo la primera vez):
 
 ```powershell
-alembic stamp head        # si creó las tablas con los scripts SQL (paso 1)
+alembic stamp head        # si creó las tablas con los scripts SQL actuales (paso 1)
 # o bien, si la base está vacía:
 # alembic upgrade head
 # python -m app.infrastructure.database.seed
@@ -156,6 +160,22 @@ uvicorn main:app --reload --port 8000
 
 - API: http://localhost:8000/api/v1 — Documentación Swagger: http://localhost:8000/docs
 - Usuario inicial: `admin@example.com` / `Admin12345` (cámbielo después del primer ingreso).
+
+### Actualizar una base existente (versión anterior)
+
+Si su base se creó con la versión anterior (con `tipo_usuario`, `precio`, rol `USUARIO`), **haga un respaldo** y aplique:
+
+```powershell
+cd backend
+.venv\Scripts\activate
+alembic stamp 0001        # solo si nunca usó Alembic en esa base
+alembic upgrade head      # ejecuta db_scripts\upgrades\002_productos_usuarios_ventas.sql
+python -m app.infrastructure.database.seed
+```
+
+o importe `backend/db_scripts/upgrades/002_productos_usuarios_ventas.sql` desde phpMyAdmin (una sola vez) y luego
+ejecute `alembic stamp head`. Los productos existentes reciben un SKU provisional (`SKU-000001`, …) y precio por
+mayor = PVP; edítelos después.
 
 ### 3. Frontend (terminal 2)
 

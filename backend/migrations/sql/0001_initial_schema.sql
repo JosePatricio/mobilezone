@@ -1,0 +1,253 @@
+-- =============================================================================
+-- FROZEN copy of the original db_scripts/02_create_tables.sql, applied by Alembic
+-- revision 0001. Do not edit: schema changes go in new revisions + db_scripts/upgrades.
+-- =============================================================================
+
+SET NAMES utf8mb4;
+
+-- -----------------------------------------------------------------------------
+-- Roles and permissions
+-- -----------------------------------------------------------------------------
+CREATE TABLE permissions (
+    id          INTEGER      NOT NULL AUTO_INCREMENT,
+    codigo      VARCHAR(100) NOT NULL COMMENT '<modulo>.<accion>, e.g. products.create',
+    descripcion VARCHAR(255),
+    CONSTRAINT pk_permissions PRIMARY KEY (id),
+    CONSTRAINT uq_permissions_codigo UNIQUE (codigo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE roles (
+    id          INTEGER      NOT NULL AUTO_INCREMENT,
+    nombre      VARCHAR(50)  NOT NULL,
+    descripcion VARCHAR(255),
+    estado      BOOL         NOT NULL DEFAULT 1,
+    created_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_roles PRIMARY KEY (id),
+    CONSTRAINT uq_roles_nombre UNIQUE (nombre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE role_permissions (
+    role_id       INTEGER NOT NULL,
+    permission_id INTEGER NOT NULL,
+    CONSTRAINT pk_role_permissions PRIMARY KEY (role_id, permission_id),
+    CONSTRAINT fk_role_permissions_role_id_roles
+        FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE CASCADE,
+    CONSTRAINT fk_role_permissions_permission_id_permissions
+        FOREIGN KEY (permission_id) REFERENCES permissions (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
+-- Users (internal users and clients share this table)
+-- -----------------------------------------------------------------------------
+CREATE TABLE users (
+    id           INTEGER      NOT NULL AUTO_INCREMENT,
+    nombre       VARCHAR(100) NOT NULL,
+    apellido     VARCHAR(100) NOT NULL,
+    email        VARCHAR(255) NOT NULL,
+    password     VARCHAR(255)          COMMENT 'bcrypt hash; NULL for clients without login',
+    tipo_usuario VARCHAR(30)  NOT NULL COMMENT 'ADMIN | USUARIO | TECNICO | CLIENTE',
+    rol_id       INTEGER,
+    estado       BOOL         NOT NULL DEFAULT 1,
+    created_at   DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at   DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_users PRIMARY KEY (id),
+    CONSTRAINT uq_users_email UNIQUE (email),
+    CONSTRAINT fk_users_rol_id_roles FOREIGN KEY (rol_id) REFERENCES roles (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_users_nombre_apellido ON users (nombre, apellido);
+CREATE INDEX ix_users_rol_id ON users (rol_id);
+CREATE INDEX ix_users_tipo_usuario ON users (tipo_usuario);
+
+-- -----------------------------------------------------------------------------
+-- Categories and products
+-- -----------------------------------------------------------------------------
+CREATE TABLE categories (
+    id          INTEGER      NOT NULL AUTO_INCREMENT,
+    nombre      VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    estado      BOOL         NOT NULL DEFAULT 1,
+    created_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_categories PRIMARY KEY (id),
+    CONSTRAINT uq_categories_nombre UNIQUE (nombre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE products (
+    id          INTEGER       NOT NULL AUTO_INCREMENT,
+    category_id INTEGER       NOT NULL,
+    nombre      VARCHAR(150)  NOT NULL,
+    descripcion TEXT,
+    precio      DECIMAL(12,2) NOT NULL,
+    stock       INTEGER       NOT NULL DEFAULT 0,
+    estado      BOOL          NOT NULL DEFAULT 1,
+    created_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_products PRIMARY KEY (id),
+    CONSTRAINT ck_products_stock_non_negative CHECK (stock >= 0),
+    CONSTRAINT ck_products_precio_non_negative CHECK (precio >= 0),
+    CONSTRAINT fk_products_category_id_categories FOREIGN KEY (category_id) REFERENCES categories (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_products_category_id ON products (category_id);
+CREATE INDEX ix_products_nombre ON products (nombre);
+
+-- Audit trail of every stock change (sale, sale cancellation, manual adjustment).
+CREATE TABLE stock_movements (
+    id               INTEGER      NOT NULL AUTO_INCREMENT,
+    product_id       INTEGER      NOT NULL,
+    tipo             VARCHAR(30)  NOT NULL COMMENT 'VENTA | ANULACION_VENTA | AJUSTE',
+    cantidad         INTEGER      NOT NULL COMMENT 'signed: negative = out, positive = in',
+    stock_resultante INTEGER      NOT NULL,
+    user_id          INTEGER,
+    referencia       VARCHAR(100),
+    motivo           VARCHAR(255),
+    fecha            DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_stock_movements PRIMARY KEY (id),
+    CONSTRAINT fk_stock_movements_product_id_products FOREIGN KEY (product_id) REFERENCES products (id),
+    CONSTRAINT fk_stock_movements_user_id_users FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_stock_movements_product_id ON stock_movements (product_id);
+
+-- -----------------------------------------------------------------------------
+-- Sales
+-- -----------------------------------------------------------------------------
+CREATE TABLE sales (
+    id         INTEGER       NOT NULL AUTO_INCREMENT,
+    user_id    INTEGER       NOT NULL,
+    fecha      DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    total      DECIMAL(12,2) NOT NULL,
+    estado     VARCHAR(30)   NOT NULL COMMENT 'CONFIRMADA | ANULADA',
+    created_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_sales PRIMARY KEY (id),
+    CONSTRAINT fk_sales_user_id_users FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_sales_fecha ON sales (fecha);
+CREATE INDEX ix_sales_user_id ON sales (user_id);
+
+CREATE TABLE sale_details (
+    id              INTEGER       NOT NULL AUTO_INCREMENT,
+    sale_id         INTEGER       NOT NULL,
+    product_id      INTEGER       NOT NULL,
+    cantidad        INTEGER       NOT NULL,
+    precio_unitario DECIMAL(12,2) NOT NULL COMMENT 'historical price at sale time',
+    subtotal        DECIMAL(12,2) NOT NULL,
+    CONSTRAINT pk_sale_details PRIMARY KEY (id),
+    CONSTRAINT ck_sale_details_cantidad_positive CHECK (cantidad > 0),
+    CONSTRAINT fk_sale_details_sale_id_sales FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE,
+    CONSTRAINT fk_sale_details_product_id_products FOREIGN KEY (product_id) REFERENCES products (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_sale_details_product_id ON sale_details (product_id);
+CREATE INDEX ix_sale_details_sale_id ON sale_details (sale_id);
+
+-- -----------------------------------------------------------------------------
+-- Brands and device models
+-- -----------------------------------------------------------------------------
+CREATE TABLE brands (
+    id          INTEGER      NOT NULL AUTO_INCREMENT,
+    nombre      VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    estado      BOOL         NOT NULL DEFAULT 1,
+    created_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_brands PRIMARY KEY (id),
+    CONSTRAINT uq_brands_nombre UNIQUE (nombre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE models (
+    id          INTEGER      NOT NULL AUTO_INCREMENT,
+    brand_id    INTEGER      NOT NULL,
+    nombre      VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    estado      BOOL         NOT NULL DEFAULT 1,
+    created_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_models PRIMARY KEY (id),
+    CONSTRAINT uq_models_brand_id_nombre UNIQUE (brand_id, nombre),
+    CONSTRAINT fk_models_brand_id_brands FOREIGN KEY (brand_id) REFERENCES brands (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_models_brand_id ON models (brand_id);
+
+-- -----------------------------------------------------------------------------
+-- Spare parts
+-- -----------------------------------------------------------------------------
+CREATE TABLE spare_parts (
+    id         INTEGER       NOT NULL AUTO_INCREMENT,
+    tipo       VARCHAR(100)  NOT NULL,
+    ubicacion  BOOL          NOT NULL DEFAULT 0,
+    precio     DECIMAL(12,2) NOT NULL,
+    garantia   BOOL          NOT NULL DEFAULT 0,
+    estado     BOOL          NOT NULL DEFAULT 1,
+    created_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_spare_parts PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_spare_parts_tipo ON spare_parts (tipo);
+
+-- -----------------------------------------------------------------------------
+-- Work orders
+-- -----------------------------------------------------------------------------
+CREATE TABLE work_orders (
+    id          INTEGER       NOT NULL AUTO_INCREMENT,
+    num_orden   INTEGER                COMMENT 'unique order number (assigned on insert)',
+    user_id     INTEGER       NOT NULL COMMENT 'user who registers the order',
+    cliente_id  INTEGER       NOT NULL COMMENT 'client (users.tipo_usuario = CLIENTE)',
+    tecnico_id  INTEGER                COMMENT 'responsible technician (users.tipo_usuario = TECNICO)',
+    marca_id    INTEGER       NOT NULL,
+    modelo_id   INTEGER       NOT NULL,
+    observacion TEXT,
+    estado      INTEGER       NOT NULL DEFAULT 0 COMMENT '0 | 1 | 2 (meaning pending definition)',
+    garantia    BOOL          NOT NULL DEFAULT 0,
+    color       VARCHAR(50),
+    presupuesto DECIMAL(12,2) NOT NULL,
+    anticipo    DECIMAL(12,2) NOT NULL,
+    saldo       DECIMAL(12,2) NOT NULL COMMENT 'presupuesto - anticipo (computed by the backend)',
+    fecha       DATE          NOT NULL,
+    created_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_work_orders PRIMARY KEY (id),
+    CONSTRAINT uq_work_orders_num_orden UNIQUE (num_orden),
+    CONSTRAINT ck_work_orders_estado_valid CHECK (estado IN (0, 1, 2)),
+    CONSTRAINT ck_work_orders_amounts_non_negative CHECK (presupuesto >= 0 AND anticipo >= 0),
+    CONSTRAINT fk_work_orders_user_id_users FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_work_orders_cliente_id_users FOREIGN KEY (cliente_id) REFERENCES users (id),
+    CONSTRAINT fk_work_orders_tecnico_id_users FOREIGN KEY (tecnico_id) REFERENCES users (id),
+    CONSTRAINT fk_work_orders_marca_id_brands FOREIGN KEY (marca_id) REFERENCES brands (id),
+    CONSTRAINT fk_work_orders_modelo_id_models FOREIGN KEY (modelo_id) REFERENCES models (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_work_orders_cliente_id ON work_orders (cliente_id);
+CREATE INDEX ix_work_orders_estado ON work_orders (estado);
+CREATE INDEX ix_work_orders_fecha ON work_orders (fecha);
+CREATE INDEX ix_work_orders_tecnico_id ON work_orders (tecnico_id);
+CREATE INDEX ix_work_orders_user_id ON work_orders (user_id);
+
+-- Spare parts used in work orders (one part can be used in many orders).
+CREATE TABLE work_order_spare_parts (
+    id            INTEGER       NOT NULL AUTO_INCREMENT,
+    work_order_id INTEGER       NOT NULL,
+    technician_id INTEGER       NOT NULL COMMENT 'authenticated technician who registered it',
+    spare_part_id INTEGER       NOT NULL,
+    cantidad      INTEGER       NOT NULL,
+    precio        DECIMAL(12,2) NOT NULL,
+    fecha         DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_work_order_spare_parts PRIMARY KEY (id),
+    CONSTRAINT ck_work_order_spare_parts_cantidad_positive CHECK (cantidad > 0),
+    CONSTRAINT fk_work_order_spare_parts_work_order_id_work_orders
+        FOREIGN KEY (work_order_id) REFERENCES work_orders (id) ON DELETE CASCADE,
+    CONSTRAINT fk_work_order_spare_parts_technician_id_users
+        FOREIGN KEY (technician_id) REFERENCES users (id),
+    CONSTRAINT fk_work_order_spare_parts_spare_part_id_spare_parts
+        FOREIGN KEY (spare_part_id) REFERENCES spare_parts (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_work_order_spare_parts_spare_part_id ON work_order_spare_parts (spare_part_id);
+CREATE INDEX ix_work_order_spare_parts_technician_id ON work_order_spare_parts (technician_id);
+CREATE INDEX ix_work_order_spare_parts_work_order_id ON work_order_spare_parts (work_order_id);

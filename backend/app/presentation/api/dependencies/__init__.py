@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from typing import Annotated, Callable, Iterator
 
-from fastapi import Depends, Query, Request
+from fastapi import Depends, Query, Request, UploadFile
 from fastapi.security import OAuth2PasswordBearer
 
+from app.application.services.files import MAX_IMAGE_BYTES, FileStorage
 from app.application.services.security import PasswordHasher, TokenService
 from app.application.use_cases.auth import GetAuthenticatedUserUseCase
 from app.application.use_cases.base import require_permission
@@ -35,7 +36,23 @@ def get_token_service(request: Request) -> TokenService:
     return request.app.state.token_service
 
 
+def get_storage(request: Request) -> FileStorage:
+    return request.app.state.file_storage
+
+
+def read_upload(file: UploadFile) -> bytes:
+    """Reads an uploaded file with a hard size cap (the use case validates the content).
+
+    Sync on purpose: upload routes are plain ``def`` (run in the threadpool) like the rest.
+    """
+    try:
+        return file.file.read(MAX_IMAGE_BYTES + 1)
+    finally:
+        file.file.close()
+
+
 UowDep = Annotated[UnitOfWork, Depends(get_uow)]
+StorageDep = Annotated[FileStorage, Depends(get_storage)]
 HasherDep = Annotated[PasswordHasher, Depends(get_password_hasher)]
 TokensDep = Annotated[TokenService, Depends(get_token_service)]
 

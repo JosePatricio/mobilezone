@@ -38,10 +38,17 @@ class SaleDetail:
 
 @dataclass(eq=False)
 class Sale:
+    """A sale. ``factura`` = True issues an invoice, False a sales receipt (comprobante).
+
+    ``cliente_id`` None means "Consumidor final".
+    """
+
     user_id: int
     fecha: datetime | None = None
     total: Decimal = ZERO
     estado: SaleStatus = SaleStatus.CONFIRMADA
+    factura: bool = False
+    cliente_id: int | None = None
     details: list[SaleDetail] = field(default_factory=list)
     id: int | None = None
     created_at: datetime | None = None
@@ -49,9 +56,11 @@ class Sale:
 
     if TYPE_CHECKING:
         user: User
+        cliente: User | None
 
     def __post_init__(self) -> None:
         self.estado = SaleStatus(self.estado)
+        self.factura = bool(self.factura)
         if self.fecha is None:
             self.fecha = utcnow()
 

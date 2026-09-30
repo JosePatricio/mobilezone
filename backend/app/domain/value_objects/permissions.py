@@ -101,24 +101,14 @@ PERMISSION_CATALOG: dict[str, str] = {
 
 ALL_PERMISSIONS: list[str] = list(PERMISSION_CATALOG)
 
-# Default roles created by the seed script. Definitive roles are pending.
+# Default roles created by the seed script (system roles, see SystemRole).
 DEFAULT_ROLES: dict[str, list[str]] = {
     "ADMIN": ALL_PERMISSIONS,
-    "USUARIO": [
-        Perm.CATEGORIES_VIEW,
+    # Seller: only the Ventas and Productos modules.
+    "VENDEDOR": [
         Perm.PRODUCTS_VIEW,
         Perm.SALES_VIEW,
         Perm.SALES_CREATE,
-        Perm.CLIENTS_VIEW,
-        Perm.CLIENTS_CREATE,
-        Perm.CLIENTS_UPDATE,
-        Perm.BRANDS_VIEW,
-        Perm.MODELS_VIEW,
-        Perm.WORK_ORDERS_VIEW,
-        Perm.WORK_ORDERS_CREATE,
-        Perm.WORK_ORDERS_UPDATE,
-        Perm.WORK_ORDERS_ASSIGN_TECHNICIAN,
-        Perm.SPARE_PARTS_VIEW,
     ],
     "TECNICO": [
         Perm.PRODUCTS_VIEW,
@@ -133,4 +123,6 @@ DEFAULT_ROLES: dict[str, list[str]] = {
         Perm.WORK_ORDERS_SPARE_PARTS_REMOVE,
         Perm.SPARE_PARTS_VIEW,
     ],
+    # Clients do not log in and have no permissions.
+    "CLIENTE": [],
 }

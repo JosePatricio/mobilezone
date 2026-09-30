@@ -5,16 +5,21 @@ from enum import Enum, IntEnum
 from app.domain.exceptions import ValidationError
 
 
-class UserType(str, Enum):
-    """User types. The same ``users`` table stores internal users and clients.
+class SystemRole(str, Enum):
+    """Roles the business rules depend on (a user's role is its only "type").
 
-    New types can be appended here without schema changes (stored as VARCHAR).
+    Internal users and clients share the ``users`` table; clients have the
+    CLIENTE role. System roles cannot be renamed, deactivated or deleted.
+    Additional custom roles can be created from the UI.
     """
 
     ADMIN = "ADMIN"
-    USUARIO = "USUARIO"
+    VENDEDOR = "VENDEDOR"
     TECNICO = "TECNICO"
     CLIENTE = "CLIENTE"
+
+
+SYSTEM_ROLES: frozenset[str] = frozenset(r.value for r in SystemRole)
 
 
 class SaleStatus(str, Enum):

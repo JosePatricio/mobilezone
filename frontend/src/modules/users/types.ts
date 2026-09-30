@@ -1,22 +1,25 @@
 import type { Id, NamedRef, Timestamps } from '@/shared/types/api';
 
-export type UserType = 'ADMIN' | 'USUARIO' | 'TECNICO' | 'CLIENTE';
-
-export const USER_TYPE_LABELS: Record<UserType, string> = {
-  ADMIN: 'Administrador',
-  USUARIO: 'Usuario',
-  TECNICO: 'Técnico',
-  CLIENTE: 'Cliente',
-};
+/** System roles. The role is the only "type" of a user (clients have the CLIENTE role). */
+export const SYSTEM_ROLES = {
+  ADMIN: 'ADMIN',
+  VENDEDOR: 'VENDEDOR',
+  TECNICO: 'TECNICO',
+  CLIENTE: 'CLIENTE',
+} as const;
 
 export interface User extends Timestamps {
   id: Id;
   nombre: string;
   apellido: string;
   email: string;
-  tipo_usuario: UserType;
-  rol_id: Id | null;
-  role: NamedRef | null;
+  identificacion: string | null;
+  celular: string | null;
+  ciudad: string | null;
+  /** null = show the default avatar */
+  foto_url: string | null;
+  rol_id: Id;
+  role: NamedRef;
   estado: boolean;
 }
 
@@ -25,7 +28,13 @@ export interface UserRequest {
   apellido: string;
   email: string;
   password?: string | null;
-  tipo_usuario: UserType;
-  rol_id: Id | null;
+  rol_id: Id;
+  identificacion: string | null;
+  celular: string | null;
+  ciudad: string | null;
   estado: boolean;
+}
+
+export function hasRole(user: { role?: NamedRef | null } | null | undefined, role: string): boolean {
+  return user?.role?.nombre === role;
 }

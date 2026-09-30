@@ -10,13 +10,18 @@ DB_SCRIPTS_DIR = Path(__file__).resolve().parents[3] / "db_scripts"
 CREATE_TABLES = "02_create_tables.sql"
 SEED_DATA = "03_seed_data.sql"
 DROP_TABLES = "99_drop_tables.sql"
+UPGRADE_002 = "upgrades/002_productos_usuarios_ventas.sql"
 
 
-def read_statements(filename: str) -> list[str]:
-    """Split a script into statements. Scripts contain no procedures, so ';' at line end ends a statement."""
+def read_statements(script: str | Path) -> list[str]:
+    """Split a script into statements. Scripts contain no procedures, so ';' at line end ends a statement.
+
+    ``script`` is a path relative to ``db_scripts`` or an absolute ``Path``.
+    """
+    path = script if isinstance(script, Path) else DB_SCRIPTS_DIR / script
     lines = [
         line
-        for line in (DB_SCRIPTS_DIR / filename).read_text(encoding="utf-8").splitlines()
+        for line in path.read_text(encoding="utf-8").splitlines()
         if line.strip() and not line.lstrip().startswith("--")
     ]
     statements, current = [], []
@@ -30,8 +35,8 @@ def read_statements(filename: str) -> list[str]:
     return statements
 
 
-def run_script(connection: Connection, filename: str) -> None:
-    for statement in read_statements(filename):
+def run_script(connection: Connection, script: str | Path) -> None:
+    for statement in read_statements(script):
         if statement.strip().upper() in ("START TRANSACTION", "COMMIT"):
             continue  # the caller controls the transaction
         # exec_driver_sql: no bind-parameter parsing (bcrypt hashes contain ':' and '$').

@@ -19,7 +19,7 @@ from app.domain.entities import (
     User,
     WorkOrder,
 )
-from app.domain.value_objects.enums import SaleStatus, UserType
+from app.domain.value_objects.enums import SaleStatus
 from app.domain.value_objects.pagination import Page, PageRequest
 
 T = TypeVar("T")
@@ -41,12 +41,15 @@ class UserRepository(Repository[User]):
     def get_by_email(self, email: str) -> User | None: ...
 
     @abstractmethod
+    def get_by_identificacion(self, identificacion: str) -> User | None: ...
+
+    @abstractmethod
     def list(
         self,
         page: PageRequest,
         *,
         search: str | None = None,
-        tipo_usuario: list[UserType] | None = None,
+        roles: list[str] | None = None,
         estado: bool | None = None,
         rol_id: int | None = None,
     ) -> Page[User]: ...
@@ -80,6 +83,9 @@ class CategoryRepository(Repository[Category]):
 
 
 class ProductRepository(Repository[Product]):
+    @abstractmethod
+    def get_by_sku(self, sku: str) -> Product | None: ...
+
     @abstractmethod
     def get_for_update(self, product_id: int) -> Product | None:
         """Load a product locking its row (``SELECT ... FOR UPDATE`` where supported)."""
