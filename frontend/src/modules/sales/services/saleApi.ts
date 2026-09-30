@@ -1,4 +1,4 @@
-import type { Client } from '@/modules/clients/types';
+import type { Client, ClientRequest } from '@/modules/clients/types';
 import { http } from '@/shared/services/httpClient';
 import type { Id, Page, QueryParams } from '@/shared/types/api';
 import { cleanParams } from '@/shared/utils/format';
@@ -15,4 +15,6 @@ export const saleApi = {
   /** Finds an active client by cédula / RUC (available to sellers). */
   lookupCustomer: (identificacion: string) =>
     http.get<Client>('/sales/customers/lookup', { params: { identificacion } }).then((r) => r.data),
+  /** Registers a new client (role CLIENTE, no password) from the sales screen. */
+  createCustomer: (body: ClientRequest) => http.post<Client>('/sales/customers', body).then((r) => r.data),
 };

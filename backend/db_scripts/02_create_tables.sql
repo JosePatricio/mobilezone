@@ -48,6 +48,21 @@ CREATE TABLE role_permissions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------------------------
+-- Branches (sucursales): products are stocked and sold per branch
+-- -----------------------------------------------------------------------------
+CREATE TABLE branches (
+    id         INTEGER      NOT NULL AUTO_INCREMENT,
+    nombre     VARCHAR(100) NOT NULL,
+    ubicacion  VARCHAR(255) NOT NULL,
+    telefono   VARCHAR(20),
+    estado     BOOL         NOT NULL DEFAULT 1,
+    created_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_branches PRIMARY KEY (id),
+    CONSTRAINT uq_branches_nombre UNIQUE (nombre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
 -- Users (internal users and clients share this table)
 -- -----------------------------------------------------------------------------
 CREATE TABLE users (
@@ -58,7 +73,8 @@ CREATE TABLE users (
     password       VARCHAR(255)          COMMENT 'bcrypt hash; NULL for clients (no login)',
     identificacion VARCHAR(13)           COMMENT 'cedula (10 digits) or RUC (13 digits)',
     celular        VARCHAR(20),
-    ciudad         VARCHAR(100),
+    provincia      VARCHAR(100),
+    ciudad         VARCHAR(100)          COMMENT 'canton of the province',
     foto           VARCHAR(255)          COMMENT 'relative path of the uploaded photo; NULL = default avatar',
     rol_id         INTEGER      NOT NULL COMMENT 'the role defines the kind of user (ADMIN, VENDEDOR, TECNICO, CLIENTE, ...)',
     estado         BOOL         NOT NULL DEFAULT 1,
@@ -72,6 +88,17 @@ CREATE TABLE users (
 
 CREATE INDEX ix_users_nombre_apellido ON users (nombre, apellido);
 CREATE INDEX ix_users_rol_id ON users (rol_id);
+
+-- Branches assigned to a user (sellers sell only from their branches).
+CREATE TABLE user_branches (
+    user_id   INTEGER NOT NULL,
+    branch_id INTEGER NOT NULL,
+    CONSTRAINT pk_user_branches PRIMARY KEY (user_id, branch_id),
+    CONSTRAINT fk_user_branches_user_id_users
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_branches_branch_id_branches
+        FOREIGN KEY (branch_id) REFERENCES branches (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------------------------
 -- Categories and products
@@ -96,14 +123,12 @@ CREATE TABLE products (
     precio_venta DECIMAL(12,2) NOT NULL COMMENT 'PVP, used in sales',
     precio_costo DECIMAL(12,2) NOT NULL COMMENT 'acquisition cost',
     precio_mayor DECIMAL(12,2) NOT NULL COMMENT 'wholesale price',
-    stock        INTEGER       NOT NULL DEFAULT 0,
     imagen       VARCHAR(255)           COMMENT 'relative path of the uploaded image; NULL = default image',
     estado       BOOL          NOT NULL DEFAULT 1,
     created_at   DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at   DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT pk_products PRIMARY KEY (id),
     CONSTRAINT uq_products_sku UNIQUE (sku),
-    CONSTRAINT ck_products_stock_non_negative CHECK (stock >= 0),
     CONSTRAINT ck_products_precios_non_negative CHECK (precio_venta >= 0 AND precio_costo >= 0 AND precio_mayor >= 0),
     CONSTRAINT fk_products_category_id_categories FOREIGN KEY (category_id) REFERENCES categories (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -111,10 +136,29 @@ CREATE TABLE products (
 CREATE INDEX ix_products_category_id ON products (category_id);
 CREATE INDEX ix_products_nombre ON products (nombre);
 
+-- Inventory: stock of each product in each branch.
+CREATE TABLE inventory (
+    id         INTEGER     NOT NULL AUTO_INCREMENT,
+    product_id INTEGER     NOT NULL,
+    branch_id  INTEGER     NOT NULL,
+    stock      INTEGER     NOT NULL DEFAULT 0,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_inventory PRIMARY KEY (id),
+    CONSTRAINT uq_inventory_product_id_branch_id UNIQUE (product_id, branch_id),
+    CONSTRAINT ck_inventory_stock_non_negative CHECK (stock >= 0),
+    CONSTRAINT fk_inventory_product_id_products FOREIGN KEY (product_id) REFERENCES products (id),
+    CONSTRAINT fk_inventory_branch_id_branches FOREIGN KEY (branch_id) REFERENCES branches (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_inventory_branch_id ON inventory (branch_id);
+CREATE INDEX ix_inventory_product_id ON inventory (product_id);
+
 -- Audit trail of every stock change (sale, sale cancellation, manual adjustment).
 CREATE TABLE stock_movements (
     id               INTEGER      NOT NULL AUTO_INCREMENT,
     product_id       INTEGER      NOT NULL,
+    inventory_id     INTEGER               COMMENT 'inventory (product + branch)',
     tipo             VARCHAR(30)  NOT NULL COMMENT 'VENTA | ANULACION_VENTA | AJUSTE',
     cantidad         INTEGER      NOT NULL COMMENT 'signed: negative = out, positive = in',
     stock_resultante INTEGER      NOT NULL,
@@ -124,9 +168,11 @@ CREATE TABLE stock_movements (
     fecha            DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     CONSTRAINT pk_stock_movements PRIMARY KEY (id),
     CONSTRAINT fk_stock_movements_product_id_products FOREIGN KEY (product_id) REFERENCES products (id),
+    CONSTRAINT fk_stock_movements_inventory_id_inventory FOREIGN KEY (inventory_id) REFERENCES inventory (id),
     CONSTRAINT fk_stock_movements_user_id_users FOREIGN KEY (user_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE INDEX ix_stock_movements_inventory_id ON stock_movements (inventory_id);
 CREATE INDEX ix_stock_movements_product_id ON stock_movements (product_id);
 
 -- -----------------------------------------------------------------------------
@@ -135,6 +181,7 @@ CREATE INDEX ix_stock_movements_product_id ON stock_movements (product_id);
 CREATE TABLE sales (
     id         INTEGER       NOT NULL AUTO_INCREMENT,
     user_id    INTEGER       NOT NULL,
+    branch_id  INTEGER       NOT NULL COMMENT 'branch (sucursal) of the sale',
     fecha      DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     total      DECIMAL(12,2) NOT NULL,
     estado     VARCHAR(30)   NOT NULL COMMENT 'CONFIRMADA | ANULADA',
@@ -144,9 +191,11 @@ CREATE TABLE sales (
     updated_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT pk_sales PRIMARY KEY (id),
     CONSTRAINT fk_sales_user_id_users FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_sales_branch_id_branches FOREIGN KEY (branch_id) REFERENCES branches (id),
     CONSTRAINT fk_sales_cliente_id_users FOREIGN KEY (cliente_id) REFERENCES users (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE INDEX ix_sales_branch_id ON sales (branch_id);
 CREATE INDEX ix_sales_cliente_id ON sales (cliente_id);
 CREATE INDEX ix_sales_fecha ON sales (fecha);
 CREATE INDEX ix_sales_user_id ON sales (user_id);
@@ -155,15 +204,18 @@ CREATE TABLE sale_details (
     id              INTEGER       NOT NULL AUTO_INCREMENT,
     sale_id         INTEGER       NOT NULL,
     product_id      INTEGER       NOT NULL,
+    inventory_id    INTEGER       NOT NULL COMMENT 'inventory the units were taken from',
     cantidad        INTEGER       NOT NULL,
     precio_unitario DECIMAL(12,2) NOT NULL COMMENT 'historical price at sale time',
     subtotal        DECIMAL(12,2) NOT NULL,
     CONSTRAINT pk_sale_details PRIMARY KEY (id),
     CONSTRAINT ck_sale_details_cantidad_positive CHECK (cantidad > 0),
     CONSTRAINT fk_sale_details_sale_id_sales FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE,
-    CONSTRAINT fk_sale_details_product_id_products FOREIGN KEY (product_id) REFERENCES products (id)
+    CONSTRAINT fk_sale_details_product_id_products FOREIGN KEY (product_id) REFERENCES products (id),
+    CONSTRAINT fk_sale_details_inventory_id_inventory FOREIGN KEY (inventory_id) REFERENCES inventory (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE INDEX ix_sale_details_inventory_id ON sale_details (inventory_id);
 CREATE INDEX ix_sale_details_product_id ON sale_details (product_id);
 CREATE INDEX ix_sale_details_sale_id ON sale_details (sale_id);
 

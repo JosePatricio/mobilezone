@@ -154,3 +154,66 @@ def test_upgrade_002_migrates_a_v1_database(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_003_moves_stock_to_branches(mysql_engine: Engine):
+    """v2 database (0001 + upgrade 002) with data → upgrade 003: stock, sales and sellers go to Matriz."""
+    from pathlib import Path
+
+    from app.infrastructure.database.sql_scripts import UPGRADE_002, UPGRADE_003
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, initial)
+            run_script(conn, UPGRADE_002)
+            conn.exec_driver_sql("INSERT INTO permissions (codigo) VALUES ('products.view'), ('products.stock')")
+            conn.exec_driver_sql(
+                "INSERT INTO role_permissions SELECT r.id, p.id FROM roles r CROSS JOIN permissions p "
+                "WHERE r.nombre IN ('ADMIN', 'VENDEDOR')"
+            )
+            conn.exec_driver_sql(
+                "INSERT INTO users (nombre, apellido, email, password, rol_id) VALUES "
+                "('V','V','v@x.com','h',(SELECT id FROM roles WHERE nombre='VENDEDOR'))"
+            )
+            conn.exec_driver_sql("INSERT INTO categories (nombre) VALUES ('Cat')")
+            conn.exec_driver_sql(
+                "INSERT INTO products (category_id, sku, nombre, precio_venta, precio_costo, precio_mayor, stock) "
+                "VALUES (1, 'A1', 'Pantalla', 10, 5, 8, 7)"
+            )
+            conn.exec_driver_sql("INSERT INTO sales (user_id, total, estado) VALUES (1, 10, 'CONFIRMADA')")
+            conn.exec_driver_sql(
+                "INSERT INTO sale_details (sale_id, product_id, cantidad, precio_unitario, subtotal) VALUES (1, 1, 1, 10, 10)"
+            )
+            conn.exec_driver_sql(
+                "INSERT INTO stock_movements (product_id, tipo, cantidad, stock_resultante) VALUES (1, 'VENTA', -1, 7)"
+            )
+
+        with mysql_engine.begin() as conn:
+            run_script(conn, UPGRADE_003)
+
+        with mysql_engine.connect() as conn:
+            q = conn.exec_driver_sql
+            assert q("SELECT nombre FROM branches").scalars().all() == ["Matriz"]
+            assert tuple(q("SELECT product_id, stock FROM inventory").one()) == (1, 7)
+            inv_id = q("SELECT id FROM inventory").scalar()
+            assert q("SELECT inventory_id FROM sale_details").scalar() == inv_id
+            assert q("SELECT inventory_id FROM stock_movements").scalar() == inv_id
+            assert q("SELECT b.nombre FROM sales s JOIN branches b ON b.id = s.branch_id").scalar() == "Matriz"
+            assert q("SELECT COUNT(*) FROM user_branches").scalar() == 1  # the seller
+            assert q("SELECT COUNT(*) FROM permissions WHERE codigo = 'products.stock'").scalar() == 0
+            vendedor = q(
+                "SELECT p.codigo FROM role_permissions rp JOIN roles r ON r.id = rp.role_id "
+                "JOIN permissions p ON p.id = rp.permission_id WHERE r.nombre = 'VENDEDOR'"
+            ).scalars().all()
+            assert "inventory.view" in vendedor
+            columns = q(
+                "SELECT COLUMN_NAME FROM information_schema.columns "
+                "WHERE table_schema = DATABASE() AND table_name = 'products'"
+            ).scalars().all()
+            assert "stock" not in columns
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

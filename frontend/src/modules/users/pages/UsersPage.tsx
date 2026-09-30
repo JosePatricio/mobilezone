@@ -61,7 +61,17 @@ export function UsersPage() {
     },
     { key: 'identificacion', header: 'Cédula / RUC', render: (r) => r.identificacion ?? '—' },
     { key: 'celular', header: 'Celular', render: (r) => r.celular ?? '—' },
-    { key: 'ciudad', header: 'Ciudad', render: (r) => r.ciudad ?? '—', sortValue: (r) => r.ciudad ?? '' },
+    {
+      key: 'ciudad',
+      header: 'Ciudad',
+      render: (r) => (r.ciudad ? `${r.ciudad}, ${r.provincia}` : '—'),
+      sortValue: (r) => r.ciudad ?? '',
+    },
+    {
+      key: 'sucursales',
+      header: 'Sucursales',
+      render: (r) => (r.branches.length ? r.branches.map((b) => b.nombre).join(', ') : '—'),
+    },
     { key: 'rol', header: 'Rol', render: (r) => r.role.nombre, sortValue: (r) => r.role.nombre },
     { key: 'estado', header: 'Estado', render: (r) => <StatusBadge active={r.estado} /> },
     {
@@ -155,8 +165,12 @@ export function UsersPage() {
             <dd>{viewing.email}</dd>
             <dt>Celular</dt>
             <dd>{viewing.celular ?? '—'}</dd>
+            <dt>Provincia</dt>
+            <dd>{viewing.provincia ?? '—'}</dd>
             <dt>Ciudad</dt>
             <dd>{viewing.ciudad ?? '—'}</dd>
+            <dt>Sucursales</dt>
+            <dd>{viewing.branches.length ? viewing.branches.map((b) => b.nombre).join(', ') : '—'}</dd>
             <dt>Creado</dt>
             <dd>{formatDateTime(viewing.created_at)}</dd>
             <dt>Actualizado</dt>

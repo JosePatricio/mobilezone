@@ -14,14 +14,14 @@ export interface Product extends Timestamps {
   precio_costo: Money;
   /** Wholesale price */
   precio_mayor: Money;
+  /** Total stock of every branch (read-only; stock is managed per branch in Inventario) */
   stock: number;
   /** null = show the default image */
   imagen_url: string | null;
   estado: boolean;
 }
 
-/** Create / update. There is no stock field: new products start at 0 and stock
- *  changes only through sales and audited adjustments. */
+/** Create / update. Stock is not part of the product: it is kept per branch (Inventario). */
 export interface ProductRequest {
   category_id: Id;
   sku: string;
@@ -31,28 +31,4 @@ export interface ProductRequest {
   precio_costo: Money;
   precio_mayor: Money;
   estado: boolean;
-}
-
-export interface ProductStock {
-  product_id: Id;
-  nombre: string;
-  stock: number;
-  estado: boolean;
-}
-
-export interface StockAdjustmentRequest {
-  cantidad: number;
-  motivo: string | null;
-}
-
-export interface StockMovement {
-  id: Id;
-  product_id: Id;
-  tipo: 'VENTA' | 'ANULACION_VENTA' | 'AJUSTE';
-  cantidad: number;
-  stock_resultante: number;
-  user_id: Id | null;
-  referencia: string | null;
-  motivo: string | null;
-  fecha: string;
 }

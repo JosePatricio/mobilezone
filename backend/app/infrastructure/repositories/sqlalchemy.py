@@ -9,9 +9,11 @@ from sqlalchemy.orm import Session
 
 from app.domain import repositories as ports
 from app.domain.entities import (
+    Branch,
     Brand,
     Category,
     DeviceModel,
+    Inventory,
     Permission,
     Product,
     Role,
@@ -24,8 +26,10 @@ from app.domain.entities import (
 from app.domain.value_objects.enums import SaleStatus
 from app.domain.value_objects.pagination import Page, PageRequest
 from app.infrastructure.database.tables import (
+    branches_table,
     brands_table,
     categories_table,
+    inventory_table,
     models_table,
     permissions_table,
     products_table,
@@ -159,11 +163,6 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository[Product], ports.ProductRe
     def get_by_sku(self, sku: str) -> Product | None:
         return self.session.scalars(select(Product).where(products_table.c.sku == sku.strip().upper())).first()
 
-    def get_for_update(self, product_id: int) -> Product | None:
-        stmt = select(Product).where(products_table.c.id == product_id).with_for_update(of=products_table)
-        # populate_existing refreshes an already loaded instance with the locked row values.
-        return self.session.scalars(stmt.execution_options(populate_existing=True)).first()
-
     def list(self, page, *, search=None, category_id=None, estado=None):
         c = products_table.c
         stmt = select(Product)
@@ -183,6 +182,66 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository[Product], ports.ProductRe
         return self._paginate(stmt.order_by(c.nombre, c.id), page)
 
 
+class SqlAlchemyBranchRepository(SqlAlchemyRepository[Branch], ports.BranchRepository):
+    entity = Branch
+
+    def get_by_nombre(self, nombre: str) -> Branch | None:
+        c = branches_table.c
+        return self.session.scalars(select(Branch).where(func.lower(c.nombre) == nombre.strip().lower())).first()
+
+    def get_many(self, ids: list[int]) -> list[Branch]:
+        if not ids:
+            return []
+        return list(self.session.scalars(select(Branch).where(branches_table.c.id.in_(ids))))
+
+    def list(self, page, *, search=None, estado=None):
+        c = branches_table.c
+        stmt = select(Branch)
+        if search:
+            pattern = _like(search)
+            stmt = stmt.where(
+                or_(func.lower(c.nombre).like(pattern, escape="\\"), func.lower(c.ubicacion).like(pattern, escape="\\"))
+            )
+        if estado is not None:
+            stmt = stmt.where(c.estado == estado)
+        return self._paginate(stmt.order_by(c.nombre), page)
+
+
+class SqlAlchemyInventoryRepository(SqlAlchemyRepository[Inventory], ports.InventoryRepository):
+    entity = Inventory
+
+    def get_for_update(self, inventory_id: int) -> Inventory | None:
+        stmt = select(Inventory).where(inventory_table.c.id == inventory_id).with_for_update(of=inventory_table)
+        # populate_existing refreshes an already loaded instance with the locked row values.
+        return self.session.scalars(stmt.execution_options(populate_existing=True)).first()
+
+    def get_by_product_and_branch(self, product_id: int, branch_id: int) -> Inventory | None:
+        c = inventory_table.c
+        return self.session.scalars(select(Inventory).where(c.product_id == product_id, c.branch_id == branch_id)).first()
+
+    def list(self, page, *, search=None, branch_id=None, product_id=None, with_stock=None, active_products=None):
+        c = inventory_table.c
+        p = products_table.alias("inventory_product")
+        b = branches_table.alias("inventory_branch")
+        stmt = select(Inventory).join(p, p.c.id == c.product_id).join(b, b.c.id == c.branch_id)
+        if search:
+            pattern = _like(search)
+            stmt = stmt.where(
+                or_(func.lower(p.c.sku).like(pattern, escape="\\"), func.lower(p.c.nombre).like(pattern, escape="\\"))
+            )
+        if branch_id is not None:
+            stmt = stmt.where(c.branch_id == branch_id)
+        if product_id is not None:
+            stmt = stmt.where(c.product_id == product_id)
+        if with_stock is True:
+            stmt = stmt.where(c.stock > 0)
+        elif with_stock is False:
+            stmt = stmt.where(c.stock == 0)
+        if active_products:
+            stmt = stmt.where(p.c.estado.is_(True), b.c.estado.is_(True))
+        return self._paginate(stmt.order_by(p.c.nombre, b.c.nombre, c.id), page)
+
+
 class SqlAlchemyStockMovementRepository(ports.StockMovementRepository):
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -191,10 +250,10 @@ class SqlAlchemyStockMovementRepository(ports.StockMovementRepository):
         self.session.add(movement)
         return movement
 
-    def list_by_product(self, product_id: int, page: PageRequest) -> Page[StockMovement]:
+    def list_by_inventory(self, inventory_id: int, page: PageRequest) -> Page[StockMovement]:
         c = stock_movements_table.c
-        stmt = select(StockMovement).where(c.product_id == product_id).order_by(c.fecha.desc(), c.id.desc())
-        total = self.session.scalar(select(func.count()).where(c.product_id == product_id)) or 0
+        stmt = select(StockMovement).where(c.inventory_id == inventory_id).order_by(c.fecha.desc(), c.id.desc())
+        total = self.session.scalar(select(func.count()).where(c.inventory_id == inventory_id)) or 0
         items = list(self.session.scalars(stmt.limit(page.size).offset(page.offset)))
         return Page(items=items, total=total, page=page.page, size=page.size)
 

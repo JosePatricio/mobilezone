@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { visibleNavigation } from '@/app/router/navigation';
 import { useAuth } from '@/app/store/AuthProvider';
 import { Avatar, useConfirm } from '@/shared/components';
@@ -32,12 +32,12 @@ export function MainLayout() {
         >
           ☰
         </button>
-        <div className="app-brand">
+        <Link to="/" className="app-brand" aria-label="MobileZone: ir al inicio">
           <span className="brand-mark" aria-hidden>
             MZ
           </span>
           <span>MobileZone</span>
-        </div>
+        </Link>
         <div className="app-user">
           <Avatar src={user?.foto_url} alt={fullName(user)} size="sm" />
           <div className="app-user-info">

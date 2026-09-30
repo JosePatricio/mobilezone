@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { SearchIcon, UserIcon } from '@/shared/components';
+import { SearchIcon } from '@/shared/components';
 import { customerLabel, type SaleCustomer } from '../types';
 import { CustomerLookupModal } from './CustomerLookupModal';
 
@@ -11,8 +11,8 @@ interface Props {
 }
 
 /**
- * Comprobante / Factura switch, customer field with a search icon (lookup by cédula / RUC)
- * and a user icon that sets "Consumidor final".
+ * Comprobante / Factura switch and customer field. "Consumidor final" is the default;
+ * the search icon finds (or registers) a client by cédula / RUC.
  */
 export function SaleDocumentFields({ factura, onFacturaChange, customer, onCustomerChange }: Props) {
   const switchId = useId();
@@ -46,13 +46,20 @@ export function SaleDocumentFields({ factura, onFacturaChange, customer, onCusto
           Cliente
         </label>
         <div className="input-group">
-          <input
-            id={customerId}
-            className="input"
-            readOnly
-            value={customerLabel(customer)}
-            title={customer?.identificacion ? `Cédula / RUC: ${customer.identificacion}` : undefined}
-          />
+          <div className="input-with-clear">
+            <input id={customerId} className="input" readOnly value={customerLabel(customer)} />
+            {customer && (
+              <button
+                type="button"
+                className="clear-button"
+                aria-label="Quitar cliente (Consumidor final)"
+                title="Quitar cliente (Consumidor final)"
+                onClick={() => onCustomerChange(null)}
+              >
+                ×
+              </button>
+            )}
+          </div>
           <button
             type="button"
             className="btn btn-secondary btn-md icon-button"
@@ -62,17 +69,7 @@ export function SaleDocumentFields({ factura, onFacturaChange, customer, onCusto
           >
             <SearchIcon />
           </button>
-          <button
-            type="button"
-            className="btn btn-secondary btn-md icon-button"
-            aria-label="Consumidor final"
-            title="Consumidor final"
-            onClick={() => onCustomerChange(null)}
-          >
-            <UserIcon />
-          </button>
         </div>
-        {customer?.identificacion && <small className="muted">Cédula / RUC: {customer.identificacion}</small>}
       </div>
 
       {lookupOpen && (

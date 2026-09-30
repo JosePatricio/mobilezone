@@ -27,15 +27,17 @@ class TestUsersAndRoles:
     def test_vendedor_only_has_sales_and_products(self, client, factory):
         seller = factory.user(SystemRole.VENDEDOR)
         body = client.post(f"{API}/auth/login", json={"email": seller.email, "password": PASSWORD}).json()
-        assert sorted(body["permissions"]) == ["products.view", "sales.create", "sales.view"]
+        assert sorted(body["permissions"]) == ["inventory.view", "products.view", "sales.create", "sales.view"]
+        assert [b["nombre"] for b in body["user"]["branches"]] == ["Matriz"]
         assert body["user"]["role"]["nombre"] == "VENDEDOR"
         headers = {"Authorization": f"Bearer {body['access_token']}"}
         assert client.get(f"{API}/products", headers=headers).status_code == 200
         assert client.get(f"{API}/sales", headers=headers).status_code == 200
-        for path in ("/clients", "/users", "/work-orders", "/categories"):
+        assert client.get(f"{API}/inventory", headers=headers).status_code == 200
+        for path in ("/clients", "/users", "/work-orders", "/categories", "/branches"):
             assert client.get(f"{API}{path}", headers=headers).status_code == 403, path
 
-    def test_create_user_with_new_fields(self, client, admin_headers, uow):
+    def test_create_user_with_new_fields(self, client, admin_headers, uow, factory):
         response = client.post(
             f"{API}/users",
             json={
@@ -46,7 +48,9 @@ class TestUsersAndRoles:
                 "rol_id": _role_id(uow, "VENDEDOR"),
                 "identificacion": "1790012345001",
                 "celular": "099 123 4567",
+                "provincia": "Pichincha",
                 "ciudad": "Quito",
+                "branch_ids": [factory.default_branch.id],
             },
             headers=admin_headers,
         )
@@ -76,11 +80,11 @@ class TestUsersAndRoles:
         assert dup.status_code == 409
         assert dup.json()["error"]["code"] == "IDENTIFICATION_ALREADY_EXISTS"
 
-    def test_password_required_except_for_clients(self, client, admin_headers, uow):
-        base = {"nombre": "A", "apellido": "B", "identificacion": "0102030405"}
+    def test_password_required_except_for_clients(self, client, admin_headers, uow, factory):
+        base = {"nombre": "A", "apellido": "B", "identificacion": "0102030400"}
         seller = client.post(
             f"{API}/users",
-            json={**base, "email": "s@example.com", "rol_id": _role_id(uow, "VENDEDOR")},
+            json={**base, "email": "s@example.com", "rol_id": _role_id(uow, "VENDEDOR"), "branch_ids": [1]},
             headers=admin_headers,
         )
         assert seller.status_code == 400
@@ -138,7 +142,13 @@ class TestUsersAndRoles:
         assert client.post(f"{API}/clients", json=payload, headers=admin_headers).status_code == 422
         created = client.post(
             f"{API}/clients",
-            json={**payload, "identificacion": "0911111111", "celular": "0987654321", "ciudad": "Guayaquil"},
+            json={
+                **payload,
+                "identificacion": "0911111110",
+                "celular": "0987654321",
+                "provincia": "Guayas",
+                "ciudad": "Guayaquil",
+            },
             headers=admin_headers,
         )
         assert created.status_code == 201
@@ -165,7 +175,7 @@ class TestProductsV2:
         assert created.status_code == 201, created.text
         product = created.json()
         assert (product["precio_venta"], product["precio_costo"], product["precio_mayor"]) == ("85.00", "50.00", "75.00")
-        assert product["stock"] == 0
+        assert product["stock"] == 0  # stock is kept per branch in /inventory
 
         dup = client.post(f"{API}/products", json=self._payload(category.id, sku="pan-001"), headers=admin_headers)
         assert dup.status_code == 409
@@ -188,9 +198,11 @@ class TestProductsV2:
         assert removed.json()["imagen_url"] is None
 
     def test_sale_uses_pvp(self, client, admin_headers, factory):
-        product = factory.product(precio="20.00")
+        inv = factory.inventory(precio="20.00")
         sale = client.post(
-            f"{API}/sales", json={"items": [{"product_id": product.id, "cantidad": 2}]}, headers=admin_headers
+            f"{API}/sales",
+            json={"branch_id": inv.branch_id, "items": [{"inventory_id": inv.id, "cantidad": 2}]},
+            headers=admin_headers,
         ).json()
         assert sale["total"] == "40.00"
 
@@ -207,7 +219,7 @@ class TestSalesV2:
         assert found.status_code == 200, found.text
         assert (found.json()["nombre"], found.json()["apellido"]) == (customer.nombre, customer.apellido)
 
-        missing = client.get(f"{API}/sales/customers/lookup", params={"identificacion": "0999999999"}, headers=headers)
+        missing = client.get(f"{API}/sales/customers/lookup", params={"identificacion": "1104680135"}, headers=headers)
         assert missing.status_code == 404
         assert missing.json()["error"]["code"] == "CLIENT_NOT_FOUND"
 
@@ -220,18 +232,19 @@ class TestSalesV2:
         seller = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, seller.email)
         customer = factory.user(SystemRole.CLIENTE)
-        product = factory.product(stock=5)
+        inv = factory.inventory(stock=5)
+        items = [{"inventory_id": inv.id, "cantidad": 1}]
 
         invoice = client.post(
             f"{API}/sales",
-            json={"items": [{"product_id": product.id, "cantidad": 1}], "factura": True, "cliente_id": customer.id},
+            json={"branch_id": inv.branch_id, "items": items, "factura": True, "cliente_id": customer.id},
             headers=headers,
         ).json()
         assert invoice["factura"] is True
         assert invoice["cliente"]["identificacion"] == customer.identificacion
 
         receipt = client.post(
-            f"{API}/sales", json={"items": [{"product_id": product.id, "cantidad": 1}]}, headers=headers
+            f"{API}/sales", json={"branch_id": inv.branch_id, "items": items}, headers=headers
         ).json()
         assert receipt["factura"] is False
         assert receipt["cliente"] is None  # consumidor final
@@ -239,10 +252,10 @@ class TestSalesV2:
     def test_sale_client_must_be_a_client(self, client, factory):
         seller = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, seller.email)
-        product = factory.product()
+        inv = factory.inventory()
         response = client.post(
             f"{API}/sales",
-            json={"items": [{"product_id": product.id, "cantidad": 1}], "cliente_id": seller.id},
+            json={"branch_id": inv.branch_id, "items": [{"inventory_id": inv.id, "cantidad": 1}], "cliente_id": seller.id},
             headers=headers,
         )
         assert response.status_code == 400

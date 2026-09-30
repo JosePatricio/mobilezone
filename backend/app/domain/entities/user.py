@@ -8,20 +8,13 @@ from typing import TYPE_CHECKING
 from app.domain.entities.base import Activatable, optional_text, require_text
 from app.domain.exceptions import ValidationError
 from app.domain.value_objects.enums import SYSTEM_ROLES, SystemRole
+from app.domain.value_objects.identificacion import normalize_identificacion
+from app.domain.value_objects.locations import validate_location
 
+if TYPE_CHECKING:
+    from app.domain.entities.branch import Branch
 
-def normalize_identificacion(value: str | None) -> str | None:
-    """Cédula (10 digits) or RUC (13 digits)."""
-    text = re.sub(r"[\s-]", "", value or "")
-    if not text:
-        return None
-    if not re.fullmatch(r"\d{10}|\d{13}", text):
-        raise ValidationError(
-            "La cédula debe tener 10 dígitos y el RUC 13 dígitos.",
-            code="INVALID_IDENTIFICATION",
-            details={"field": "identificacion"},
-        )
-    return text
+__all__ = ["Permission", "Role", "User", "normalize_celular", "normalize_identificacion"]
 
 
 def normalize_celular(value: str | None) -> str | None:
@@ -85,9 +78,11 @@ class User(Activatable):
     password: str | None = None
     identificacion: str | None = None
     celular: str | None = None
+    provincia: str | None = None
     ciudad: str | None = None
     foto: str | None = None
     estado: bool = True
+    branches: list[Branch] = field(default_factory=list)  # sucursales assigned (sellers)
     id: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -101,7 +96,7 @@ class User(Activatable):
         self.email = require_text(self.email, "email", 255).lower()
         self.identificacion = normalize_identificacion(self.identificacion)
         self.celular = normalize_celular(self.celular)
-        self.ciudad = optional_text(self.ciudad)
+        self.provincia, self.ciudad = validate_location(self.provincia, self.ciudad)
 
     @property
     def nombre_completo(self) -> str:
@@ -119,6 +114,17 @@ class User(Activatable):
     @property
     def is_client(self) -> bool:
         return self.role_name == SystemRole.CLIENTE.value
+
+    @property
+    def is_seller(self) -> bool:
+        return self.role_name == SystemRole.VENDEDOR.value
+
+    @property
+    def branch_ids(self) -> set[int]:
+        return {b.id for b in self.branches if b.id is not None}
+
+    def set_branches(self, branches: list[Branch]) -> None:
+        self.branches[:] = branches
 
     @property
     def permissions(self) -> set[str]:

@@ -1,32 +1,38 @@
 import type { Id, Money } from '@/shared/types/api';
 import { fromCents, multiplyMoney } from '@/shared/utils/money';
 
+/** A sale line. Units are taken from an inventory row (product + branch of the sale). */
 export interface CartLine {
+  inventoryId: Id;
   productId: Id;
+  sku: string;
   nombre: string;
+  imagenUrl: string | null;
   precio: Money;
+  /** Stock available in the branch */
   stock: number;
   cantidad: number;
 }
 
-export interface CartProduct {
-  id: Id;
-  nombre: string;
-  precio: Money;
-  stock: number;
-}
+export type CartProduct = Omit<CartLine, 'cantidad'>;
 
 export type CartAction =
   | { type: 'add'; product: CartProduct }
-  | { type: 'setQuantity'; productId: Id; cantidad: number }
-  | { type: 'remove'; productId: Id }
+  | { type: 'increment'; inventoryId: Id }
+  | { type: 'decrement'; inventoryId: Id }
+  | { type: 'setQuantity'; inventoryId: Id; cantidad: number }
+  | { type: 'remove'; inventoryId: Id }
   | { type: 'updateStock'; productId: Id; stock: number }
   | { type: 'clear' };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
+function withQuantity(line: CartLine, cantidad: number): CartLine {
+  return { ...line, cantidad: clamp(Math.floor(cantidad) || 1, 1, Math.max(line.stock, 1)) };
+}
+
 /**
- * Pure cart reducer. The UI prevents selling more than the available stock
+ * Pure cart reducer. The UI prevents selling more than the stock of the branch
  * whenever possible; the backend remains the final source of truth.
  */
 export function cartReducer(lines: CartLine[], action: CartAction): CartLine[] {
@@ -34,25 +40,22 @@ export function cartReducer(lines: CartLine[], action: CartAction): CartLine[] {
     case 'add': {
       const { product } = action;
       if (product.stock <= 0) return lines;
-      const existing = lines.find((l) => l.productId === product.id);
+      const existing = lines.find((l) => l.inventoryId === product.inventoryId);
       if (existing) {
         return lines.map((l) =>
-          l.productId === product.id ? { ...l, stock: product.stock, cantidad: clamp(l.cantidad + 1, 1, product.stock) } : l,
+          l.inventoryId === product.inventoryId ? withQuantity({ ...l, stock: product.stock }, l.cantidad + 1) : l,
         );
       }
-      return [
-        ...lines,
-        { productId: product.id, nombre: product.nombre, precio: product.precio, stock: product.stock, cantidad: 1 },
-      ];
+      return [...lines, { ...product, cantidad: 1 }];
     }
+    case 'increment':
+      return lines.map((l) => (l.inventoryId === action.inventoryId ? withQuantity(l, l.cantidad + 1) : l));
+    case 'decrement':
+      return lines.map((l) => (l.inventoryId === action.inventoryId ? withQuantity(l, l.cantidad - 1) : l));
     case 'setQuantity':
-      return lines.map((l) =>
-        l.productId === action.productId
-          ? { ...l, cantidad: clamp(Math.floor(action.cantidad) || 1, 1, Math.max(l.stock, 1)) }
-          : l,
-      );
+      return lines.map((l) => (l.inventoryId === action.inventoryId ? withQuantity(l, action.cantidad) : l));
     case 'remove':
-      return lines.filter((l) => l.productId !== action.productId);
+      return lines.filter((l) => l.inventoryId !== action.inventoryId);
     case 'updateStock':
       return lines.map((l) => (l.productId === action.productId ? { ...l, stock: action.stock } : l));
     case 'clear':

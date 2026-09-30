@@ -11,6 +11,7 @@ CREATE_TABLES = "02_create_tables.sql"
 SEED_DATA = "03_seed_data.sql"
 DROP_TABLES = "99_drop_tables.sql"
 UPGRADE_002 = "upgrades/002_productos_usuarios_ventas.sql"
+UPGRADE_003 = "upgrades/003_sucursales_inventario.sql"
 
 
 def read_statements(script: str | Path) -> list[str]:

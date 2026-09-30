@@ -60,12 +60,15 @@ Estado de servidor con TanStack Query, formularios con react-hook-form + zod.
 | Módulo | Endpoints |
 |---|---|
 | auth | `POST /auth/login`, `GET /auth/me` (`POST /auth/token` para Swagger) |
-| users | CRUD + `PATCH /{id}/status`, `PUT/DELETE /{id}/photo`, `GET /users/technicians` (filtro `rol_id`) |
+| users | CRUD (provincia/ciudad, `branch_ids`) + `PATCH /{id}/status`, `PUT/DELETE /{id}/photo`, `GET /users/technicians` (filtro `rol_id`) |
 | clients | CRUD + status + `PUT/DELETE /{id}/photo` (usuarios con rol `CLIENTE`) |
 | roles / permissions | CRUD roles, `PUT /roles/{id}/permissions`, `POST/DELETE /roles/{id}/permissions/{pid}`, `GET /permissions` |
 | categories, brands, models, spare-parts | `GET`, `GET /{id}`, `POST`, `PUT /{id}`, `PATCH /{id}/status`, `DELETE /{id}` (409 si tiene registros asociados) |
-| products | CRUD (SKU, PVP, costo, por mayor) + `PUT/DELETE /{id}/image`, `GET/PATCH /{id}/stock`, `GET /{id}/stock-movements` |
-| sales | `GET`, `GET /{id}`, `POST` (confirmar: `factura`, `cliente_id`), `POST /{id}/cancel`, `GET /customers/lookup?identificacion=` |
+| products | CRUD (SKU, PVP, costo, por mayor; `stock` = total de todas las sucursales) + `PUT/DELETE /{id}/image` |
+| branches | CRUD de sucursales (nombre, ubicación, teléfono) + status |
+| inventory | `GET` (filtros `search` SKU/nombre, `branch_id`, `product_id`, `with_stock`, `active`), `GET /{id}`, `POST` (producto + sucursal + stock inicial), `PATCH /{id}/stock`, `GET /{id}/movements`, `DELETE /{id}`, `GET /inventory/branches` |
+| locations | `GET /locations/provinces` (provincias del Ecuador con sus ciudades) |
+| sales | `GET`, `GET /{id}`, `POST` (confirmar: `branch_id`, `items[{inventory_id, cantidad}]`, `factura`, `cliente_id`), `POST /{id}/cancel`, `GET /customers/lookup?identificacion=`, `POST /customers` (registrar cliente) |
 | work-orders | CRUD, `PATCH /{id}/status`, `GET /by-number/{n}`, `GET /statuses`, `POST /calculate-balance`, `POST/DELETE /{id}/spare-parts` |
 
 Listados paginados: `?page=&size=` (máx. 100) → `{items, total, page, size, pages}`. Montos como string decimal (`"10.50"`).
@@ -80,8 +83,11 @@ Todas están centralizadas para cambiarlas fácilmente:
 | Tipo de usuario | Eliminado: el **rol** define el tipo. Roles del sistema `ADMIN`, `VENDEDOR`, `TECNICO`, `CLIENTE` (no se pueden renombrar, desactivar ni eliminar); se pueden crear roles adicionales | `SystemRole` en `domain/value_objects/enums.py` |
 | Roles y permisos | Catálogo `<modulo>.<accion>`; VENDEDOR solo accede a Ventas y Productos; CLIENTE sin permisos (no inicia sesión) | `domain/value_objects/permissions.py` |
 | Usuarios | Cédula (10 dígitos) o RUC (13) única, celular, ciudad y foto (avatar por defecto) | `domain/entities/user.py` |
-| Productos | SKU único (mayúsculas, sin espacios); PVP, costo y precio por mayor; la venta usa el PVP; imagen (imagen por defecto); se crean con stock 0 | `domain/entities/product.py` |
-| Ventas | Comprobante o factura; cliente buscado por cédula/RUC o "Consumidor final" (sin cliente) | `ConfirmSaleUseCase` |
+| Productos | SKU único (mayúsculas, sin espacios); PVP, costo y precio por mayor; la venta usa el PVP; imagen (imagen por defecto). El stock no está en el producto | `domain/entities/product.py` |
+| Inventario / sucursales | Stock por producto y sucursal (`inventory`); la venta descuenta del inventario de su sucursal; el vendedor vende solo desde sus sucursales asignadas (ADMIN desde cualquiera: `sales.any_branch`); sucursal por defecto "Matriz" | `domain/entities/inventory.py`, `ConfirmSaleUseCase` |
+| Cédula / RUC | Cédula: provincia, 3er dígito y dígito verificador módulo 10. RUC persona natural: cédula válida + establecimiento. RUC sociedades/públicos: estructura (sin exigir el dígito verificador módulo 11, porque el SRI emite RUC válidos que no lo cumplen) | `value_objects/identificacion.py` |
+| Provincia / ciudad | 24 provincias y sus 221 cantones; la ciudad debe pertenecer a la provincia | `value_objects/locations.py` |
+| Ventas | Comprobante o factura; "Consumidor final" por defecto; cliente buscado por cédula/RUC o registrado desde la misma venta (rol CLIENTE, sin contraseña) | `ConfirmSaleUseCase` |
 | Imágenes | JPG/PNG/WEBP ≤ 2 MB validadas por contenido; guardadas en `backend/media` y servidas en `/media` | `infrastructure/storage/local.py` |
 | Estados 0/1/2 de orden | Etiquetas "Recibida / En proceso / Finalizada", expuestas por `GET /work-orders/statuses` | `WORK_ORDER_STATUS_LABELS` |
 | Login de clientes | Los clientes no tienen contraseña y no pueden iniciar sesión | `LoginUseCase` |
@@ -91,7 +97,7 @@ Todas están centralizadas para cambiarlas fácilmente:
 | Eliminación | Lógica vía `estado`; `DELETE` físico solo si no hay registros asociados | `CrudUseCases.delete` |
 | Anulación de ventas | Implementada: restituye stock (permiso `sales.cancel`) | `CancelSaleUseCase` |
 | Stock de repuestos | Los repuestos no descuentan stock | — |
-| Auditoría | Tabla `stock_movements` (venta, anulación, ajuste, stock inicial) con usuario y fecha | `StockMovement` |
+| Auditoría | Tabla `stock_movements` por inventario (venta, anulación, ajuste, stock inicial) con usuario y fecha | `StockMovement` |
 | Sesión en frontend | Token en `sessionStorage`, logout automático al expirar o ante un 401 | `shared/services/tokenStorage.ts` |
 | UI | Sin librería de componentes; CSS propio responsive con modo oscuro | `src/styles.css` |
 
@@ -163,19 +169,27 @@ uvicorn main:app --reload --port 8000
 
 ### Actualizar una base existente (versión anterior)
 
-Si su base se creó con la versión anterior (con `tipo_usuario`, `precio`, rol `USUARIO`), **haga un respaldo** y aplique:
+**Haga un respaldo** y aplique, en orden y una sola vez, los scripts de `backend/db_scripts/upgrades` que falten:
+
+| Script | Aplica a bases… |
+|---|---|
+| `002_productos_usuarios_ventas.sql` | con `tipo_usuario`, `precio` y rol `USUARIO` (versión 1) |
+| `003_sucursales_inventario.sql` | sin sucursales ni inventario (versión 2) |
+
+Con Alembic (aplica solo lo que falta):
 
 ```powershell
 cd backend
 .venv\Scripts\activate
-alembic stamp 0001        # solo si nunca usó Alembic en esa base
-alembic upgrade head      # ejecuta db_scripts\upgrades\002_productos_usuarios_ventas.sql
+alembic current           # 0002 = falta el 003; sin versión = ejecute primero "alembic stamp 0001" o "0002"
+alembic upgrade head
 python -m app.infrastructure.database.seed
 ```
 
-o importe `backend/db_scripts/upgrades/002_productos_usuarios_ventas.sql` desde phpMyAdmin (una sola vez) y luego
-ejecute `alembic stamp head`. Los productos existentes reciben un SKU provisional (`SKU-000001`, …) y precio por
-mayor = PVP; edítelos después.
+o importe los scripts desde phpMyAdmin y luego ejecute `alembic stamp head` y el seed. Notas:
+- 002: los productos existentes reciben un SKU provisional (`SKU-000001`, …) y precio por mayor = PVP.
+- 003: se crea la sucursal **Matriz** con el stock actual de cada producto; ventas y movimientos existentes quedan en
+  Matriz y los vendedores quedan asignados a ella. Edite luego su ubicación y teléfono en **Sucursales**.
 
 ### 3. Frontend (terminal 2)
 

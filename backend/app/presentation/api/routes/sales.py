@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.application.dto import ConfirmSaleData, SaleItemData
+from app.application.dto import ClientData, ConfirmSaleData, SaleItemData
 from app.application.use_cases.sales import CancelSaleUseCase, ConfirmSaleUseCase, SaleQueries
 from app.application.use_cases.users import ClientUseCases
 from app.domain.entities import User
@@ -14,7 +14,7 @@ from app.domain.value_objects.permissions import Perm
 from app.presentation.api.dependencies import PageDep, UowDep, require_permissions
 from app.presentation.api.schemas.common import PageResponse
 from app.presentation.api.schemas.sales import CreateSaleRequest, SaleResponse
-from app.presentation.api.schemas.users import ClientResponse
+from app.presentation.api.schemas.users import ClientRequest, ClientResponse
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
@@ -45,6 +45,19 @@ def lookup_customer(
     return ClientResponse.model_validate(ClientUseCases(uow).find_by_identificacion(identificacion))
 
 
+@router.post("/customers", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
+def create_customer(
+    body: ClientRequest,
+    uow: UowDep,
+    _: Annotated[User, Depends(require_permissions(Perm.SALES_CREATE))],
+):
+    """Registers a new client (role CLIENTE, no password) from the sales screen.
+
+    Sellers do not need access to the Usuarios / Clientes modules for this.
+    """
+    return ClientResponse.model_validate(ClientUseCases(uow).create(ClientData(**body.model_dump())))
+
+
 @router.get("/{sale_id}", response_model=SaleResponse)
 def get_sale(sale_id: int, uow: UowDep, _: CanView):
     return SaleResponse.model_validate(SaleQueries(uow).get(sale_id))
@@ -56,8 +69,8 @@ def confirm_sale(
     uow: UowDep,
     actor: Annotated[User, Depends(require_permissions(Perm.SALES_CREATE))],
 ):
-    items = [SaleItemData(product_id=i.product_id, cantidad=i.cantidad) for i in body.items]
-    data = ConfirmSaleData(items=items, factura=body.factura, cliente_id=body.cliente_id)
+    items = [SaleItemData(inventory_id=i.inventory_id, cantidad=i.cantidad) for i in body.items]
+    data = ConfirmSaleData(branch_id=body.branch_id, items=items, factura=body.factura, cliente_id=body.cliente_id)
     return SaleResponse.model_validate(ConfirmSaleUseCase(uow).execute(data, actor))
 
 

@@ -9,6 +9,7 @@ export interface Client extends Timestamps {
   /** Cédula (10 digits) or RUC (13 digits) */
   identificacion: string | null;
   celular: string | null;
+  provincia: string | null;
   ciudad: string | null;
   /** null = show the default avatar */
   foto_url: string | null;
@@ -21,6 +22,7 @@ export interface ClientRequest {
   email: string;
   identificacion: string;
   celular: string | null;
+  provincia: string | null;
   ciudad: string | null;
   estado: boolean;
 }

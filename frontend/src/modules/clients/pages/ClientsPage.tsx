@@ -52,7 +52,12 @@ export function ClientsPage() {
     },
     { key: 'identificacion', header: 'Cédula / RUC', render: (r) => r.identificacion ?? '—' },
     { key: 'celular', header: 'Celular', render: (r) => r.celular ?? '—' },
-    { key: 'ciudad', header: 'Ciudad', render: (r) => r.ciudad ?? '—', sortValue: (r) => r.ciudad ?? '' },
+    {
+      key: 'ciudad',
+      header: 'Ciudad',
+      render: (r) => (r.ciudad ? `${r.ciudad}, ${r.provincia}` : '—'),
+      sortValue: (r) => r.ciudad ?? '',
+    },
     { key: 'estado', header: 'Estado', render: (r) => <StatusBadge active={r.estado} /> },
     {
       key: 'acciones',

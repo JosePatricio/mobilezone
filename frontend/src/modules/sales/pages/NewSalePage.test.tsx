@@ -1,46 +1,66 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
+import type { ClientRequest } from '@/modules/clients/types';
+import type { InventoryItem } from '@/modules/inventory/types';
 import { ApiError } from '@/shared/services/apiError';
-import { renderWithProviders } from '@/test/utils';
+import { fakeAuth, renderWithProviders } from '@/test/utils';
 import type { CreateSaleRequest } from '../types';
 import { NewSalePage } from './NewSalePage';
 
-const product = (id: number, nombre: string, precio_venta: string, stock: number) => ({
+const inventory = (id: number, nombre: string, precio_venta: string, stock: number, sku = `SKU-${id}`): InventoryItem => ({
   id,
-  sku: `SKU-${id}`,
-  nombre,
-  precio_venta,
-  precio_costo: '1.00',
-  precio_mayor: '2.00',
+  product_id: id * 10,
+  product: { id: id * 10, sku, nombre, precio_venta, imagen_url: null, estado: true },
+  branch_id: 1,
+  branch: { id: 1, nombre: 'Matriz' },
   stock,
-  imagen_url: null,
-  estado: true,
-  category_id: 1,
-  category: { id: 1, nombre: 'C' },
+  updated_at: '2026-01-01T00:00:00Z',
 });
-const products = [product(1, 'Producto A', '10.00', 15), product(2, 'Producto B', '25.00', 3)];
+const stockMatriz = [inventory(1, 'Pantalla A', '10.00', 15, 'PAN-A'), inventory(2, 'Pantalla B', '25.00', 3, 'PAN-B')];
 
 const customer = {
   id: 7,
   nombre: 'Juan',
   apellido: 'Pérez',
   email: 'juan@example.com',
-  identificacion: '1712345678',
+  identificacion: '1712345675',
   celular: '0991234567',
+  provincia: 'Pichincha',
   ciudad: 'Quito',
   foto_url: null,
   estado: true,
 };
 
-vi.mock('@/modules/products/services/productApi', () => ({
-  PRODUCTS_KEY: 'products',
-  productApi: { list: () => Promise.resolve({ items: products, total: 2, page: 1, size: 10, pages: 1 }) },
+const inventoryCalls: Record<string, unknown>[] = [];
+vi.mock('@/modules/inventory/services/inventoryApi', () => ({
+  INVENTORY_KEY: 'inventory',
+  inventoryApi: {
+    list: (params: Record<string, unknown>) => {
+      inventoryCalls.push(params);
+      const term = String(params.search ?? '').toLowerCase();
+      const items = stockMatriz.filter(
+        (i) => i.product.sku.toLowerCase().includes(term) || i.product.nombre.toLowerCase().includes(term),
+      );
+      return Promise.resolve({ items, total: items.length, page: 1, size: 10, pages: 1 });
+    },
+  },
+}));
+
+// Provinces / cities come from GET /locations/provinces.
+vi.mock('@/shared/services/httpClient', () => ({
+  http: {
+    get: (url: string) =>
+      url === '/locations/provinces'
+        ? Promise.resolve({ data: [{ nombre: 'Pichincha', ciudades: ['Quito', 'Cayambe'] }] })
+        : Promise.reject(new Error(`unexpected GET ${url}`)),
+  },
+  onUnauthorized: () => () => undefined,
 }));
 
 // Plain functions (not vi.fn) so rejected promises are not tracked by a spy.
 const saleCalls: CreateSaleRequest[] = [];
-const lookupCalls: string[] = [];
+const createdCustomers: ClientRequest[] = [];
 let confirmImpl: (body: CreateSaleRequest) => Promise<unknown> = () => new Promise(() => {});
 vi.mock('../services/saleApi', () => ({
   SALES_KEY: 'sales',
@@ -49,19 +69,27 @@ vi.mock('../services/saleApi', () => ({
       saleCalls.push(body);
       return confirmImpl(body);
     },
-    lookupCustomer: (identificacion: string) => {
-      lookupCalls.push(identificacion);
-      return identificacion === customer.identificacion
+    lookupCustomer: (identificacion: string) =>
+      identificacion === customer.identificacion
         ? Promise.resolve(customer)
-        : Promise.reject(new ApiError(404, 'CLIENT_NOT_FOUND', 'No se encontró ningún cliente con esa cédula / RUC.'));
+        : Promise.reject(new ApiError(404, 'CLIENT_NOT_FOUND', 'No se encontró ningún cliente con esa cédula / RUC.')),
+    createCustomer: (body: ClientRequest) => {
+      createdCustomers.push(body);
+      return Promise.resolve({ ...customer, ...body, id: 8 });
     },
   },
 }));
 
-async function addProduct(name: string) {
-  await userEvent.click(screen.getByLabelText('Buscar producto'));
-  const list = await screen.findByRole('listbox');
-  await userEvent.click(await within(list).findByText(name));
+const seller = fakeAuth({ permissionCodes: ['sales.create', 'sales.view', 'products.view', 'inventory.view'] });
+
+function renderPage() {
+  return renderWithProviders(<NewSalePage />, { auth: seller });
+}
+
+async function searchProduct(term: string) {
+  const input = screen.getByRole('textbox', { name: 'Buscar producto' });
+  await userEvent.clear(input);
+  await userEvent.type(input, `${term}{Enter}`);
 }
 
 async function confirmSale() {
@@ -73,105 +101,141 @@ async function confirmSale() {
 describe('NewSalePage', () => {
   beforeEach(() => {
     saleCalls.length = 0;
-    lookupCalls.length = 0;
+    createdCustomers.length = 0;
+    inventoryCalls.length = 0;
     confirmImpl = () => new Promise(() => {});
   });
 
-  it('adds several products at PVP, shows stock and calculates the total', async () => {
-    renderWithProviders(<NewSalePage />);
-    await addProduct('Producto A');
-    await addProduct('Producto B');
-    const qtyA = screen.getByLabelText('Cantidad de Producto A');
-    await userEvent.clear(qtyA);
-    await userEvent.type(qtyA, '2');
-    expect(screen.getByTestId('sale-total')).toHaveTextContent('45,00');
-    const rowB = screen.getByLabelText('Cantidad de Producto B').closest('tr')!;
-    expect(within(rowB).getByText('3')).toBeInTheDocument();
+  it('searches in the seller branch with Enter and shows image, SKU, name, quantity, stock and price', async () => {
+    renderPage();
+    await searchProduct('pan-a');
+    expect(inventoryCalls[0]).toMatchObject({ branch_id: 1, search: 'pan-a', active: true });
+
+    const row = screen.getByLabelText('Cantidad de Pantalla A').closest('tr')!;
+    expect(within(row).getByText('PAN-A')).toBeInTheDocument();
+    expect(within(row).getByText('Pantalla A')).toBeInTheDocument();
+    expect(within(row).getByText('15')).toBeInTheDocument(); // stock
+    expect(within(row).getByRole('button', { name: 'Ver imagen de Pantalla A' })).toBeInTheDocument();
+
+    await userEvent.click(within(row).getByRole('button', { name: 'Agregar una unidad de Pantalla A' }));
+    await userEvent.click(within(row).getByRole('button', { name: 'Agregar una unidad de Pantalla A' }));
+    expect(screen.getByLabelText('Cantidad de Pantalla A')).toHaveValue(3);
+    await userEvent.click(within(row).getByRole('button', { name: 'Quitar una unidad de Pantalla A' }));
+    expect(screen.getByLabelText('Cantidad de Pantalla A')).toHaveValue(2);
+    expect(screen.getByTestId('sale-total')).toHaveTextContent('20,00');
+  });
+
+  it('lists several matches to choose and opens the image large', async () => {
+    renderPage();
+    await searchProduct('pantalla');
+    const results = await screen.findByRole('list', { name: 'Resultados de la búsqueda' });
+    await userEvent.click(within(results).getByText('Pantalla B'));
+    expect(screen.getByLabelText('Cantidad de Pantalla B')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ver imagen de Pantalla B' }));
+    expect(await screen.findByRole('dialog', { name: 'Pantalla B' })).toBeInTheDocument();
+  });
+
+  it('offers the Inventario module when the product is not in the branch', async () => {
+    renderPage();
+    await searchProduct('cargador');
+    expect(await screen.findByText(/No se encontró “cargador” en la sucursal Matriz/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Buscar en otras sucursales/ })).toHaveAttribute(
+      'href',
+      '/inventory?search=cargador',
+    );
   });
 
   it('shows a clear message on INSUFFICIENT_STOCK from the backend', async () => {
     confirmImpl = () =>
       Promise.reject(
-        new ApiError(409, 'INSUFFICIENT_STOCK', "Stock insuficiente para el producto 'Producto B'.", {
-          product_id: 2,
+        new ApiError(409, 'INSUFFICIENT_STOCK', "Stock insuficiente para el producto 'Pantalla B'.", {
+          product_id: 20,
           available: 0,
           requested: 1,
         }),
       );
-    renderWithProviders(<NewSalePage />);
-    await addProduct('Producto B');
+    renderPage();
+    await searchProduct('pan-b');
     await confirmSale();
 
-    expect(await screen.findByText(/Stock insuficiente para el producto 'Producto B'/)).toBeInTheDocument();
-    expect(saleCalls).toEqual([{ items: [{ product_id: 2, cantidad: 1 }], factura: false, cliente_id: null }]);
+    expect(await screen.findByText(/Stock insuficiente para el producto 'Pantalla B'/)).toBeInTheDocument();
+    expect(saleCalls).toEqual([
+      { branch_id: 1, items: [{ inventory_id: 2, cantidad: 1 }], factura: false, cliente_id: null },
+    ]);
     expect(screen.getByText('Supera el stock disponible')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Confirmar venta' })).toBeDisabled();
   });
 
-  it('requires confirmation before registering the sale', async () => {
-    renderWithProviders(<NewSalePage />);
-    await addProduct('Producto A');
-    await userEvent.click(screen.getByRole('button', { name: 'Confirmar venta' }));
-    const dialog = await screen.findByRole('alertdialog');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
-    expect(saleCalls).toEqual([]);
-  });
-
-  it('defaults to comprobante for consumidor final', () => {
-    renderWithProviders(<NewSalePage />);
+  it('defaults to Consumidor final without a user icon', () => {
+    renderPage();
     expect(screen.getByLabelText('Cliente')).toHaveValue('Consumidor final');
+    expect(screen.queryByRole('button', { name: 'Consumidor final' })).not.toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Tipo de documento' })).not.toBeChecked();
   });
 
-  it('finds a client by cédula with Enter, selects it and issues a factura', async () => {
-    renderWithProviders(<NewSalePage />);
+  it('selects a client by cédula and shows "name, cédula, phone" in the field', async () => {
+    renderPage();
     await userEvent.click(screen.getByRole('switch', { name: 'Tipo de documento' }));
     await userEvent.click(screen.getByRole('button', { name: 'Buscar cliente por cédula o RUC' }));
-
     const modal = await screen.findByRole('dialog', { name: 'Buscar cliente' });
-    const select = within(modal).getByRole('button', { name: 'Seleccionar' });
-    expect(select).toBeDisabled();
-    await userEvent.type(within(modal).getByLabelText('Cédula o RUC'), '1712345678{Enter}');
-
+    await userEvent.type(within(modal).getByLabelText('Cédula o RUC'), '1712345675{Enter}');
     expect(await within(modal).findByText('Juan Pérez')).toBeInTheDocument();
-    expect(within(modal).getByText('Quito')).toBeInTheDocument();
-    expect(lookupCalls).toEqual(['1712345678']);
-    await userEvent.click(select);
+    await userEvent.click(within(modal).getByRole('button', { name: 'Seleccionar' }));
 
-    expect(screen.queryByRole('dialog', { name: 'Buscar cliente' })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Cliente')).toHaveValue('Juan Pérez');
+    expect(screen.getByLabelText('Cliente')).toHaveValue('Juan Pérez, 1712345675, 0991234567');
+    expect(screen.queryByText(/Cédula \/ RUC:/)).not.toBeInTheDocument();
 
-    await addProduct('Producto A');
+    await searchProduct('pan-a');
     await confirmSale();
-    expect(saleCalls).toEqual([{ items: [{ product_id: 1, cantidad: 1 }], factura: true, cliente_id: 7 }]);
+    expect(saleCalls).toEqual([{ branch_id: 1, items: [{ inventory_id: 1, cantidad: 1 }], factura: true, cliente_id: 7 }]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar cliente (Consumidor final)' }));
+    expect(screen.getByLabelText('Cliente')).toHaveValue('Consumidor final');
   });
 
-  it('shows an error when the client does not exist and validates the format', async () => {
-    renderWithProviders(<NewSalePage />);
+  it('registers a new client (role CLIENTE) from the modal when it does not exist', async () => {
+    renderPage();
     await userEvent.click(screen.getByRole('button', { name: 'Buscar cliente por cédula o RUC' }));
     const modal = await screen.findByRole('dialog', { name: 'Buscar cliente' });
-    const input = within(modal).getByLabelText('Cédula o RUC');
+    await userEvent.type(within(modal).getByLabelText('Cédula o RUC'), '0102030400{Enter}');
+    await userEvent.click(await within(modal).findByRole('button', { name: 'Registrar nuevo cliente' }));
 
-    await userEvent.type(input, '123{Enter}');
-    expect(await within(modal).findByRole('alert')).toHaveTextContent('10 dígitos');
-    expect(lookupCalls).toEqual([]);
+    const form = within(modal).getByRole('form', { name: 'Registrar cliente' });
+    expect(within(form).getByText('CLIENTE')).toBeInTheDocument();
+    expect(within(form).queryByLabelText(/Contraseña/)).not.toBeInTheDocument();
+    await userEvent.type(within(form).getByLabelText(/Nombre/), 'Ana');
+    await userEvent.type(within(form).getByLabelText(/Apellido/), 'Loor');
+    await userEvent.type(within(form).getByLabelText(/Email/), 'ana@example.com');
+    await userEvent.type(within(form).getByLabelText('Celular'), '0987654321');
+    await within(form).findByRole('option', { name: 'Pichincha' });
+    await userEvent.selectOptions(within(form).getByLabelText('Provincia'), 'Pichincha');
+    await userEvent.selectOptions(within(form).getByLabelText('Ciudad'), 'Quito');
+    await userEvent.click(within(form).getByRole('button', { name: 'Registrar cliente' }));
 
-    await userEvent.clear(input);
-    await userEvent.type(input, '0999999999{Enter}');
-    expect(await within(modal).findByRole('alert')).toHaveTextContent('No se encontró');
-    expect(within(modal).getByRole('button', { name: 'Seleccionar' })).toBeDisabled();
+    expect(createdCustomers[0]).toMatchObject({
+      nombre: 'Ana',
+      apellido: 'Loor',
+      identificacion: '0102030400',
+      provincia: 'Pichincha',
+      ciudad: 'Quito',
+    });
+    await userEvent.click(within(modal).getByRole('button', { name: 'Seleccionar' }));
+    expect(screen.getByLabelText('Cliente')).toHaveValue('Ana Loor, 0102030400, 0987654321');
   });
 
-  it('the user icon sets Consumidor final', async () => {
-    renderWithProviders(<NewSalePage />);
+  it('rejects an invalid cédula before calling the API', async () => {
+    renderPage();
     await userEvent.click(screen.getByRole('button', { name: 'Buscar cliente por cédula o RUC' }));
     const modal = await screen.findByRole('dialog', { name: 'Buscar cliente' });
     await userEvent.type(within(modal).getByLabelText('Cédula o RUC'), '1712345678{Enter}');
-    await within(modal).findByText('Juan Pérez');
-    await userEvent.click(within(modal).getByRole('button', { name: 'Seleccionar' }));
-    expect(screen.getByLabelText('Cliente')).toHaveValue('Juan Pérez');
+    expect(await within(modal).findByRole('alert')).toHaveTextContent('no es válido');
+  });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Consumidor final' }));
-    expect(screen.getByLabelText('Cliente')).toHaveValue('Consumidor final');
+  it('asks for a branch when the seller has none', () => {
+    renderWithProviders(<NewSalePage />, {
+      auth: fakeAuth({ permissionCodes: ['sales.create'], user: { ...seller.user!, branches: [] } }),
+    });
+    expect(screen.getByText('Sin sucursal asignada')).toBeInTheDocument();
   });
 });

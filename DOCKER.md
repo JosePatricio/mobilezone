@@ -301,3 +301,8 @@ docker compose exec db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" mobilezone 
 ```
 
 Do **not** run `docker compose down -v`. It deletes the database volume and all data.
+
+
+cd /opt/mobilezone
+git pull
+docker compose up -d --build

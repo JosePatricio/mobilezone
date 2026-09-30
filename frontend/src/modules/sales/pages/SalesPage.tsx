@@ -7,7 +7,7 @@ import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatDateTime, fullName } from '@/shared/utils/format';
 import { formatMoney, toCents } from '@/shared/utils/money';
 import { SALES_KEY, saleApi } from '../services/saleApi';
-import { customerLabel, documentLabel, type Sale } from '../types';
+import { customerName, documentLabel, type Sale } from '../types';
 
 export function SalesPage() {
   const navigate = useNavigate();
@@ -32,9 +32,10 @@ export function SalesPage() {
     {
       key: 'cliente',
       header: 'Cliente',
-      render: (r) => customerLabel(r.cliente),
-      sortValue: (r) => customerLabel(r.cliente).toLowerCase(),
+      render: (r) => customerName(r.cliente),
+      sortValue: (r) => customerName(r.cliente).toLowerCase(),
     },
+    { key: 'sucursal', header: 'Sucursal', render: (r) => r.branch.nombre, sortValue: (r) => r.branch.nombre },
     { key: 'vendedor', header: 'Vendedor', render: (r) => fullName(r.user) },
     { key: 'items', header: 'Productos', align: 'right', render: (r) => r.details.length },
     { key: 'total', header: 'Total', align: 'right', render: (r) => formatMoney(r.total), sortValue: (r) => toCents(r.total) },

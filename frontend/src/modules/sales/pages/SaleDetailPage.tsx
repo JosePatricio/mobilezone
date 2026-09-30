@@ -79,10 +79,9 @@ export function SaleDetailPage() {
           <dt>Documento</dt>
           <dd>{documentLabel(sale.factura)}</dd>
           <dt>Cliente</dt>
-          <dd>
-            {customerLabel(sale.cliente)}
-            {sale.cliente?.identificacion && <small className="muted"> · {sale.cliente.identificacion}</small>}
-          </dd>
+          <dd>{customerLabel(sale.cliente)}</dd>
+          <dt>Sucursal</dt>
+          <dd>{sale.branch.nombre}</dd>
           <dt>Vendedor</dt>
           <dd>{fullName(sale.user)}</dd>
           <dt>Estado</dt>

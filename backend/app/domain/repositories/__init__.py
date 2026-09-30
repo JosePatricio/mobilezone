@@ -7,9 +7,11 @@ from datetime import date
 from typing import Generic, Iterator, TypeVar
 
 from app.domain.entities import (
+    Branch,
     Brand,
     Category,
     DeviceModel,
+    Inventory,
     Permission,
     Product,
     Role,
@@ -87,10 +89,6 @@ class ProductRepository(Repository[Product]):
     def get_by_sku(self, sku: str) -> Product | None: ...
 
     @abstractmethod
-    def get_for_update(self, product_id: int) -> Product | None:
-        """Load a product locking its row (``SELECT ... FOR UPDATE`` where supported)."""
-
-    @abstractmethod
     def list(
         self,
         page: PageRequest,
@@ -101,12 +99,45 @@ class ProductRepository(Repository[Product]):
     ) -> Page[Product]: ...
 
 
+class BranchRepository(Repository[Branch]):
+    @abstractmethod
+    def get_by_nombre(self, nombre: str) -> Branch | None: ...
+
+    @abstractmethod
+    def get_many(self, ids: list[int]) -> list[Branch]: ...
+
+    @abstractmethod
+    def list(self, page: PageRequest, *, search: str | None = None, estado: bool | None = None) -> Page[Branch]: ...
+
+
+class InventoryRepository(Repository[Inventory]):
+    @abstractmethod
+    def get_for_update(self, inventory_id: int) -> Inventory | None:
+        """Load an inventory row locking it (``SELECT ... FOR UPDATE``)."""
+
+    @abstractmethod
+    def get_by_product_and_branch(self, product_id: int, branch_id: int) -> Inventory | None: ...
+
+    @abstractmethod
+    def list(
+        self,
+        page: PageRequest,
+        *,
+        search: str | None = None,
+        branch_id: int | None = None,
+        product_id: int | None = None,
+        with_stock: bool | None = None,
+        active_products: bool | None = None,
+    ) -> Page[Inventory]:
+        """``search`` matches the product SKU or name."""
+
+
 class StockMovementRepository(ABC):
     @abstractmethod
     def add(self, movement: StockMovement) -> StockMovement: ...
 
     @abstractmethod
-    def list_by_product(self, product_id: int, page: PageRequest) -> Page[StockMovement]: ...
+    def list_by_inventory(self, inventory_id: int, page: PageRequest) -> Page[StockMovement]: ...
 
 
 class SaleRepository(Repository[Sale]):
@@ -177,6 +208,8 @@ class UnitOfWork(ABC):
     permissions: PermissionRepository
     categories: CategoryRepository
     products: ProductRepository
+    branches: BranchRepository
+    inventory: InventoryRepository
     stock_movements: StockMovementRepository
     sales: SaleRepository
     brands: BrandRepository

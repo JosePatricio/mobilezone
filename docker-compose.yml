@@ -38,6 +38,8 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
       UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
       TZ: ${TZ:-UTC}
+    volumes:
+      - media_data:/app/media   # uploaded product images and user photos
     expose:
       - "8000"
 
@@ -51,3 +53,4 @@ services:
 
 volumes:
   mysql_data:
+  media_data:

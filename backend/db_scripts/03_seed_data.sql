@@ -1,5 +1,5 @@
 -- =============================================================================
--- MobileZone — 03. Initial data: permission catalog, system roles, admin user
+-- MobileZone — 03. Initial data: permission catalog, system roles, default branch, admin
 -- Idempotent: can be run several times. Equivalent to
 --   python -m app.infrastructure.database.seed
 -- (the Python seed reads the admin credentials from .env; prefer it when possible).
@@ -26,10 +26,16 @@ INSERT INTO permissions (codigo, descripcion) VALUES
     ('products.create', 'Crear productos'),
     ('products.update', 'Editar y activar/desactivar productos'),
     ('products.delete', 'Eliminar productos'),
-    ('products.stock', 'Ajustar stock de productos'),
+    ('branches.view', 'Ver sucursales'),
+    ('branches.create', 'Crear sucursales'),
+    ('branches.update', 'Editar y activar/desactivar sucursales'),
+    ('branches.delete', 'Eliminar sucursales'),
+    ('inventory.view', 'Ver inventario (stock por sucursal)'),
+    ('inventory.manage', 'Registrar productos en sucursales y ajustar stock'),
     ('sales.view', 'Ver ventas'),
     ('sales.create', 'Registrar ventas'),
     ('sales.cancel', 'Anular ventas'),
+    ('sales.any_branch', 'Vender desde cualquier sucursal (sin estar asignado)'),
     ('clients.view', 'Ver clientes'),
     ('clients.create', 'Crear clientes'),
     ('clients.update', 'Editar clientes'),
@@ -67,7 +73,8 @@ SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.nombre = 'ADMIN'
 -- VENDEDOR
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p ON p.codigo IN (
-    'products.view', 'sales.view', 'sales.create'
+    'products.view', 'inventory.view', 'sales.view',
+    'sales.create'
 ) WHERE r.nombre = 'VENDEDOR';
 
 -- TECNICO
@@ -80,6 +87,10 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.codigo IN (
 ) WHERE r.nombre = 'TECNICO';
 
 -- CLIENTE: no permissions (clients do not log in)
+
+-- Default branch (stock is kept per branch) ----------------------------------
+INSERT INTO branches (nombre, ubicacion)
+SELECT 'Matriz', 'Por definir' FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM branches);
 
 -- Initial administrator -----------------------------------------------------
 -- email: admin@example.com / password: Admin12345  (bcrypt hash below)

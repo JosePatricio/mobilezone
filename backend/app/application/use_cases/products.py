@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from app.application.dto import ProductData, StockAdjustmentData
+from app.application.dto import ProductData
 from app.application.services.files import FileStorage
-from app.application.use_cases.base import CrudUseCases, UseCase
+from app.application.use_cases.base import CrudUseCases
 from app.application.use_cases.images import replace_image
-from app.domain.entities import Product, StockMovement, User
+from app.domain.entities import Product
 from app.domain.exceptions import ConflictError, NotFoundError, ValidationError
 from app.domain.repositories import Repository, UnitOfWork
-from app.domain.value_objects.enums import StockMovementType
 from app.domain.value_objects.pagination import Page, PageRequest
 
 
@@ -91,29 +90,3 @@ class ProductUseCases(CrudUseCases[Product]):
         return replace_image(
             self.uow, self.storage, lambda: self.get(product_id), "imagen", PRODUCT_IMAGES_FOLDER, content
         )
-
-    def stock_movements(self, product_id: int, page: PageRequest) -> Page[StockMovement]:
-        self.get(product_id)
-        return self.uow.stock_movements.list_by_product(product_id, page)
-
-
-class UpdateProductStockUseCase(UseCase):
-    """Manual stock adjustment (entry or exit), audited and transactional."""
-
-    def execute(self, product_id: int, data: StockAdjustmentData, actor: User) -> Product:
-        with self.uow.transaction():
-            product = self.uow.products.get_for_update(product_id)
-            if product is None:
-                raise NotFoundError("Producto no encontrado.", code="PRODUCT_NOT_FOUND")
-            product.adjust_stock(data.cantidad)
-            self.uow.stock_movements.add(
-                StockMovement(
-                    product_id=product_id,
-                    tipo=StockMovementType.AJUSTE,
-                    cantidad=data.cantidad,
-                    stock_resultante=product.stock,
-                    user_id=actor.id,
-                    motivo=(data.motivo or "").strip() or None,
-                )
-            )
-        return product

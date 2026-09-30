@@ -13,7 +13,9 @@ RUN pip install -r requirements.txt
 
 COPY . .
 # Normalise line endings in case the repo was checked out on Windows with CRLF.
+# /app/media holds uploaded images (mounted as a volume in docker-compose.yml).
 RUN sed -i 's/\r$//' docker/entrypoint.sh && chmod +x docker/entrypoint.sh \
+    && mkdir -p /app/media \
     && useradd --create-home --uid 1000 appuser && chown -R appuser /app
 USER appuser
 

@@ -31,7 +31,7 @@ export function ProductsPage() {
   const canCreate = usePermission(P.PRODUCTS_CREATE);
   const canUpdate = usePermission(P.PRODUCTS_UPDATE);
   const canDelete = usePermission(P.PRODUCTS_DELETE);
-  const canAdjust = usePermission(P.PRODUCTS_STOCK);
+  const canViewInventory = usePermission(P.INVENTORY_VIEW);
   // The seller (VENDEDOR) has no access to Categorías: the filter is hidden for them.
   const canViewCategories = usePermission(P.CATEGORIES_VIEW);
   // Acquisition cost is only shown to users who manage products.
@@ -108,7 +108,7 @@ export function ProductsPage() {
       : []),
     {
       key: 'stock',
-      header: 'Stock',
+      header: 'Stock total',
       align: 'right',
       sortValue: (r) => r.stock,
       render: (r) => <span className={r.stock === 0 ? 'text-danger' : undefined}>{r.stock}</span>,
@@ -120,9 +120,11 @@ export function ProductsPage() {
       align: 'right',
       render: (r) => (
         <div className="row-actions">
-          <Button size="sm" variant="ghost" onClick={() => setStockOf(r)}>
-            Stock
-          </Button>
+          {canViewInventory && (
+            <Button size="sm" variant="ghost" onClick={() => setStockOf(r)}>
+              Stock
+            </Button>
+          )}
           {canUpdate && (
             <>
               <Button size="sm" variant="secondary" onClick={() => setEditing(r)}>
@@ -190,7 +192,7 @@ export function ProductsPage() {
           }}
         />
       )}
-      {stockOf && <StockModal product={stockOf} canAdjust={canAdjust} onClose={() => setStockOf(null)} />}
+      {stockOf && <StockModal product={stockOf} onClose={() => setStockOf(null)} />}
     </>
   );
 }

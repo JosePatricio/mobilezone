@@ -15,11 +15,14 @@ export interface User extends Timestamps {
   email: string;
   identificacion: string | null;
   celular: string | null;
+  provincia: string | null;
   ciudad: string | null;
   /** null = show the default avatar */
   foto_url: string | null;
   rol_id: Id;
   role: NamedRef;
+  /** Branches (sucursales) assigned to the user; sellers sell only from them. */
+  branches: NamedRef[];
   estado: boolean;
 }
 
@@ -31,8 +34,11 @@ export interface UserRequest {
   rol_id: Id;
   identificacion: string | null;
   celular: string | null;
+  provincia: string | null;
   ciudad: string | null;
   estado: boolean;
+  /** Required for the VENDEDOR role */
+  branch_ids: Id[];
 }
 
 export function hasRole(user: { role?: NamedRef | null } | null | undefined, role: string): boolean {

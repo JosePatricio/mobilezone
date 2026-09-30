@@ -6,7 +6,6 @@ from typing import Annotated
 
 from pydantic import Field, StringConstraints, computed_field
 
-from app.domain.value_objects.enums import StockMovementType
 from app.presentation.api.schemas.catalog import CategorySummary
 from app.presentation.api.schemas.common import Description, LongName, Money, RequestSchema, Schema, media_url
 
@@ -15,9 +14,8 @@ Sku = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_
 
 
 class ProductRequest(RequestSchema):
-    """Create / update. There is no stock field: new products start at 0 and stock
-    changes only with ``PATCH /products/{id}/stock`` and sales. The image is uploaded
-    with ``PUT /products/{id}/image``."""
+    """Create / update. Stock is not part of the product: it is kept per branch in
+    ``/inventory``. The image is uploaded with ``PUT /products/{id}/image``."""
 
     category_id: int
     sku: Sku
@@ -27,11 +25,6 @@ class ProductRequest(RequestSchema):
     precio_costo: Money = Field(description="Precio de adquisición")
     precio_mayor: Money = Field(description="Precio de venta al por mayor")
     estado: bool = True
-
-
-class StockAdjustmentRequest(RequestSchema):
-    cantidad: int = Field(description="Positivo = entrada, negativo = salida. Distinto de cero.")
-    motivo: Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=255)] = None
 
 
 class _WithImage(Schema):
@@ -59,26 +52,7 @@ class ProductResponse(_WithImage):
     precio_venta: Decimal
     precio_costo: Decimal
     precio_mayor: Decimal
-    stock: int
+    stock: int = Field(validation_alias="stock_total", description="Stock total (suma de todas las sucursales)")
     estado: bool
     created_at: datetime
     updated_at: datetime
-
-
-class ProductStockResponse(Schema):
-    product_id: int
-    nombre: str
-    stock: int
-    estado: bool
-
-
-class StockMovementResponse(Schema):
-    id: int
-    product_id: int
-    tipo: StockMovementType
-    cantidad: int
-    stock_resultante: int
-    user_id: int | None
-    referencia: str | None
-    motivo: str | None
-    fecha: datetime

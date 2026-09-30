@@ -9,10 +9,13 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.application.services.security import PasswordHasher
-from app.domain.entities import Permission, Role, User
+from app.domain.entities import Branch, Permission, Role, User
+from app.domain.value_objects.pagination import PageRequest
 from app.domain.value_objects.permissions import DEFAULT_ROLES, PERMISSION_CATALOG
 from app.infrastructure.config.settings import Settings, get_settings
 from app.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
+
+DEFAULT_BRANCH = "Matriz"
 
 
 def seed(session: Session, settings: Settings, hasher: PasswordHasher) -> None:
@@ -25,6 +28,9 @@ def seed(session: Session, settings: Settings, hasher: PasswordHasher) -> None:
             else:
                 existing[codigo] = Permission(codigo=codigo, descripcion=descripcion)
                 session.add(existing[codigo])
+        # Permissions removed from the catalog (e.g. products.stock, replaced by inventory.manage).
+        for codigo in [c for c in existing if c not in PERMISSION_CATALOG]:
+            session.delete(existing.pop(codigo))
         uow.flush()
 
         for nombre, codes in DEFAULT_ROLES.items():
@@ -38,6 +44,10 @@ def seed(session: Session, settings: Settings, hasher: PasswordHasher) -> None:
                 # permissions (e.g. created empty by an upgrade script) gets its defaults.
                 role.set_permissions([existing[c] for c in codes])
         uow.flush()
+
+        # Stock is kept per branch: make sure at least one branch exists.
+        if uow.branches.list(PageRequest(1, 1)).total == 0:
+            uow.branches.add(Branch(nombre=DEFAULT_BRANCH, ubicacion="Por definir"))
 
         if uow.users.get_by_email(settings.admin_email) is None:
             admin_role = uow.roles.get_by_nombre("ADMIN")

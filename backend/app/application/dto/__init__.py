@@ -28,8 +28,8 @@ class DeviceModelData:
 
 @dataclass(frozen=True)
 class ProductData:
-    """Create / update data. Stock is excluded: new products start at 0 and stock
-    changes only through sales and audited adjustments."""
+    """Create / update data. Stock is not part of the product: it lives in the
+    inventory of each branch (``InventoryData``)."""
 
     category_id: int
     sku: str
@@ -48,13 +48,31 @@ class StockAdjustmentData:
 
 
 @dataclass(frozen=True)
-class SaleItemData:
+class BranchData:
+    nombre: str
+    ubicacion: str
+    telefono: str | None = None
+    estado: bool = True
+
+
+@dataclass(frozen=True)
+class InventoryData:
+    """Registers a product in a branch with its initial stock."""
+
     product_id: int
+    branch_id: int
+    stock: int = 0
+
+
+@dataclass(frozen=True)
+class SaleItemData:
+    inventory_id: int  # inventory (product + branch) the units are taken from
     cantidad: int
 
 
 @dataclass(frozen=True)
 class ConfirmSaleData:
+    branch_id: int
     items: list[SaleItemData]
     factura: bool = False  # True = factura, False = comprobante de venta
     cliente_id: int | None = None  # None = consumidor final
@@ -80,8 +98,10 @@ class UserData:
     password: str | None = None  # on update, None keeps the current password
     identificacion: str | None = None
     celular: str | None = None
+    provincia: str | None = None
     ciudad: str | None = None
     estado: bool = True
+    branch_ids: list[int] | None = None  # sucursales (required for VENDEDOR)
 
 
 @dataclass(frozen=True)
@@ -91,6 +111,7 @@ class ClientData:
     email: str
     identificacion: str
     celular: str | None = None
+    provincia: str | None = None
     ciudad: str | None = None
     estado: bool = True
 

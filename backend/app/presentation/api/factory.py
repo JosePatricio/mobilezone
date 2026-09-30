@@ -12,7 +12,7 @@ from app.infrastructure.database.session import build_engine, build_session_fact
 from app.infrastructure.security.jwt_tokens import JwtTokenService
 from app.infrastructure.security.passwords import BcryptPasswordHasher
 from app.infrastructure.storage.local import LocalFileStorage
-from app.presentation.api.routes import auth, catalog, products, roles, sales, users, work_orders
+from app.presentation.api.routes import auth, catalog, inventory, products, roles, sales, users, work_orders
 from app.presentation.api.schemas.common import configure_media_url
 from app.presentation.middleware.errors import register_error_handlers
 
@@ -56,6 +56,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         roles.permissions_router,
         catalog.categories,
         products.router,
+        inventory.branches,
+        inventory.inventory,
+        inventory.locations,
         sales.router,
         catalog.brands,
         catalog.models,

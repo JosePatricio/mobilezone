@@ -20,15 +20,19 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    func,
+    select,
     text,
 )
 from sqlalchemy.dialects.mysql import DATETIME
-from sqlalchemy.orm import registry, relationship
+from sqlalchemy.orm import column_property, registry, relationship
 
 from app.domain.entities import (
+    Branch,
     Brand,
     Category,
     DeviceModel,
+    Inventory,
     Permission,
     Product,
     Role,
@@ -121,7 +125,8 @@ users_table = Table(
     Column("password", String(255)),  # bcrypt hash; NULL for clients (no login)
     Column("identificacion", String(13), unique=True),  # cédula (10) / RUC (13)
     Column("celular", String(20)),
-    Column("ciudad", String(100)),
+    Column("provincia", String(100)),
+    Column("ciudad", String(100)),  # canton of the province (see value_objects/locations.py)
     Column("foto", String(255)),  # relative path in the media storage
     Column("rol_id", ForeignKey("roles.id"), nullable=False, index=True),  # the role defines the user kind
     Column("estado", Boolean, nullable=False, default=True, server_default=TRUE),
@@ -150,11 +155,39 @@ products_table = Table(
     Column("precio_costo", MONEY, nullable=False),  # acquisition cost
     Column("precio_mayor", MONEY, nullable=False),  # wholesale
     Column("imagen", String(255)),  # relative path in the media storage
-    Column("stock", Integer, nullable=False, default=0, server_default=FALSE),
     Column("estado", Boolean, nullable=False, default=True, server_default=TRUE),
     *_timestamps(),
-    CheckConstraint("stock >= 0", name="stock_non_negative"),
     CheckConstraint("precio_venta >= 0 AND precio_costo >= 0 AND precio_mayor >= 0", name="precios_non_negative"),
+)
+
+branches_table = Table(
+    "branches",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("nombre", String(100), nullable=False, unique=True),
+    Column("ubicacion", String(255), nullable=False),
+    Column("telefono", String(20)),
+    Column("estado", Boolean, nullable=False, default=True, server_default=TRUE),
+    *_timestamps(),
+)
+
+user_branches_table = Table(
+    "user_branches",
+    metadata,
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("branch_id", ForeignKey("branches.id", ondelete="CASCADE"), primary_key=True),
+)
+
+inventory_table = Table(
+    "inventory",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("product_id", ForeignKey("products.id"), nullable=False, index=True),
+    Column("branch_id", ForeignKey("branches.id"), nullable=False, index=True),
+    Column("stock", Integer, nullable=False, default=0, server_default=FALSE),
+    *_timestamps(),
+    UniqueConstraint("product_id", "branch_id", name="uq_inventory_product_id_branch_id"),
+    CheckConstraint("stock >= 0", name="stock_non_negative"),
 )
 
 stock_movements_table = Table(
@@ -162,6 +195,7 @@ stock_movements_table = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("product_id", ForeignKey("products.id"), nullable=False, index=True),
+    Column("inventory_id", ForeignKey("inventory.id"), index=True),  # product + branch
     Column("tipo", _str_enum(StockMovementType), nullable=False),
     Column("cantidad", Integer, nullable=False),
     Column("stock_resultante", Integer, nullable=False),
@@ -176,6 +210,7 @@ sales_table = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("user_id", ForeignKey("users.id"), nullable=False, index=True),
+    Column("branch_id", ForeignKey("branches.id"), nullable=False, index=True),  # sucursal
     Column("fecha", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)"), index=True),
     Column("total", MONEY, nullable=False),
     Column("estado", _str_enum(SaleStatus), nullable=False),
@@ -190,6 +225,7 @@ sale_details_table = Table(
     Column("id", Integer, primary_key=True),
     Column("sale_id", ForeignKey("sales.id", ondelete="CASCADE"), nullable=False, index=True),
     Column("product_id", ForeignKey("products.id"), nullable=False, index=True),
+    Column("inventory_id", ForeignKey("inventory.id"), nullable=False, index=True),  # stock taken from
     Column("cantidad", Integer, nullable=False),
     Column("precio_unitario", MONEY, nullable=False),
     Column("subtotal", MONEY, nullable=False),
@@ -296,12 +332,39 @@ def start_mappers() -> None:
             )
         },
     )
+    mapper_registry.map_imperatively(Branch, branches_table)
     mapper_registry.map_imperatively(
-        User, users_table, properties={"role": relationship(Role, lazy="joined")}
+        User,
+        users_table,
+        properties={
+            "role": relationship(Role, lazy="joined"),
+            "branches": relationship(
+                Branch, secondary=user_branches_table, lazy="selectin", order_by=branches_table.c.nombre
+            ),
+        },
     )
     mapper_registry.map_imperatively(Category, categories_table)
+    stock_total = (
+        select(func.coalesce(func.sum(inventory_table.c.stock), 0))
+        .where(inventory_table.c.product_id == products_table.c.id)
+        .correlate_except(inventory_table)
+        .scalar_subquery()
+    )
     mapper_registry.map_imperatively(
-        Product, products_table, properties={"category": relationship(Category, lazy="joined")}
+        Product,
+        products_table,
+        properties={
+            "category": relationship(Category, lazy="joined"),
+            "stock_total": column_property(stock_total),  # read-only: stock of every branch
+        },
+    )
+    mapper_registry.map_imperatively(
+        Inventory,
+        inventory_table,
+        properties={
+            "product": relationship(Product, lazy="joined"),
+            "branch": relationship(Branch, lazy="joined"),
+        },
     )
     mapper_registry.map_imperatively(StockMovement, stock_movements_table)
     mapper_registry.map_imperatively(
@@ -316,6 +379,7 @@ def start_mappers() -> None:
             ),
             "user": relationship(User, foreign_keys=[sales_table.c.user_id], lazy="joined"),
             "cliente": relationship(User, foreign_keys=[sales_table.c.cliente_id], lazy="joined"),
+            "branch": relationship(Branch, lazy="joined"),
         },
     )
     mapper_registry.map_imperatively(Brand, brands_table)

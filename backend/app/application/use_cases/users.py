@@ -5,11 +5,11 @@ from app.application.services.files import FileStorage
 from app.application.services.security import PasswordHasher
 from app.application.use_cases.base import CrudUseCases
 from app.application.use_cases.images import replace_image
-from app.domain.entities import Role, User
+from app.domain.entities import Branch, Role, User
 from app.domain.exceptions import ConflictError, NotFoundError, ValidationError
-from app.domain.entities.user import normalize_identificacion
 from app.domain.repositories import Repository, UnitOfWork
 from app.domain.value_objects.enums import SystemRole
+from app.domain.value_objects.identificacion import normalize_identificacion
 from app.domain.value_objects.pagination import Page, PageRequest
 
 MIN_PASSWORD_LENGTH = 8
@@ -82,15 +82,33 @@ class UserUseCases(_UserValidation):
             rol_id=data.rol_id,
             identificacion=data.identificacion,
             celular=data.celular,
+            provincia=data.provincia,
             ciudad=data.ciudad,
             estado=data.estado,
         )
+
+    def _resolve_branches(self, role: Role, branch_ids: list[int] | None) -> list[Branch]:
+        """Sellers must be assigned to at least one active branch; clients never have branches."""
+        if role.nombre == SystemRole.CLIENTE.value:
+            return []
+        ids = sorted(set(branch_ids or []))
+        branches = self.uow.branches.get_many(ids)
+        if len(branches) != len(ids):
+            raise ValidationError("Sucursal no encontrada.", code="BRANCH_NOT_FOUND", details={"field": "branch_ids"})
+        if role.nombre == SystemRole.VENDEDOR.value and not any(b.estado for b in branches):
+            raise ValidationError(
+                "Asigne al menos una sucursal activa al vendedor.",
+                code="BRANCH_REQUIRED",
+                details={"field": "branch_ids"},
+            )
+        return branches
 
     def create(self, data: UserData) -> User:
         with self.uow.transaction():
             role = self._get_role(data.rol_id)
             user = self._build(data)
             self._ensure_unique(user.email, user.identificacion)
+            user.set_branches(self._resolve_branches(role, data.branch_ids))
             # Clients never log in (no password); every other role needs one.
             if role.nombre != SystemRole.CLIENTE.value:
                 if not data.password:
@@ -109,8 +127,10 @@ class UserUseCases(_UserValidation):
                 raise ValidationError("No puede desactivar su propio usuario.", code="CANNOT_DEACTIVATE_SELF")
             if user.id == actor.id and data.rol_id != user.rol_id:
                 raise ValidationError("No puede cambiar su propio rol.", code="CANNOT_CHANGE_OWN_ROLE")
-            for attr in ("nombre", "apellido", "email", "identificacion", "celular", "ciudad", "estado", "rol_id"):
+            attrs = ("nombre", "apellido", "email", "identificacion", "celular", "provincia", "ciudad", "estado", "rol_id")
+            for attr in attrs:
                 setattr(user, attr, getattr(changes, attr))
+            user.set_branches(self._resolve_branches(role, data.branch_ids))
             if role.nombre == SystemRole.CLIENTE.value:
                 user.password = None
             elif data.password:
@@ -174,6 +194,7 @@ class ClientUseCases(_UserValidation):
             rol_id=rol_id,
             identificacion=data.identificacion,
             celular=data.celular,
+            provincia=data.provincia,
             ciudad=data.ciudad,
             estado=data.estado,
         )
@@ -190,7 +211,7 @@ class ClientUseCases(_UserValidation):
             client = self.get(client_id)
             changes = self._build(data, client.rol_id)  # type: ignore[arg-type]
             self._ensure_unique(changes.email, changes.identificacion, current_id=client.id)
-            for attr in ("nombre", "apellido", "email", "identificacion", "celular", "ciudad", "estado"):
+            for attr in ("nombre", "apellido", "email", "identificacion", "celular", "provincia", "ciudad", "estado"):
                 setattr(client, attr, getattr(changes, attr))
         return client
 

@@ -145,22 +145,29 @@ class TestProducts:
 
         assert created.json()["sku"] == "CARGADOR-USBC"
         assert created.json()["imagen_url"] is None
-        stock = client.get(f"{API}/products/{pid}/stock", headers=admin_headers).json()
-        assert stock["stock"] == 0  # new products always start with stock 0
+        assert created.json()["stock"] == 0  # stock lives in the branch inventory
 
-        client.patch(f"{API}/products/{pid}/stock", json={"cantidad": 4, "motivo": "compra"}, headers=admin_headers)
+        branch_id = factory.default_branch.id
+        inv = client.post(
+            f"{API}/inventory", json={"product_id": pid, "branch_id": branch_id, "stock": 4}, headers=admin_headers
+        )
+        assert inv.status_code == 201, inv.text
+        inv_id = inv.json()["id"]
+        dup = client.post(f"{API}/inventory", json={"product_id": pid, "branch_id": branch_id}, headers=admin_headers)
+        assert dup.json()["error"]["code"] == "INVENTORY_ALREADY_EXISTS"
 
         adjusted = client.patch(
-            f"{API}/products/{pid}/stock", json={"cantidad": -5, "motivo": "rotura"}, headers=admin_headers
+            f"{API}/inventory/{inv_id}/stock", json={"cantidad": -5, "motivo": "rotura"}, headers=admin_headers
         )
         assert adjusted.status_code == 409
         assert adjusted.json()["error"]["code"] == "INSUFFICIENT_STOCK"
 
-        adjusted = client.patch(f"{API}/products/{pid}/stock", json={"cantidad": 6}, headers=admin_headers)
+        adjusted = client.patch(f"{API}/inventory/{inv_id}/stock", json={"cantidad": 6}, headers=admin_headers)
         assert adjusted.json()["stock"] == 10
+        assert client.get(f"{API}/products/{pid}", headers=admin_headers).json()["stock"] == 10
 
-        movements = client.get(f"{API}/products/{pid}/stock-movements", headers=admin_headers).json()
-        assert movements["total"] == 2
+        movements = client.get(f"{API}/inventory/{inv_id}/movements", headers=admin_headers).json()
+        assert movements["total"] == 2  # initial stock + adjustment
 
     def test_negative_price_rejected(self, client, admin_headers, factory):
         category = factory.category()
@@ -193,12 +200,16 @@ class TestSales:
     def test_sale_flow(self, client, factory):
         seller = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, seller.email)
-        a = factory.product(precio="10.00", stock=10)
-        b = factory.product(precio="25.00", stock=1)
+        a = factory.inventory(precio="10.00", stock=10)
+        b = factory.inventory(precio="25.00", stock=1)
+        branch_id = factory.default_branch.id
 
         response = client.post(
             f"{API}/sales",
-            json={"items": [{"product_id": a.id, "cantidad": 2}, {"product_id": b.id, "cantidad": 1}]},
+            json={
+                "branch_id": branch_id,
+                "items": [{"inventory_id": a.id, "cantidad": 2}, {"inventory_id": b.id, "cantidad": 1}],
+            },
             headers=headers,
         )
         assert response.status_code == 201, response.text
@@ -207,10 +218,13 @@ class TestSales:
         assert sale["user"]["id"] == seller.id
         assert len(sale["details"]) == 2
 
-        assert client.get(f"{API}/products/{a.id}/stock", headers=headers).json()["stock"] == 8
+        assert sale["branch"]["id"] == branch_id
+        assert client.get(f"{API}/inventory/{a.id}", headers=headers).json()["stock"] == 8
 
         response = client.post(
-            f"{API}/sales", json={"items": [{"product_id": b.id, "cantidad": 1}]}, headers=headers
+            f"{API}/sales",
+            json={"branch_id": branch_id, "items": [{"inventory_id": b.id, "cantidad": 1}]},
+            headers=headers,
         )
         assert response.status_code == 409
         assert response.json()["error"]["code"] == "INSUFFICIENT_STOCK"
@@ -218,17 +232,20 @@ class TestSales:
     def test_cancel_requires_permission(self, client, factory, admin_headers):
         seller = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, seller.email)
-        product = factory.product(stock=2)
+        inv = factory.inventory(stock=2)
         sale = client.post(
-            f"{API}/sales", json={"items": [{"product_id": product.id, "cantidad": 2}]}, headers=headers
+            f"{API}/sales",
+            json={"branch_id": inv.branch_id, "items": [{"inventory_id": inv.id, "cantidad": 2}]},
+            headers=headers,
         ).json()
         assert client.post(f"{API}/sales/{sale['id']}/cancel", headers=headers).status_code == 403
         cancelled = client.post(f"{API}/sales/{sale['id']}/cancel", headers=admin_headers)
         assert cancelled.json()["estado"] == "ANULADA"
-        assert client.get(f"{API}/products/{product.id}/stock", headers=admin_headers).json()["stock"] == 2
+        assert client.get(f"{API}/inventory/{inv.id}", headers=admin_headers).json()["stock"] == 2
 
     def test_empty_sale_rejected(self, client, admin_headers):
-        assert client.post(f"{API}/sales", json={"items": []}, headers=admin_headers).status_code == 422
+        response = client.post(f"{API}/sales", json={"branch_id": 1, "items": []}, headers=admin_headers)
+        assert response.status_code == 422
 
 
 # ---------------------------------------------------------- work orders
@@ -339,8 +356,9 @@ class TestUsersAndRoles:
                 "email": "tec@x.com",
                 "password": "Password123",
                 "rol_id": role.id,
-                "identificacion": "1712345678",
+                "identificacion": "1712345675",
                 "celular": "0991234567",
+                "provincia": "Pichincha",
                 "ciudad": "Quito",
             },
             headers=admin_headers,
@@ -386,7 +404,7 @@ class TestUsersAndRoles:
         assert body["total"] == 1
         created = client.post(
             f"{API}/clients",
-            json={"nombre": "Juan", "apellido": "Pérez", "email": "juan@x.com", "identificacion": "0102030405"},
+            json={"nombre": "Juan", "apellido": "Pérez", "email": "juan@x.com", "identificacion": "0102030400"},
             headers=admin_headers,
         )
         assert created.status_code == 201

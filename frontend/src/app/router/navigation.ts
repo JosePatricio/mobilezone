@@ -21,6 +21,7 @@ export const NAVIGATION: NavGroup[] = [
     label: 'Comercial',
     items: [
       { to: '/products', label: 'Productos', permissions: [P.PRODUCTS_VIEW] },
+      { to: '/inventory', label: 'Inventario', permissions: [P.INVENTORY_VIEW] },
       { to: '/categories', label: 'Categorías', permissions: [P.CATEGORIES_VIEW] },
     ],
   },
@@ -35,6 +36,7 @@ export const NAVIGATION: NavGroup[] = [
   {
     label: 'Configuración',
     items: [
+      { to: '/branches', label: 'Sucursales', permissions: [P.BRANCHES_VIEW] },
       { to: '/brands', label: 'Marcas', permissions: [P.BRANDS_VIEW] },
       { to: '/models', label: 'Modelos', permissions: [P.MODELS_VIEW] },
       { to: '/users', label: 'Usuarios', permissions: [P.USERS_VIEW] },

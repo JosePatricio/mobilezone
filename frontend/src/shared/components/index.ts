@@ -20,3 +20,4 @@ export {
   DEFAULT_PRODUCT_IMAGE,
   type ImageSelection,
 } from './Images';
+export { LocationFields, useProvinces, type Province } from './LocationFields';

@@ -40,7 +40,7 @@ interface Props {
   onSubmit: (body: ProductRequest, image: ImageSelection) => Promise<void>;
 }
 
-/** There is no initial stock field: stock is loaded with "Stock → Aplicar ajuste" or changes through sales. */
+/** Stock is not part of the product: it is registered per branch in the Inventario module. */
 export function ProductFormModal({ product, categoryOptions, onClose, onSubmit }: Props) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [image, setImage] = useState<ImageSelection>(NO_IMAGE_CHANGE);
@@ -131,7 +131,7 @@ export function ProductFormModal({ product, categoryOptions, onClose, onSubmit }
         <Textarea label="Descripción" className="full" error={errors.descripcion?.message} {...register('descripcion')} />
         <Checkbox label="Activo" toggle {...register('estado')} />
         {!product && (
-          <p className="field-hint full">El producto se crea con stock 0. Cargue el stock con el botón “Stock”.</p>
+          <p className="field-hint full">El stock se registra por sucursal en el módulo Inventario.</p>
         )}
       </form>
     </Modal>

@@ -4,28 +4,21 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, UploadFile, status
 
-from app.application.dto import ProductData, StockAdjustmentData
-from app.application.use_cases.products import ProductUseCases, UpdateProductStockUseCase
-from app.domain.entities import Product, User
+from app.application.dto import ProductData
+from app.application.use_cases.products import ProductUseCases
+from app.domain.entities import User
 from app.domain.value_objects.permissions import Perm
 from app.presentation.api.dependencies import PageDep, StorageDep, UowDep, read_upload, require_permissions
 from app.presentation.api.schemas.common import PageResponse, StatusUpdateRequest
 from app.presentation.api.schemas.products import (
     ProductRequest,
     ProductResponse,
-    ProductStockResponse,
-    StockAdjustmentRequest,
-    StockMovementResponse,
 )
 
 router = APIRouter(prefix="/products", tags=["products"])
 
 CanView = Annotated[User, Depends(require_permissions(Perm.PRODUCTS_VIEW))]
 CanUpdate = Annotated[User, Depends(require_permissions(Perm.PRODUCTS_UPDATE))]
-
-
-def _stock(product: Product) -> ProductStockResponse:
-    return ProductStockResponse(product_id=product.id, nombre=product.nombre, stock=product.stock, estado=product.estado)
 
 
 @router.get("", response_model=PageResponse[ProductResponse])
@@ -52,7 +45,7 @@ def create_product(
     uow: UowDep,
     _: Annotated[User, Depends(require_permissions(Perm.PRODUCTS_CREATE))],
 ):
-    """Creates the product with stock 0 (load stock with PATCH /products/{id}/stock)."""
+    """Creates the product. Its stock is registered per branch in /inventory."""
     product = ProductUseCases(uow).create(ProductData(**body.model_dump()))
     return ProductResponse.model_validate(product)
 
@@ -91,25 +84,3 @@ def delete_product(
 ) -> Response:
     ProductUseCases(uow, storage).delete(product_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.get("/{product_id}/stock", response_model=ProductStockResponse)
-def get_product_stock(product_id: int, uow: UowDep, _: CanView):
-    return _stock(ProductUseCases(uow).get(product_id))
-
-
-@router.patch("/{product_id}/stock", response_model=ProductStockResponse)
-def adjust_product_stock(
-    product_id: int,
-    body: StockAdjustmentRequest,
-    uow: UowDep,
-    actor: Annotated[User, Depends(require_permissions(Perm.PRODUCTS_STOCK))],
-):
-    product = UpdateProductStockUseCase(uow).execute(product_id, StockAdjustmentData(**body.model_dump()), actor)
-    return _stock(product)
-
-
-@router.get("/{product_id}/stock-movements", response_model=PageResponse[StockMovementResponse])
-def list_stock_movements(product_id: int, uow: UowDep, page: PageDep, _: CanView):
-    result = ProductUseCases(uow).stock_movements(product_id, page)
-    return PageResponse[StockMovementResponse].from_page(result, StockMovementResponse)

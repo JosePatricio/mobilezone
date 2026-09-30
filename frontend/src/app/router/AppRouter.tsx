@@ -1,10 +1,12 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { MainLayout } from '@/layouts/MainLayout';
 import { LoginPage } from '@/modules/auth/pages/LoginPage';
+import { BranchesPage } from '@/modules/branches/pages/BranchesPage';
 import { BrandsPage } from '@/modules/brands/pages/BrandsPage';
 import { CategoriesPage } from '@/modules/categories/pages/CategoriesPage';
 import { ClientsPage } from '@/modules/clients/pages/ClientsPage';
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
+import { InventoryPage } from '@/modules/inventory/pages/InventoryPage';
 import { ModelsPage } from '@/modules/models/pages/ModelsPage';
 import { PermissionsPage } from '@/modules/permissions/pages/PermissionsPage';
 import { ProductsPage } from '@/modules/products/pages/ProductsPage';
@@ -33,6 +35,12 @@ export function AppRouter() {
 
           <Route element={<PermissionRoute permission={P.PRODUCTS_VIEW} />}>
             <Route path="products" element={<ProductsPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission={P.INVENTORY_VIEW} />}>
+            <Route path="inventory" element={<InventoryPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission={P.BRANCHES_VIEW} />}>
+            <Route path="branches" element={<BranchesPage />} />
           </Route>
           <Route element={<PermissionRoute permission={P.CATEGORIES_VIEW} />}>
             <Route path="categories" element={<CategoriesPage />} />

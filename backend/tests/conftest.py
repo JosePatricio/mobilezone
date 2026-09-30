@@ -19,7 +19,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.engine import make_url
 
-from app.domain.entities import Brand, Category, DeviceModel, Product, SparePart, User
+from app.domain.entities import Branch, Brand, Category, DeviceModel, Inventory, Product, SparePart, User
+from app.domain.value_objects.identificacion import cedula_check_digit
 from app.domain.repositories import UnitOfWork
 from app.domain.value_objects.enums import SystemRole
 from app.infrastructure.config.settings import Settings
@@ -30,6 +31,12 @@ from app.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
 from app.presentation.api.factory import create_app
 
 PASSWORD = "Secret1234"
+
+
+def valid_cedula(n: int, province: str = "17") -> str:
+    """A valid Ecuadorian cédula (módulo 10) derived from ``n``."""
+    first_nine = f"{province}1{n % 1_000_000:06d}"
+    return first_nine + str(cedula_check_digit(first_nine))
 
 
 def _test_database_url() -> str | None:
@@ -107,16 +114,22 @@ class Factory:
         self.uow = uow
         self.hasher = app.state.password_hasher
         self._seq = 0
+        self.default_branch: Branch = uow.branches.get_by_nombre("Matriz")  # created by the seed
 
     def _next(self) -> int:
         self._seq += 1
         return self._seq
 
-    def user(self, role: SystemRole = SystemRole.VENDEDOR, estado: bool = True) -> User:
-        """A user with the given system role; clients get a cedula and no password."""
+    def user(
+        self, role: SystemRole = SystemRole.VENDEDOR, estado: bool = True, branches: list[Branch] | None = None
+    ) -> User:
+        """A user with the given system role; clients get a valid cédula and no password.
+        Sellers are assigned to the default branch unless ``branches`` is given."""
         n = self._next()
         role_entity = self.uow.roles.get_by_nombre(role.value)
         is_client = role == SystemRole.CLIENTE
+        if branches is None:
+            branches = [self.default_branch] if role == SystemRole.VENDEDOR else []
         with self.uow.transaction():
             user = User(
                 nombre=f"Nombre{n}",
@@ -124,8 +137,9 @@ class Factory:
                 email=f"{role.value.lower()}{n}@example.com",
                 rol_id=role_entity.id,
                 password=None if is_client else self.hasher.hash(PASSWORD),
-                identificacion=f"{1700000000 + n}" if is_client else None,
+                identificacion=valid_cedula(n) if is_client else None,
                 estado=estado,
+                branches=list(branches),
             )
             self.uow.users.add(user)
         return user
@@ -136,8 +150,21 @@ class Factory:
             self.uow.categories.add(category)
         return category
 
-    def product(self, precio: str = "10.00", stock: int = 10, category: Category | None = None, **kw) -> Product:
-        """``precio`` is the PVP (precio_venta)."""
+    def branch(self, nombre: str | None = None, estado: bool = True) -> Branch:
+        with self.uow.transaction():
+            branch = Branch(nombre=nombre or f"Sucursal {self._next()}", ubicacion="Av. Principal", estado=estado)
+            self.uow.branches.add(branch)
+        return branch
+
+    def product(
+        self,
+        precio: str = "10.00",
+        stock: int | None = 10,
+        category: Category | None = None,
+        branch: Branch | None = None,
+        **kw,
+    ) -> Product:
+        """``precio`` is the PVP. With ``stock`` (not None) it is registered in ``branch`` (default: Matriz)."""
         category = category or self.category()
         n = self._next()
         with self.uow.transaction():
@@ -148,11 +175,25 @@ class Factory:
                 precio_venta=Decimal(precio),
                 precio_costo=Decimal(precio) / 2,
                 precio_mayor=Decimal(precio) * Decimal("0.9"),
-                stock=stock,
                 **kw,
             )
             self.uow.products.add(product)
+        if stock is not None:
+            self.stock_of(product, stock, branch)
         return product
+
+    def stock_of(self, product: Product, stock: int, branch: Branch | None = None) -> Inventory:
+        """Registers ``product`` in ``branch`` (default: Matriz) with ``stock`` units."""
+        branch = branch or self.default_branch
+        with self.uow.transaction():
+            inventory = Inventory(product_id=product.id, branch_id=branch.id, stock=stock)
+            self.uow.inventory.add(inventory)
+        return inventory
+
+    def inventory(self, precio: str = "10.00", stock: int = 10, branch: Branch | None = None, **kw) -> Inventory:
+        """A new product registered in ``branch`` (default: Matriz); returns its inventory row."""
+        product = self.product(precio=precio, stock=None, **kw)
+        return self.stock_of(product, stock, branch)
 
     def brand_and_model(self) -> tuple[Brand, DeviceModel]:
         n = self._next()

@@ -24,11 +24,19 @@ class Perm:
     PRODUCTS_CREATE = "products.create"
     PRODUCTS_UPDATE = "products.update"
     PRODUCTS_DELETE = "products.delete"
-    PRODUCTS_STOCK = "products.stock"
+
+    BRANCHES_VIEW = "branches.view"
+    BRANCHES_CREATE = "branches.create"
+    BRANCHES_UPDATE = "branches.update"
+    BRANCHES_DELETE = "branches.delete"
+
+    INVENTORY_VIEW = "inventory.view"
+    INVENTORY_MANAGE = "inventory.manage"
 
     SALES_VIEW = "sales.view"
     SALES_CREATE = "sales.create"
     SALES_CANCEL = "sales.cancel"
+    SALES_ANY_BRANCH = "sales.any_branch"
 
     CLIENTS_VIEW = "clients.view"
     CLIENTS_CREATE = "clients.create"
@@ -72,10 +80,16 @@ PERMISSION_CATALOG: dict[str, str] = {
     Perm.PRODUCTS_CREATE: "Crear productos",
     Perm.PRODUCTS_UPDATE: "Editar y activar/desactivar productos",
     Perm.PRODUCTS_DELETE: "Eliminar productos",
-    Perm.PRODUCTS_STOCK: "Ajustar stock de productos",
+    Perm.BRANCHES_VIEW: "Ver sucursales",
+    Perm.BRANCHES_CREATE: "Crear sucursales",
+    Perm.BRANCHES_UPDATE: "Editar y activar/desactivar sucursales",
+    Perm.BRANCHES_DELETE: "Eliminar sucursales",
+    Perm.INVENTORY_VIEW: "Ver inventario (stock por sucursal)",
+    Perm.INVENTORY_MANAGE: "Registrar productos en sucursales y ajustar stock",
     Perm.SALES_VIEW: "Ver ventas",
     Perm.SALES_CREATE: "Registrar ventas",
     Perm.SALES_CANCEL: "Anular ventas",
+    Perm.SALES_ANY_BRANCH: "Vender desde cualquier sucursal (sin estar asignado)",
     Perm.CLIENTS_VIEW: "Ver clientes",
     Perm.CLIENTS_CREATE: "Crear clientes",
     Perm.CLIENTS_UPDATE: "Editar clientes",
@@ -104,9 +118,10 @@ ALL_PERMISSIONS: list[str] = list(PERMISSION_CATALOG)
 # Default roles created by the seed script (system roles, see SystemRole).
 DEFAULT_ROLES: dict[str, list[str]] = {
     "ADMIN": ALL_PERMISSIONS,
-    # Seller: only the Ventas and Productos modules.
+    # Seller: Ventas, Productos and Inventario (to find the branch that has a product).
     "VENDEDOR": [
         Perm.PRODUCTS_VIEW,
+        Perm.INVENTORY_VIEW,
         Perm.SALES_VIEW,
         Perm.SALES_CREATE,
     ],

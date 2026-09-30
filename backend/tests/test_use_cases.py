@@ -12,7 +12,7 @@ from app.application.dto import (
     WorkOrderData,
     WorkOrderSparePartData,
 )
-from app.application.use_cases.products import UpdateProductStockUseCase
+from app.application.use_cases.inventory import InventoryUseCases
 from app.application.use_cases.sales import CancelSaleUseCase, ConfirmSaleUseCase
 from app.application.use_cases.work_orders import (
     AddSparePartToWorkOrderUseCase,
@@ -30,72 +30,105 @@ def reload(uow, repo_name, entity_id):
     return getattr(uow, repo_name).get(entity_id)
 
 
+def sale(inv_or_items, branch_id: int, **kw) -> ConfirmSaleData:
+    return ConfirmSaleData(branch_id=branch_id, items=inv_or_items, **kw)
+
+
 class TestConfirmSale:
-    def test_sufficient_stock(self, uow, factory):
+    def test_sufficient_stock_discounts_branch_inventory(self, uow, factory):
         seller = factory.user(SystemRole.VENDEDOR)
-        product = factory.product(precio="10.00", stock=10)
-        sale = ConfirmSaleUseCase(uow).execute(ConfirmSaleData([SaleItemData(product.id, 3)]), seller)
-        assert sale.total == Decimal("30.00")
-        assert sale.estado == SaleStatus.CONFIRMADA
-        assert reload(uow, "products", product.id).stock == 7
+        inv = factory.inventory(precio="10.00", stock=10)
+        result = ConfirmSaleUseCase(uow).execute(sale([SaleItemData(inv.id, 3)], inv.branch_id), seller)
+        assert result.total == Decimal("30.00")
+        assert result.estado == SaleStatus.CONFIRMADA
+        assert result.details[0].inventory_id == inv.id
+        assert reload(uow, "inventory", inv.id).stock == 7
+        assert reload(uow, "products", inv.product_id).stock_total == 7
 
     def test_multiple_products_and_merged_lines(self, uow, factory):
         seller = factory.user()
-        a = factory.product(precio="10.00", stock=5)
-        b = factory.product(precio="25.00", stock=5)
+        a = factory.inventory(precio="10.00", stock=5)
+        b = factory.inventory(precio="25.00", stock=5)
         items = [SaleItemData(a.id, 1), SaleItemData(b.id, 1), SaleItemData(a.id, 1)]
-        sale = ConfirmSaleUseCase(uow).execute(ConfirmSaleData(items), seller)
-        assert sale.total == Decimal("45.00")
-        assert len(sale.details) == 2
-        assert reload(uow, "products", a.id).stock == 3
-        assert reload(uow, "products", b.id).stock == 4
+        result = ConfirmSaleUseCase(uow).execute(sale(items, a.branch_id), seller)
+        assert result.total == Decimal("45.00")
+        assert len(result.details) == 2
+        assert reload(uow, "inventory", a.id).stock == 3
+        assert reload(uow, "inventory", b.id).stock == 4
+
+    def test_only_the_sale_branch_is_discounted(self, uow, factory):
+        other = factory.branch()
+        seller = factory.user(SystemRole.VENDEDOR, branches=[factory.default_branch, other])
+        product = factory.product(stock=5)  # Matriz
+        other_inv = factory.stock_of(product, 8, other)
+        ConfirmSaleUseCase(uow).execute(sale([SaleItemData(other_inv.id, 2)], other.id), seller)
+        assert reload(uow, "inventory", other_inv.id).stock == 6
+        assert reload(uow, "products", product.id).stock_total == 11  # 5 in Matriz + 6
+
+    def test_item_from_another_branch_is_rejected(self, uow, factory):
+        other = factory.branch()
+        seller = factory.user(SystemRole.VENDEDOR, branches=[factory.default_branch, other])
+        inv = factory.inventory(stock=5)  # Matriz
+        with pytest.raises(NotFoundError) as exc:
+            ConfirmSaleUseCase(uow).execute(sale([SaleItemData(inv.id, 1)], other.id), seller)
+        assert exc.value.code == "INVENTORY_NOT_FOUND"
+
+    def test_seller_must_be_assigned_to_the_branch(self, uow, factory):
+        other = factory.branch()
+        seller = factory.user(SystemRole.VENDEDOR)  # only Matriz
+        inv = factory.inventory(stock=5, branch=other)
+        with pytest.raises(PermissionDeniedError) as exc:
+            ConfirmSaleUseCase(uow).execute(sale([SaleItemData(inv.id, 1)], other.id), seller)
+        assert exc.value.code == "BRANCH_NOT_ASSIGNED"
+        admin = factory.user(SystemRole.ADMIN)  # sales.any_branch
+        ConfirmSaleUseCase(uow).execute(sale([SaleItemData(inv.id, 1)], other.id), admin)
 
     def test_insufficient_stock_rolls_back_everything(self, uow, factory):
         seller = factory.user()
-        a = factory.product(stock=5)
-        b = factory.product(stock=1)
+        a = factory.inventory(stock=5)
+        b = factory.inventory(stock=1)
         with pytest.raises(InsufficientStockError):
-            ConfirmSaleUseCase(uow).execute(ConfirmSaleData([SaleItemData(a.id, 2), SaleItemData(b.id, 2)]), seller)
-        assert reload(uow, "products", a.id).stock == 5
-        assert reload(uow, "products", b.id).stock == 1
+            ConfirmSaleUseCase(uow).execute(sale([SaleItemData(a.id, 2), SaleItemData(b.id, 2)], a.branch_id), seller)
+        assert reload(uow, "inventory", a.id).stock == 5
+        assert reload(uow, "inventory", b.id).stock == 1
         assert uow.sales.list(PageRequest()).total == 0
 
     def test_historical_price_is_kept(self, uow, factory):
         seller = factory.user()
-        product = factory.product(precio="10.00")
-        sale = ConfirmSaleUseCase(uow).execute(ConfirmSaleData([SaleItemData(product.id, 1)]), seller)
+        inv = factory.inventory(precio="10.00")
+        result = ConfirmSaleUseCase(uow).execute(sale([SaleItemData(inv.id, 1)], inv.branch_id), seller)
         with uow.transaction():
-            reload(uow, "products", product.id).change_prices(Decimal("99.00"), Decimal("50"), Decimal("90"))
-        assert reload(uow, "sales", sale.id).details[0].precio_unitario == Decimal("10.00")
+            reload(uow, "products", inv.product_id).change_prices(Decimal("99.00"), Decimal("50"), Decimal("90"))
+        assert reload(uow, "sales", result.id).details[0].precio_unitario == Decimal("10.00")
 
     def test_inactive_product_rejected(self, uow, factory):
         seller = factory.user()
-        product = factory.product(estado=False)
+        inv = factory.inventory(estado=False)
         with pytest.raises(ValidationError):
-            ConfirmSaleUseCase(uow).execute(ConfirmSaleData([SaleItemData(product.id, 1)]), seller)
+            ConfirmSaleUseCase(uow).execute(sale([SaleItemData(inv.id, 1)], inv.branch_id), seller)
 
-    def test_unknown_product(self, uow, factory):
+    def test_unknown_inventory(self, uow, factory):
         with pytest.raises(NotFoundError):
-            ConfirmSaleUseCase(uow).execute(ConfirmSaleData([SaleItemData(999, 1)]), factory.user())
+            ConfirmSaleUseCase(uow).execute(sale([SaleItemData(999, 1)], factory.default_branch.id), factory.user())
 
     def test_cancel_restores_stock_and_audits(self, uow, factory):
         seller = factory.user()
-        product = factory.product(stock=4)
-        sale = ConfirmSaleUseCase(uow).execute(ConfirmSaleData([SaleItemData(product.id, 3)]), seller)
-        CancelSaleUseCase(uow).execute(sale.id, seller)
-        assert reload(uow, "products", product.id).stock == 4
-        movements = uow.stock_movements.list_by_product(product.id, PageRequest()).items
+        inv = factory.inventory(stock=4)
+        result = ConfirmSaleUseCase(uow).execute(sale([SaleItemData(inv.id, 3)], inv.branch_id), seller)
+        CancelSaleUseCase(uow).execute(result.id, seller)
+        assert reload(uow, "inventory", inv.id).stock == 4
+        movements = uow.stock_movements.list_by_inventory(inv.id, PageRequest()).items
         assert {m.tipo for m in movements} >= {StockMovementType.VENTA, StockMovementType.ANULACION_VENTA}
 
 
 def test_manual_stock_adjustment_never_negative(uow, factory):
     actor = factory.user(SystemRole.ADMIN)
-    product = factory.product(stock=2)
-    UpdateProductStockUseCase(uow).execute(product.id, StockAdjustmentData(cantidad=5, motivo="Compra"), actor)
-    assert reload(uow, "products", product.id).stock == 7
+    inv = factory.inventory(stock=2)
+    InventoryUseCases(uow).adjust_stock(inv.id, StockAdjustmentData(cantidad=5, motivo="Compra"), actor)
+    assert reload(uow, "inventory", inv.id).stock == 7
     with pytest.raises(InsufficientStockError):
-        UpdateProductStockUseCase(uow).execute(product.id, StockAdjustmentData(cantidad=-8), actor)
-    assert reload(uow, "products", product.id).stock == 7
+        InventoryUseCases(uow).adjust_stock(inv.id, StockAdjustmentData(cantidad=-8), actor)
+    assert reload(uow, "inventory", inv.id).stock == 7
 
 
 class TestWorkOrders:

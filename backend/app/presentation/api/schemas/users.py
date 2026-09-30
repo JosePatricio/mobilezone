@@ -8,10 +8,18 @@ from pydantic import EmailStr, Field, StringConstraints, computed_field
 from app.presentation.api.schemas.common import Name, RequestSchema, Schema, media_url
 
 Identificacion = Annotated[
-    str, StringConstraints(strip_whitespace=True, pattern=r"^\d{10}(\d{3})?$"), Field(description="Cédula (10) o RUC (13)")
+    str,
+    StringConstraints(strip_whitespace=True, pattern=r"^\d{10}(\d{3})?$"),
+    Field(description="Cédula (10) o RUC (13), validados con el algoritmo ecuatoriano"),
 ]
 Celular = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=20)]
+Provincia = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=100)]
 Ciudad = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=100)]
+
+
+class BranchRef(Schema):
+    id: int
+    nombre: str
 
 
 class LoginRequest(RequestSchema):
@@ -49,9 +57,11 @@ class UserResponse(_WithPhoto):
     email: str
     identificacion: str | None
     celular: str | None
+    provincia: str | None
     ciudad: str | None
     rol_id: int
     role: RoleSummary
+    branches: list[BranchRef] = Field(description="Sucursales asignadas")
     estado: bool
     created_at: datetime
     updated_at: datetime
@@ -83,8 +93,10 @@ class UserRequest(RequestSchema):
     rol_id: int
     identificacion: Identificacion | None = None
     celular: Celular = None
+    provincia: Provincia = None
     ciudad: Ciudad = None
     estado: bool = True
+    branch_ids: list[int] = Field(default_factory=list, description="Sucursales (obligatorio para VENDEDOR)")
 
 
 class ClientRequest(RequestSchema):
@@ -93,6 +105,7 @@ class ClientRequest(RequestSchema):
     email: EmailStr
     identificacion: Identificacion
     celular: Celular = None
+    provincia: Provincia = None
     ciudad: Ciudad = None
     estado: bool = True
 
@@ -102,6 +115,7 @@ class ClientSummary(Schema):
     nombre: str
     apellido: str
     identificacion: str | None
+    celular: str | None
 
 
 class ClientResponse(_WithPhoto):
@@ -111,6 +125,7 @@ class ClientResponse(_WithPhoto):
     email: str
     identificacion: str | None
     celular: str | None
+    provincia: str | None
     ciudad: str | None
     estado: bool
     created_at: datetime
