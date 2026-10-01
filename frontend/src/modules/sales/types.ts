@@ -51,6 +51,9 @@ export interface Sale extends Timestamps {
   cliente_id: Id | null;
   /** null = consumidor final */
   cliente: SaleCustomer | null;
+  /** Sale of a finalized work order (no product lines; it cannot be modified nor cancelled). */
+  work_order_id: Id | null;
+  work_order: { id: Id; num_orden: number } | null;
   details: SaleDetail[];
 }
 

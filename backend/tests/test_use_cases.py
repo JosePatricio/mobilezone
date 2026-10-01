@@ -200,11 +200,10 @@ class TestWorkOrders:
         order = CreateWorkOrderUseCase(uow).execute(data, tech)
         updated = UpdateWorkOrderUseCase(uow).execute(
             order.id,
-            WorkOrderData(**{**data.__dict__, "presupuesto": Decimal("200"), "anticipo": Decimal("50"), "estado": 1}),
+            WorkOrderData(**{**data.__dict__, "presupuesto": Decimal("200"), "anticipo": Decimal("50")}),
             tech,
         )
         assert updated.saldo == Decimal("150.00")
-        assert updated.estado == 1
 
     def test_add_spare_part_registers_authenticated_technician(self, uow, factory):
         tech = factory.user(SystemRole.TECNICO)

@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { useAuth } from '@/app/store/AuthProvider';
 import { formatDate, formatDateTime, formatOrderNumber, formatWarrantyDays, fullName } from '@/shared/utils/format';
 import { formatMoney } from '@/shared/utils/money';
 import type { WorkOrder } from '../types';
@@ -12,6 +13,9 @@ const LOCK_LABELS = { NINGUNO: 'Sin bloqueo', PATRON: 'Patrón registrado', PIN:
  */
 export function PrintableOrder({ order }: { order: WorkOrder }) {
   const { url, image } = useOrderQr(order.codigo_publico);
+  const { user } = useAuth();
+  // Technician of the order (the user who registered it); orders without one show the logged user.
+  const technician = order.tecnico ?? user;
   // Rendered directly in <body>: when printing, everything else is hidden.
   return createPortal(
     <section className="print-sheet" aria-hidden="true">
@@ -81,7 +85,7 @@ export function PrintableOrder({ order }: { order: WorkOrder }) {
           <dt>Estado</dt>
           <dd>{order.estado_label}</dd>
           <dt>Técnico</dt>
-          <dd>{order.tecnico ? fullName(order.tecnico) : '—'}</dd>
+          <dd>{fullName(technician)}</dd>
         </dl>
         <div className="print-qr">
           {image && <img src={image} alt="" />}

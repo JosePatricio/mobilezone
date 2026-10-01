@@ -310,7 +310,8 @@ class TestWorkOrders:
     def test_invalid_status(self, client, factory):
         tech = factory.user(SystemRole.TECNICO)
         headers = auth_headers(client, tech.email)
-        response = client.post(f"{API}/work-orders", json=self._payload(factory, estado=5), headers=headers)
+        order = client.post(f"{API}/work-orders", json=self._payload(factory), headers=headers).json()
+        response = client.patch(f"{API}/work-orders/{order['id']}/status", json={"estado": 5}, headers=headers)
         assert response.status_code == 422
 
     def test_spare_parts_and_filters(self, client, factory):
@@ -338,8 +339,12 @@ class TestWorkOrders:
         listed = client.get(f"{API}/work-orders", params={"cliente": "nombre"}, headers=headers)
         assert listed.json()["total"] == 1
 
-        status = client.patch(f"{API}/work-orders/{order['id']}/status", json={"estado": 2}, headers=headers)
-        assert status.json()["estado"] == 2
+        status = client.patch(
+            f"{API}/work-orders/{order['id']}/status",
+            json={"estado": 1, "fecha_entrega": "2026-10-03T15:00", "observacion": "Cambio de pantalla"},
+            headers=headers,
+        )
+        assert status.json()["estado"] == 1
 
     def test_statuses_endpoint(self, client, admin_headers):
         statuses = client.get(f"{API}/work-orders/statuses", headers=admin_headers).json()

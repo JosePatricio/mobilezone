@@ -184,13 +184,14 @@ uvicorn main:app --reload --port 8000
 | `005_ordenes_trabajo.sql` | órdenes de trabajo sin motivo de ingreso, fotos ni QR (versión 4) |
 | `006_ordenes_vendedor.sql` | órdenes con tipo de garantía en lugar de días (versión 5) |
 | `007_modelo_tecnico.sql` | órdenes sin modelo técnico del teléfono (versión 6) |
+| `008_estados_venta_orden.sql` | órdenes sin historial de estados ni venta al finalizar (versión 7) |
 
 Con Alembic (aplica solo lo que falta):
 
 ```powershell
 cd backend
 .venv\Scripts\activate
-alembic current           # p. ej. 0006 = falta el 007; sin versión = ejecute primero "alembic stamp <versión>"
+alembic current           # p. ej. 0007 = falta el 008; sin versión = ejecute primero "alembic stamp <versión>"
 alembic upgrade head
 python -m app.infrastructure.database.seed
 ```
@@ -208,6 +209,9 @@ o importe los scripts desde phpMyAdmin y luego ejecute `alembic stamp head` y el
   demás con 0); nueva **fecha de entrega**; el técnico es el usuario que registra la orden (se elimina el permiso
   `work_orders.assign_technician`); el rol VENDEDOR recibe órdenes de trabajo, repuestos (ver), marcas y modelos.
 - 007: nuevo campo **modelo técnico** del teléfono en las órdenes (p. ej. SM-A105M).
+- 008: historial de estados de las órdenes (las existentes reciben su estado actual); las ventas pueden venir de una
+  orden finalizada (`sales.work_order_id`); las órdenes sin técnico quedan con el usuario que las registró.
+  Las órdenes que ya estaban en **Finalizado** quedan cerradas (no se pueden editar) y sin venta asociada.
 
 ### 3. Frontend (terminal 2)
 

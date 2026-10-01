@@ -14,7 +14,6 @@ import { cleanIdentificacion, isValidIdentificacion, zCelular, zIdentificacion }
 import { calculateBalance, formatMoney, isValidMoney, toCents } from '@/shared/utils/money';
 import { type FormShape, zodForm, applyServerErrors, zMoney, zOptionalEmail, zOptionalText, zRequiredId, zText } from '@/shared/utils/validation';
 import { useWorkOrderCatalogs } from '../hooks/useWorkOrderCatalogs';
-import { useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
 import { workOrderApi } from '../services/workOrderApi';
 import { DISPLAY_CHANGE, type LockType, type WorkOrder, type WorkOrderRequest } from '../types';
 import { ColorPalette } from './ColorPalette';
@@ -51,7 +50,6 @@ export const workOrderSchema = z
     patron: z.string().optional(),
     pin: z.string().trim().optional(),
     observacion: zOptionalText(5000),
-    estado: z.coerce.number().int().min(0).max(2),
     presupuesto: zMoney,
     anticipo: zMoney,
     fecha_entrega: z.string().optional(),
@@ -92,7 +90,6 @@ type ClientLookup = 'idle' | 'searching' | 'found' | 'missing';
 
 export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
   const { user } = useAuth();
-  const { statuses } = useWorkOrderStatuses();
   const { catalogs } = useWorkOrderCatalogs();
   const [serverError, setServerError] = useState<string | null>(null);
   const [lookup, setLookup] = useState<ClientLookup>(order ? 'found' : 'idle');
@@ -131,7 +128,6 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
       patron: order?.bloqueo_tipo === 'PATRON' ? (order.bloqueo_valor ?? '') : '',
       pin: order?.bloqueo_tipo === 'PIN' ? (order.bloqueo_valor ?? '') : '',
       observacion: order?.observacion ?? '',
-      estado: order?.estado ?? 0,
       presupuesto: order?.presupuesto ?? '0.00',
       anticipo: order?.anticipo ?? '0.00',
       fecha_entrega: toDateTimeLocal(order?.fecha_entrega),
@@ -408,13 +404,6 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           <div className="full">
             <PhotoSlots value={photos} onChange={setPhotos} />
           </div>
-          <Select
-            label="Estado"
-            required
-            options={statuses.map((s) => ({ value: s.value, label: s.label }))}
-            error={errors.estado?.message}
-            {...register('estado')}
-          />
           <div className="field">
             <span className="field-label">Técnico</span>
             <p className="readonly-value">{technician}</p>

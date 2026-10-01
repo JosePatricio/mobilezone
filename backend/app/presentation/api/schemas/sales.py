@@ -42,6 +42,11 @@ class SaleDetailResponse(Schema):
     subtotal: Decimal
 
 
+class SaleWorkOrderRef(Schema):
+    id: int
+    num_orden: int
+
+
 class SaleResponse(Schema):
     id: int
     user_id: int
@@ -59,6 +64,8 @@ class SaleResponse(Schema):
     cambio: Decimal | None
     cliente_id: int | None
     cliente: ClientSummary | None = Field(description="null = consumidor final")
+    work_order_id: int | None = Field(description="Venta de una orden de trabajo finalizada (sin productos)")
+    work_order: SaleWorkOrderRef | None
     details: list[SaleDetailResponse]
     created_at: datetime
     updated_at: datetime

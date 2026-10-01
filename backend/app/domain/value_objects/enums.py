@@ -41,16 +41,15 @@ class PaymentMethod(str, Enum):
 
 
 class WorkOrderStatus(IntEnum):
-    """Work order status.
+    """Work order status (stored as 0, 1, 2).
 
-    The spec defines the values 0, 1 and 2 but their meaning is still pending.
-    Labels are centralized here (and exposed through the API) so they can be
-    renamed in a single place once defined.
+    FINALIZADO closes the order: it can no longer be modified and a sale is registered.
+    Labels are centralized here and exposed through the API.
     """
 
-    ESTADO_0 = 0
-    ESTADO_1 = 1
-    ESTADO_2 = 2
+    RECIBIDO = 0
+    EN_PROCESO = 1
+    FINALIZADO = 2
 
     @property
     def label(self) -> str:
@@ -68,9 +67,8 @@ class WorkOrderStatus(IntEnum):
             ) from exc
 
 
-# Provisional labels — meaning pending definition (BACKEND_SPEC §14).
 WORK_ORDER_STATUS_LABELS: dict[WorkOrderStatus, str] = {
-    WorkOrderStatus.ESTADO_0: "Recibida",
-    WorkOrderStatus.ESTADO_1: "En proceso",
-    WorkOrderStatus.ESTADO_2: "Finalizada",
+    WorkOrderStatus.RECIBIDO: "Recibido",
+    WorkOrderStatus.EN_PROCESO: "En proceso",
+    WorkOrderStatus.FINALIZADO: "Finalizado",
 }

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { usePermission } from '@/modules/auth/components/Can';
 import { Button, Card, ErrorState, Loading, PageHeader, ProductThumb, StatusBadge } from '@/shared/components';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
-import { formatDateTime, fullName } from '@/shared/utils/format';
+import { formatDateTime, formatOrderNumber, fullName } from '@/shared/utils/format';
 import { formatMoney } from '@/shared/utils/money';
 import { useDeleteSale } from '../hooks/useDeleteSale';
 import { ReceiptViewer } from '../components/ReceiptViewer';
@@ -22,7 +22,8 @@ export function SaleDetailPage() {
   if (query.isLoading) return <Loading />;
   if (query.isError || !query.data) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
   const sale = query.data;
-  const editable = sale.estado === 'CONFIRMADA';
+  // Sales of finalized work orders cannot be modified nor cancelled.
+  const editable = sale.estado === 'CONFIRMADA' && !sale.work_order_id;
 
   return (
     <>
@@ -84,6 +85,23 @@ export function SaleDetailPage() {
               </tr>
             </thead>
             <tbody>
+              {sale.work_order && (
+                <tr>
+                  <td data-label="Producto">
+                    <strong>Reparación</strong>{' '}
+                    <Link to={`/work-orders/${sale.work_order.id}`}>Orden #{formatOrderNumber(sale.work_order.num_orden)}</Link>
+                  </td>
+                  <td data-label="Cantidad" className="text-right">
+                    1
+                  </td>
+                  <td data-label="Precio" className="text-right">
+                    {formatMoney(sale.total)}
+                  </td>
+                  <td data-label="Subtotal" className="text-right">
+                    {formatMoney(sale.total)}
+                  </td>
+                </tr>
+              )}
               {sale.details.map((d) => (
                 <tr key={d.id}>
                   <td data-label="Producto">

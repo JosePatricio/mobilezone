@@ -6,6 +6,8 @@ from decimal import Decimal
 
 from app.application.dto import (
     BalanceResult,
+    FinalizeWorkOrderData,
+    WorkOrderStatusData,
     WorkOrderClientData,
     WorkOrderData,
     WorkOrderFilters,
@@ -13,7 +15,8 @@ from app.application.dto import (
 )
 from app.application.services.files import FileStorage, validate_image
 from app.application.use_cases.base import UseCase
-from app.domain.entities import User, WorkOrder, WorkOrderPhoto, WorkOrderSparePart, calculate_balance
+from app.application.use_cases.branch_access import ensure_branch_access
+from app.domain.entities import Sale, User, WorkOrder, WorkOrderPhoto, WorkOrderSparePart, calculate_balance
 from app.domain.exceptions import ConflictError, NotFoundError, ValidationError
 from app.domain.repositories import UnitOfWork
 from app.domain.value_objects.enums import SystemRole, WorkOrderStatus
@@ -136,7 +139,6 @@ class CreateWorkOrderUseCase(_WorkOrderValidation):
                 motivo_ingreso=data.motivo_ingreso,  # type: ignore[arg-type]
                 tipo_display=data.tipo_display,  # type: ignore[arg-type]
                 observacion=data.observacion,
-                estado=data.estado,
                 color=data.color,
                 presupuesto=data.presupuesto,
                 anticipo=data.anticipo,
@@ -144,6 +146,7 @@ class CreateWorkOrderUseCase(_WorkOrderValidation):
                 codigo_publico=secrets.token_hex(12),  # unguessable code for the public status page (QR)
             )
             self._apply(order, data)
+            order.record_status(actor.id)  # type: ignore[arg-type]  # history starts with Recibido
             self.uow.work_orders.add(order)  # assigns num_orden
         return order
 
@@ -152,6 +155,7 @@ class UpdateWorkOrderUseCase(_WorkOrderValidation):
     def execute(self, work_order_id: int, data: WorkOrderData, actor: User) -> WorkOrder:
         with self.uow.transaction():
             order = _get_order(self.uow, work_order_id)
+            order.ensure_editable()
             client = self._resolve_client(data.cliente)
             self._validate_device(data.marca_id, data.modelo_id)
             order.cliente_id = client.id  # type: ignore[assignment]
@@ -165,23 +169,47 @@ class UpdateWorkOrderUseCase(_WorkOrderValidation):
                 tipo_display=data.tipo_display,  # type: ignore[arg-type]
                 observacion=data.observacion,
                 color=data.color,
-                estado=data.estado,
                 presupuesto=data.presupuesto,
                 anticipo=data.anticipo,
             )
             order.observacion, order.color = normalized.observacion, normalized.color
             self._apply(order, data)
-            order.change_status(data.estado)
             order.set_amounts(data.presupuesto, data.anticipo)
         return order
 
 
 class ChangeWorkOrderStatusUseCase(UseCase):
-    def execute(self, work_order_id: int, estado: int) -> WorkOrder:
+    """Recibido / En proceso (with the approximate delivery time and a note). Recorded in the history."""
+
+    def execute(self, work_order_id: int, data: WorkOrderStatusData, actor: User) -> WorkOrder:
         with self.uow.transaction():
             order = _get_order(self.uow, work_order_id)
-            order.change_status(estado)
+            order.change_status(data.estado, actor.id, data.observacion, data.fecha_entrega)  # type: ignore[arg-type]
         return order
+
+
+class FinalizeWorkOrderUseCase(UseCase):
+    """Finalizado: closes the order (it can no longer be modified) and registers the sale of
+    the repair in the chosen branch. Sale total = repair cost; the anticipo counts as already
+    paid, so the card surcharge and the cash change are computed on the saldo."""
+
+    def execute(self, work_order_id: int, data: FinalizeWorkOrderData, actor: User) -> tuple[WorkOrder, Sale]:
+        with self.uow.transaction():
+            order = _get_order(self.uow, work_order_id)
+            order.ensure_editable()
+            ensure_branch_access(self.uow, actor, data.branch_id)
+            sale = Sale.for_work_order(
+                user_id=actor.id,  # type: ignore[arg-type]
+                branch_id=data.branch_id,
+                cliente_id=order.cliente_id,
+                work_order_id=order.id,  # type: ignore[arg-type]
+                total=order.presupuesto,
+            )
+            sale.apply_payment(data.metodo_pago, data.monto_recibido, pagado_previo=order.anticipo)
+            self.uow.sales.add(sale)
+            order.finalize(actor.id, data.observacion)  # type: ignore[arg-type]
+            self.uow.flush()
+        return order, sale
 
 
 class AddSparePartToWorkOrderUseCase(UseCase):
@@ -249,7 +277,7 @@ class AddWorkOrderPhotoUseCase(UseCase):
 
     def execute(self, work_order_id: int, content: bytes) -> WorkOrderPhoto:
         extension = validate_image(content)
-        _get_order(self.uow, work_order_id)
+        _get_order(self.uow, work_order_id).ensure_editable()
         path = self.storage.save(WORK_ORDER_PHOTOS_FOLDER, content, extension)
         try:
             with self.uow.transaction():

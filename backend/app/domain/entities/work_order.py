@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from app.domain.entities.base import optional_text, utcnow
-from app.domain.exceptions import NotFoundError, ValidationError
+from app.domain.exceptions import ConflictError, NotFoundError, ValidationError
 from app.domain.value_objects.enums import WorkOrderStatus
 from app.domain.value_objects.money import ZERO, non_negative_money
 from app.domain.value_objects.work_orders import (
@@ -81,6 +81,29 @@ class WorkOrderPhoto:
 
 
 @dataclass(eq=False)
+class WorkOrderStatusChange:
+    """History of the order status: who changed it, when, an optional note and, for
+    EN_PROCESO, the approximate delivery time given to the client."""
+
+    estado: int
+    user_id: int
+    observacion: str | None = None
+    fecha_entrega: datetime | None = None
+    work_order_id: int | None = None
+    id: int | None = None
+    created_at: datetime | None = None
+
+    if TYPE_CHECKING:
+        user: User
+
+    def __post_init__(self) -> None:
+        self.estado = int(WorkOrderStatus.parse(self.estado))
+        self.observacion = optional_text(self.observacion)
+        if self.created_at is None:
+            self.created_at = utcnow()
+
+
+@dataclass(eq=False)
 class WorkOrder:
     """A repair order. ``presupuesto`` is the repair cost (costo de reparación).
 
@@ -102,7 +125,7 @@ class WorkOrder:
     fecha_entrega: datetime | None = None  # promised delivery date and time
     tecnico_id: int | None = None  # technician: the user who registered the order
     observacion: str | None = None
-    estado: int = WorkOrderStatus.ESTADO_0
+    estado: int = WorkOrderStatus.RECIBIDO
     color: str | None = None
     modelo_tecnico: str | None = None  # technical model code of the phone, e.g. SM-A105M
     presupuesto: Decimal = ZERO
@@ -112,6 +135,7 @@ class WorkOrder:
     codigo_publico: str | None = None
     spare_parts: list[WorkOrderSparePart] = field(default_factory=list)
     photos: list[WorkOrderPhoto] = field(default_factory=list)
+    status_changes: list[WorkOrderStatusChange] = field(default_factory=list)
     id: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -139,6 +163,17 @@ class WorkOrder:
     def status(self) -> WorkOrderStatus:
         return WorkOrderStatus(self.estado)
 
+    @property
+    def is_finalized(self) -> bool:
+        return self.estado == WorkOrderStatus.FINALIZADO
+
+    def ensure_editable(self) -> None:
+        """A finalized order is closed: nothing can be modified anymore."""
+        if self.is_finalized:
+            raise ConflictError(
+                "La orden está finalizada y ya no se puede modificar.", code="WORK_ORDER_FINALIZED"
+            )
+
     def set_amounts(self, presupuesto: Decimal, anticipo: Decimal) -> None:
         self.presupuesto, self.anticipo, self.saldo = calculate_balance(presupuesto, anticipo)
 
@@ -149,6 +184,7 @@ class WorkOrder:
         self.bloqueo_tipo, self.bloqueo_valor = validate_lock(tipo, valor)
 
     def add_photo(self, photo: WorkOrderPhoto) -> WorkOrderPhoto:
+        self.ensure_editable()
         if len(self.photos) >= MAX_WORK_ORDER_PHOTOS:
             raise ValidationError(
                 f"La orden admite como máximo {MAX_WORK_ORDER_PHOTOS} fotos.", code="TOO_MANY_PHOTOS"
@@ -157,20 +193,54 @@ class WorkOrder:
         return photo
 
     def remove_photo(self, photo_id: int) -> WorkOrderPhoto:
+        self.ensure_editable()
         for photo in self.photos:
             if photo.id == photo_id:
                 self.photos.remove(photo)
                 return photo
         raise NotFoundError("La foto no pertenece a esta orden.", code="WORK_ORDER_PHOTO_NOT_FOUND")
 
-    def change_status(self, estado: int) -> None:
-        self.estado = int(WorkOrderStatus.parse(estado))
+    def change_status(
+        self, estado: int, user_id: int, observacion: str | None = None, fecha_entrega: datetime | None = None
+    ) -> WorkOrderStatusChange:
+        """Recibido / En proceso. FINALIZADO is only reached through ``finalize`` (it registers a sale).
+        En proceso requires the approximate delivery time, which becomes the delivery date."""
+        self.ensure_editable()
+        status = WorkOrderStatus.parse(estado)
+        if status == WorkOrderStatus.FINALIZADO:
+            raise ValidationError(
+                "Para finalizar la orden use la opción Finalizar (registra la venta).", code="FINALIZE_REQUIRED"
+            )
+        if status == WorkOrderStatus.EN_PROCESO and fecha_entrega is None:
+            raise ValidationError(
+                "Ingrese la hora aproximada de entrega.", code="REQUIRED_FIELD", details={"field": "fecha_entrega"}
+            )
+        if fecha_entrega is not None:
+            self.fecha_entrega = fecha_entrega
+        self.estado = int(status)
+        return self.record_status(user_id, observacion, fecha_entrega)
+
+    def finalize(self, user_id: int, observacion: str | None = None) -> WorkOrderStatusChange:
+        self.ensure_editable()
+        self.estado = int(WorkOrderStatus.FINALIZADO)
+        return self.record_status(user_id, observacion)
+
+    def record_status(
+        self, user_id: int, observacion: str | None = None, fecha_entrega: datetime | None = None
+    ) -> WorkOrderStatusChange:
+        change = WorkOrderStatusChange(
+            estado=self.estado, user_id=user_id, observacion=observacion, fecha_entrega=fecha_entrega
+        )
+        self.status_changes.append(change)
+        return change
 
     def add_spare_part(self, item: WorkOrderSparePart) -> WorkOrderSparePart:
+        self.ensure_editable()
         self.spare_parts.append(item)
         return item
 
     def remove_spare_part(self, item_id: int) -> WorkOrderSparePart:
+        self.ensure_editable()
         for item in self.spare_parts:
             if item.id == item_id:
                 self.spare_parts.remove(item)

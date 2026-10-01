@@ -723,3 +723,14 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
   .print-signatures { display: flex; justify-content: space-between; margin-top: 60px; gap: 40px; }
   .print-signatures span { flex: 1; border-top: 1px solid #000; padding-top: 4px; text-align: center; }
 }
+
+/* Work orders v8: status selector and history */
+.alert-warning { background: var(--warning-soft); color: var(--warning); }
+.status-control { display: inline-flex; }
+.input-sm { padding: 4px 8px; font-size: 0.85rem; min-height: 0; }
+.status-select { width: auto; font-weight: 600; }
+.status-select.status-info { background: var(--info-soft); color: var(--info); }
+.status-select.status-warning { background: var(--warning-soft); color: var(--warning); }
+.status-select.status-success { background: var(--success-soft); color: var(--success); }
+.status-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.status-history li { display: flex; flex-direction: column; gap: 2px; padding-left: 12px; border-left: 3px solid var(--primary-soft); }

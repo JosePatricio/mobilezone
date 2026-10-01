@@ -15,7 +15,7 @@ import {
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { useListParams } from '@/shared/hooks/useListParams';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
-import { formatDateTime, fullName, todayIso } from '@/shared/utils/format';
+import { formatDateTime, formatOrderNumber, fullName, todayIso } from '@/shared/utils/format';
 import { formatMoney, toCents } from '@/shared/utils/money';
 import { ReceiptViewer } from '../components/ReceiptViewer';
 import { useDeleteSale } from '../hooks/useDeleteSale';
@@ -63,7 +63,12 @@ export function SalesPage() {
     {
       key: 'documento',
       header: 'Documento',
-      render: (r) => <StatusBadge label={documentLabel(r.factura)} tone={r.factura ? 'info' : 'neutral'} />,
+      render: (r) =>
+        r.work_order ? (
+          <StatusBadge label={`Orden #${formatOrderNumber(r.work_order.num_orden)}`} tone="warning" />
+        ) : (
+          <StatusBadge label={documentLabel(r.factura)} tone={r.factura ? 'info' : 'neutral'} />
+        ),
     },
     {
       key: 'cliente',
@@ -106,7 +111,8 @@ export function SalesPage() {
       header: 'Acciones',
       align: 'right',
       render: (r) =>
-        r.estado === 'CONFIRMADA' && (canUpdate || canDelete) ? (
+        // Sales of finalized work orders cannot be modified nor cancelled.
+        r.estado === 'CONFIRMADA' && !r.work_order_id && (canUpdate || canDelete) ? (
           <div className="row-actions" onClick={(e) => e.stopPropagation()}>
             {canUpdate && (
               <Button size="sm" variant="secondary" onClick={() => navigate(`/sales/${r.id}/edit`)}>

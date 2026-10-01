@@ -164,10 +164,29 @@ class WorkOrderData:
     bloqueo_tipo: str = "NINGUNO"  # NINGUNO | PATRON | PIN
     bloqueo_valor: str | None = None
     observacion: str | None = None
-    estado: int = 0
     color: str | None = None
     modelo_tecnico: str | None = None  # technical model code of the phone, e.g. SM-A105M
     fecha_entrega: datetime | None = None  # timezone-aware
+
+
+@dataclass(frozen=True)
+class WorkOrderStatusData:
+    """Recibido / En proceso. ``fecha_entrega`` (approximate delivery time) is required for En proceso."""
+
+    estado: int
+    observacion: str | None = None
+    fecha_entrega: datetime | None = None
+
+
+@dataclass(frozen=True)
+class FinalizeWorkOrderData:
+    """Closes the order and registers the sale of the repair (total = repair cost; the
+    anticipo counts as already paid)."""
+
+    branch_id: int
+    metodo_pago: PaymentMethod
+    monto_recibido: Decimal | None = None
+    observacion: str | None = None
 
 
 @dataclass(frozen=True)

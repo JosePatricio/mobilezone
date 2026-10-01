@@ -2,14 +2,15 @@ import { useNavigate } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { usePermission } from '@/modules/auth/components/Can';
 import { userApi } from '@/modules/users/services/userApi';
-import { Button, DataList, DatePicker, Input, PageHeader, SearchInput, Select, StatusBadge, type Column } from '@/shared/components';
+import { Button, DataList, DatePicker, Input, PageHeader, SearchInput, Select, type Column } from '@/shared/components';
 import { useListParams } from '@/shared/hooks/useListParams';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatDate, formatDateTime, formatOrderNumber, formatWarrantyDays, fullName } from '@/shared/utils/format';
 import { formatMoney, toCents } from '@/shared/utils/money';
-import { statusTone, useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
+import { useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
 import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
-import type { WorkOrderListItem } from '../types';
+import { StatusControl } from '../components/StatusControl';
+import { WORK_ORDER_STATUS, type WorkOrderListItem } from '../types';
 
 export function WorkOrdersPage() {
   const navigate = useNavigate();
@@ -43,12 +44,6 @@ export function WorkOrdersPage() {
     { key: 'modelo', header: 'Modelo', render: (r) => r.modelo.nombre },
     { key: 'motivo', header: 'Motivo', render: (r) => r.motivo_ingreso_label, sortValue: (r) => r.motivo_ingreso_label },
     { key: 'tecnico', header: 'Técnico', render: (r) => (r.tecnico ? fullName(r.tecnico) : 'Sin asignar') },
-    {
-      key: 'estado',
-      header: 'Estado',
-      render: (r) => <StatusBadge label={r.estado_label} tone={statusTone(r.estado)} />,
-      sortValue: (r) => r.estado,
-    },
     { key: 'garantia', header: 'Garantía', render: (r) => formatWarrantyDays(r.garantia_dias), sortValue: (r) => r.garantia_dias },
     { key: 'presupuesto', header: 'Costo', align: 'right', render: (r) => formatMoney(r.presupuesto) },
     { key: 'anticipo', header: 'Anticipo', align: 'right', render: (r) => formatMoney(r.anticipo) },
@@ -69,13 +64,20 @@ export function WorkOrdersPage() {
           <Button size="sm" variant="ghost" onClick={() => navigate(`/work-orders/${r.id}`)}>
             Ver
           </Button>
-          {canUpdate && (
+          {canUpdate && r.estado !== WORK_ORDER_STATUS.FINALIZADO && (
             <Button size="sm" variant="secondary" onClick={() => navigate(`/work-orders/${r.id}/edit`)}>
               Editar
             </Button>
           )}
         </div>
       ),
+    },
+    // Last column: the status can be changed from the table.
+    {
+      key: 'estado',
+      header: 'Estado',
+      render: (r) => <StatusControl order={r} canUpdate={canUpdate} />,
+      sortValue: (r) => r.estado,
     },
   ];
 

@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request, Response, UploadFile, status
 
-from app.application.dto import ClientData, WorkOrderClientData, WorkOrderData, WorkOrderFilters, WorkOrderSparePartData
+from app.application.dto import ClientData, FinalizeWorkOrderData, WorkOrderClientData, WorkOrderStatusData, WorkOrderData, WorkOrderFilters, WorkOrderSparePartData
 from app.application.use_cases.users import ClientUseCases
 from app.application.use_cases.work_orders import (
     AddSparePartToWorkOrderUseCase,
@@ -17,6 +17,7 @@ from app.application.use_cases.work_orders import (
     CalculateWorkOrderBalanceUseCase,
     ChangeWorkOrderStatusUseCase,
     CreateWorkOrderUseCase,
+    FinalizeWorkOrderUseCase,
     RemoveSparePartFromWorkOrderUseCase,
     UpdateWorkOrderUseCase,
     WorkOrderQueries,
@@ -39,6 +40,7 @@ from app.presentation.api.schemas.work_orders import (
     AddWorkOrderSparePartRequest,
     BalanceRequest,
     BalanceResponse,
+    FinalizeWorkOrderRequest,
     PublicWorkOrderResponse,
     WorkOrderCatalogsResponse,
     WorkOrderListItem,
@@ -64,9 +66,7 @@ def _tz(request: Request) -> ZoneInfo:
 
 def _data(body: WorkOrderRequest, tz: ZoneInfo) -> WorkOrderData:
     values = body.model_dump(mode="json", exclude={"cliente", "presupuesto", "anticipo", "fecha_entrega"})
-    entrega = body.fecha_entrega
-    if entrega is not None and entrega.tzinfo is None:
-        entrega = entrega.replace(tzinfo=tz)  # a time without offset is the local time of the shop
+    entrega = _local(body.fecha_entrega, tz)
     return WorkOrderData(
         **values,
         cliente=WorkOrderClientData(**body.cliente.model_dump()),
@@ -152,9 +152,27 @@ def update_work_order(request: Request, work_order_id: int, body: WorkOrderReque
     return WorkOrderResponse.model_validate(order)
 
 
+def _local(value, tz: ZoneInfo):
+    """A date-time without offset is the local time of the shop."""
+    return value.replace(tzinfo=tz) if value is not None and value.tzinfo is None else value
+
+
 @router.patch("/{work_order_id}/status", response_model=WorkOrderResponse)
-def change_work_order_status(work_order_id: int, body: WorkOrderStatusRequest, uow: UowDep, _: CanUpdate):
-    order = ChangeWorkOrderStatusUseCase(uow).execute(work_order_id, int(body.estado))
+def change_work_order_status(
+    request: Request, work_order_id: int, body: WorkOrderStatusRequest, uow: UowDep, actor: CanUpdate
+):
+    """Recibido / En proceso (requires the approximate delivery time). Recorded in the history."""
+    data = WorkOrderStatusData(int(body.estado), body.observacion, _local(body.fecha_entrega, _tz(request)))
+    return WorkOrderResponse.model_validate(ChangeWorkOrderStatusUseCase(uow).execute(work_order_id, data, actor))
+
+
+@router.post("/{work_order_id}/finalize", response_model=WorkOrderResponse)
+def finalize_work_order(work_order_id: int, body: FinalizeWorkOrderRequest, uow: UowDep, actor: CanUpdate):
+    """Finalizado: the order is closed (no more changes) and the sale of the repair is registered
+    (total = repair cost; the anticipo counts as paid). It appears in the sales module."""
+    order, _sale = FinalizeWorkOrderUseCase(uow).execute(
+        work_order_id, FinalizeWorkOrderData(**body.model_dump()), actor
+    )
     return WorkOrderResponse.model_validate(order)
 
 

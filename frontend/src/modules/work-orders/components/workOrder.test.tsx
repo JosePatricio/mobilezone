@@ -31,7 +31,6 @@ const valid = {
   patron: '',
   pin: '',
   observacion: 'No carga',
-  estado: '0',
   presupuesto: '100',
   anticipo: '30',
   fecha_entrega: '',
@@ -116,9 +115,6 @@ describe('work order form validation', () => {
     );
   });
 
-  it('rejects unknown statuses', () => {
-    expect(workOrderSchema.safeParse({ ...valid, estado: '5' }).success).toBe(false);
-  });
 });
 
 describe('pattern lock', () => {

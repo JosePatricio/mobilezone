@@ -19,6 +19,9 @@ export interface WorkOrderCatalogs {
 }
 
 export const DISPLAY_CHANGE = 'CAMBIO_DISPLAY';
+
+/** Order statuses (labels come from the backend). FINALIZADO closes the order and registers a sale. */
+export const WORK_ORDER_STATUS = { RECIBIDO: 0, EN_PROCESO: 1, FINALIZADO: 2 } as const;
 export type LockType = 'NINGUNO' | 'PATRON' | 'PIN';
 
 export interface WorkOrderClient {
@@ -79,6 +82,25 @@ export interface WorkOrderPhoto {
   created_at: string | null;
 }
 
+export interface WorkOrderStatusChange {
+  id: Id;
+  estado: number;
+  estado_label: string;
+  observacion: string | null;
+  /** Approximate delivery time given when it went En proceso. */
+  fecha_entrega: string | null;
+  user: UserRef;
+  created_at: string;
+}
+
+export interface WorkOrderSale {
+  id: Id;
+  fecha: string;
+  total: Money;
+  total_pagar: Money;
+  metodo_pago: string | null;
+}
+
 export interface WorkOrder extends WorkOrderListItem, Timestamps {
   /** User who registered the order. */
   user: UserRef;
@@ -91,6 +113,10 @@ export interface WorkOrder extends WorkOrderListItem, Timestamps {
   /** Code of the public status page (QR). */
   codigo_publico: string;
   photos: WorkOrderPhoto[];
+  /** Status history (oldest first). */
+  status_changes: WorkOrderStatusChange[];
+  /** Sale registered when the order was finalized. */
+  sale: WorkOrderSale | null;
   spare_parts: WorkOrderSparePart[];
   spare_parts_total: Money;
 }
@@ -113,7 +139,6 @@ export interface WorkOrderRequest {
   bloqueo_tipo: LockType;
   bloqueo_valor: string | null;
   observacion: string | null;
-  estado: number;
   presupuesto: Money;
   anticipo: Money;
   /** ISO 8601 */
@@ -138,6 +163,21 @@ export interface PublicWorkOrder {
   saldo: Money;
   fecha_entrega: string | null;
   updated_at: string;
+}
+
+/** Recibido / En proceso (`fecha_entrega` required for En proceso). */
+export interface WorkOrderStatusRequest {
+  estado: number;
+  fecha_entrega?: string | null;
+  observacion?: string | null;
+}
+
+/** Finalizado: closes the order and registers the sale (payment of the saldo). */
+export interface FinalizeWorkOrderRequest {
+  branch_id: Id;
+  metodo_pago: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
+  monto_recibido: Money | null;
+  observacion?: string | null;
 }
 
 export interface AddSparePartRequest {

@@ -4,6 +4,7 @@ import type { Id, Page, QueryParams } from '@/shared/types/api';
 import { cleanParams } from '@/shared/utils/format';
 import type {
   AddSparePartRequest,
+  FinalizeWorkOrderRequest,
   PublicWorkOrder,
   WorkOrder,
   WorkOrderCatalogs,
@@ -13,6 +14,7 @@ import type {
   WorkOrderRequest,
   WorkOrderSparePart,
   WorkOrderStatusOption,
+  WorkOrderStatusRequest,
 } from '../types';
 
 export const WORK_ORDERS_KEY = 'work-orders';
@@ -26,7 +28,12 @@ export const workOrderApi = {
   getByNumber: (num: number) => http.get<WorkOrder>(`${BASE}/by-number/${num}`).then((r) => r.data),
   create: (body: WorkOrderRequest) => http.post<WorkOrder>(BASE, body).then((r) => r.data),
   update: (id: Id, body: WorkOrderRequest) => http.put<WorkOrder>(`${BASE}/${id}`, body).then((r) => r.data),
-  setStatus: (id: Id, estado: number) => http.patch<WorkOrder>(`${BASE}/${id}/status`, { estado }).then((r) => r.data),
+  /** Recibido / En proceso (recorded in the history). */
+  setStatus: (id: Id, body: WorkOrderStatusRequest) =>
+    http.patch<WorkOrder>(`${BASE}/${id}/status`, body).then((r) => r.data),
+  /** Finalizado: the order is closed and the sale of the repair is registered. */
+  finalize: (id: Id, body: FinalizeWorkOrderRequest) =>
+    http.post<WorkOrder>(`${BASE}/${id}/finalize`, body).then((r) => r.data),
   statuses: () => http.get<WorkOrderStatusOption[]>(`${BASE}/statuses`).then((r) => r.data),
   catalogs: () => http.get<WorkOrderCatalogs>(`${BASE}/catalogs`).then((r) => r.data),
   /** Client by cédula / RUC (404 = new client). */

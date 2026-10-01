@@ -47,6 +47,7 @@ from app.domain.entities import (
     WorkOrder,
     WorkOrderPhoto,
     WorkOrderSparePart,
+    WorkOrderStatusChange,
 )
 from app.domain.entities.base import utcnow
 from app.domain.value_objects.enums import PaymentMethod, SaleStatus, StockMovementType
@@ -244,6 +245,8 @@ sales_table = Table(
     Column("total_pagar", MONEY, nullable=False, default=0, server_default=FALSE),  # total + recargo
     Column("monto_recibido", MONEY),  # cash received
     Column("cambio", MONEY),  # change given back (cash)
+    # Sale of a finalized work order (no product lines); one sale per order.
+    Column("work_order_id", ForeignKey("work_orders.id"), unique=True),
     *_timestamps(),
 )
 
@@ -324,6 +327,18 @@ work_orders_table = Table(
     CheckConstraint("estado IN (0, 1, 2)", name="estado_valid"),
     CheckConstraint("garantia_dias >= 0", name="garantia_dias_non_negative"),
     CheckConstraint("presupuesto >= 0 AND anticipo >= 0", name="amounts_non_negative"),
+)
+
+work_order_status_changes_table = Table(
+    "work_order_status_changes",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("work_order_id", ForeignKey("work_orders.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("estado", Integer, nullable=False),
+    Column("user_id", ForeignKey("users.id"), nullable=False, index=True),
+    Column("observacion", Text),
+    Column("fecha_entrega", TIMESTAMP),  # approximate delivery time given when it goes En proceso
+    Column("created_at", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
 )
 
 work_order_photos_table = Table(
@@ -425,6 +440,7 @@ def start_mappers() -> None:
             "user": relationship(User, foreign_keys=[sales_table.c.user_id], lazy="joined"),
             "cliente": relationship(User, foreign_keys=[sales_table.c.cliente_id], lazy="joined"),
             "branch": relationship(Branch, lazy="joined"),
+            "work_order": relationship(WorkOrder, lazy="selectin", viewonly=True),
         },
     )
     mapper_registry.map_imperatively(Brand, brands_table)
@@ -441,6 +457,11 @@ def start_mappers() -> None:
         },
     )
     mapper_registry.map_imperatively(WorkOrderPhoto, work_order_photos_table)
+    mapper_registry.map_imperatively(
+        WorkOrderStatusChange,
+        work_order_status_changes_table,
+        properties={"user": relationship(User, lazy="joined")},
+    )
     wo = work_orders_table.c
     mapper_registry.map_imperatively(
         WorkOrder,
@@ -462,6 +483,20 @@ def start_mappers() -> None:
                 lazy="selectin",
                 cascade="all, delete-orphan",
                 order_by=work_order_photos_table.c.id,
+            ),
+            "status_changes": relationship(
+                WorkOrderStatusChange,
+                lazy="selectin",
+                cascade="all, delete-orphan",
+                order_by=work_order_status_changes_table.c.id,
+            ),
+            "sale": relationship(
+                Sale,
+                primaryjoin=sales_table.c.work_order_id == wo.id,
+                foreign_keys=[sales_table.c.work_order_id],
+                uselist=False,
+                viewonly=True,
+                lazy="selectin",
             ),
         },
     )

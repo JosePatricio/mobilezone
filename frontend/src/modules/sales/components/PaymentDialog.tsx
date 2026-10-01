@@ -18,6 +18,12 @@ interface Props {
   loading?: boolean;
   /** Summary of the operation, shown at the bottom as a small footer. */
   children: ReactNode;
+  /** Content shown above the amount (e.g. a warning or extra fields). */
+  header?: ReactNode;
+  /** Label of the amount to collect (default "Total a pagar"). */
+  totalLabel?: string;
+  /** Blocks the confirmation (e.g. a required field outside the dialog is missing). */
+  confirmDisabled?: boolean;
   onCancel: () => void;
   onConfirm: (payment: PaymentResult) => void;
 }
@@ -35,6 +41,9 @@ export function PaymentDialog({
   initialMethod,
   loading = false,
   children,
+  header,
+  totalLabel = 'Total a pagar',
+  confirmDisabled = false,
   onCancel,
   onConfirm,
 }: Props) {
@@ -43,7 +52,7 @@ export function PaymentDialog({
   const [recibido, setRecibido] = useState('');
   const payment = calculatePayment(total, metodo, recibido);
   const recibidoInvalido = metodo === 'EFECTIVO' && recibido.trim() !== '' && !isValidMoney(recibido);
-  const blocked = recibidoInvalido || payment.insuficiente;
+  const blocked = recibidoInvalido || payment.insuficiente || confirmDisabled;
 
   const confirm = () => {
     if (blocked) return;
@@ -72,8 +81,9 @@ export function PaymentDialog({
       }
     >
       <div className="payment">
+        {header}
         <div className="payment-total">
-          <span>Total a pagar</span>
+          <span>{totalLabel}</span>
           <strong data-testid="payment-total">{formatMoney(payment.totalPagar)}</strong>
         </div>
         {metodo === 'TARJETA' && (

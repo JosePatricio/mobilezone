@@ -396,3 +396,41 @@ def test_upgrade_007_adds_technical_model(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_008_status_history_and_order_sales(mysql_engine: Engine):
+    """v7 database (0001 + 002..007) with an order without technician -> upgrade 008."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005, sql.UPGRADE_006, sql.UPGRADE_007)
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+            q = conn.exec_driver_sql
+            q(
+                "INSERT INTO users (nombre, apellido, email, password, rol_id) VALUES "
+                "('A','A','a@x.com','h',(SELECT id FROM roles WHERE nombre='ADMIN'))"
+            )
+            q("INSERT INTO brands (nombre) VALUES ('Samsung')")
+            q("INSERT INTO models (brand_id, nombre) VALUES ((SELECT id FROM brands), 'A10')")
+            q(
+                "INSERT INTO work_orders (user_id, cliente_id, marca_id, modelo_id, estado, motivo_ingreso, "
+                "codigo_publico, presupuesto, anticipo, saldo, fecha) VALUES (1, 1, (SELECT id FROM brands), "
+                "(SELECT id FROM models), 1, 'OTROS', 'c1', 10, 0, 10, '2026-09-01')"
+            )
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_008)
+        with mysql_engine.connect() as conn:
+            q = conn.exec_driver_sql
+            assert q("SELECT tecnico_id FROM work_orders").scalar() == 1
+            assert tuple(q("SELECT estado, user_id FROM work_order_status_changes").one()) == (1, 1)
+            assert "work_order_id" in set(q("SHOW COLUMNS FROM sales").scalars())
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

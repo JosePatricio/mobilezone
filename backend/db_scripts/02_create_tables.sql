@@ -176,55 +176,6 @@ CREATE INDEX ix_stock_movements_inventory_id ON stock_movements (inventory_id);
 CREATE INDEX ix_stock_movements_product_id ON stock_movements (product_id);
 
 -- -----------------------------------------------------------------------------
--- Sales
--- -----------------------------------------------------------------------------
-CREATE TABLE sales (
-    id         INTEGER       NOT NULL AUTO_INCREMENT,
-    user_id    INTEGER       NOT NULL,
-    branch_id  INTEGER       NOT NULL COMMENT 'branch (sucursal) of the sale',
-    fecha      DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    total      DECIMAL(12,2) NOT NULL,
-    estado     VARCHAR(30)   NOT NULL COMMENT 'CONFIRMADA | ANULADA',
-    factura    BOOL          NOT NULL DEFAULT 0 COMMENT '1 = factura, 0 = comprobante de venta',
-    cliente_id INTEGER                COMMENT 'client (role CLIENTE); NULL = consumidor final',
-    metodo_pago    VARCHAR(30)        COMMENT 'EFECTIVO | TRANSFERENCIA | TARJETA; NULL = sale registered before payments were recorded',
-    recargo        DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'credit card surcharge (6 %)',
-    total_pagar    DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'total + recargo',
-    monto_recibido DECIMAL(12,2)      COMMENT 'cash received',
-    cambio         DECIMAL(12,2)      COMMENT 'change given back (cash)',
-    created_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    updated_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-    CONSTRAINT pk_sales PRIMARY KEY (id),
-    CONSTRAINT fk_sales_user_id_users FOREIGN KEY (user_id) REFERENCES users (id),
-    CONSTRAINT fk_sales_branch_id_branches FOREIGN KEY (branch_id) REFERENCES branches (id),
-    CONSTRAINT fk_sales_cliente_id_users FOREIGN KEY (cliente_id) REFERENCES users (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE INDEX ix_sales_branch_id ON sales (branch_id);
-CREATE INDEX ix_sales_cliente_id ON sales (cliente_id);
-CREATE INDEX ix_sales_fecha ON sales (fecha);
-CREATE INDEX ix_sales_user_id ON sales (user_id);
-
-CREATE TABLE sale_details (
-    id              INTEGER       NOT NULL AUTO_INCREMENT,
-    sale_id         INTEGER       NOT NULL,
-    product_id      INTEGER       NOT NULL,
-    inventory_id    INTEGER       NOT NULL COMMENT 'inventory the units were taken from',
-    cantidad        INTEGER       NOT NULL,
-    precio_unitario DECIMAL(12,2) NOT NULL COMMENT 'historical price at sale time',
-    subtotal        DECIMAL(12,2) NOT NULL,
-    CONSTRAINT pk_sale_details PRIMARY KEY (id),
-    CONSTRAINT ck_sale_details_cantidad_positive CHECK (cantidad > 0),
-    CONSTRAINT fk_sale_details_sale_id_sales FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE,
-    CONSTRAINT fk_sale_details_product_id_products FOREIGN KEY (product_id) REFERENCES products (id),
-    CONSTRAINT fk_sale_details_inventory_id_inventory FOREIGN KEY (inventory_id) REFERENCES inventory (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE INDEX ix_sale_details_inventory_id ON sale_details (inventory_id);
-CREATE INDEX ix_sale_details_product_id ON sale_details (product_id);
-CREATE INDEX ix_sale_details_sale_id ON sale_details (sale_id);
-
--- -----------------------------------------------------------------------------
 -- Brands and device models
 -- -----------------------------------------------------------------------------
 CREATE TABLE brands (
@@ -282,7 +233,7 @@ CREATE TABLE work_orders (
     marca_id    INTEGER       NOT NULL,
     modelo_id   INTEGER       NOT NULL,
     observacion TEXT,
-    estado      INTEGER       NOT NULL DEFAULT 0 COMMENT '0 | 1 | 2 (meaning pending definition)',
+    estado      INTEGER       NOT NULL DEFAULT 0 COMMENT '0 Recibido | 1 En proceso | 2 Finalizado (closed, sale registered)',
     motivo_ingreso VARCHAR(30) NOT NULL COMMENT 'CAMBIO_DISPLAY | PIN_CARGA | BATERIA | TAPA | ... | OTROS',
     tipo_display   VARCHAR(30)          COMMENT 'INCELL | OLED | ORIGINAL (only for CAMBIO_DISPLAY)',
     garantia_dias  INTEGER     NOT NULL DEFAULT 0 COMMENT 'tiempo de garantia in days (0 = sin garantia)',
@@ -316,6 +267,24 @@ CREATE INDEX ix_work_orders_estado ON work_orders (estado);
 CREATE INDEX ix_work_orders_fecha ON work_orders (fecha);
 CREATE INDEX ix_work_orders_tecnico_id ON work_orders (tecnico_id);
 CREATE INDEX ix_work_orders_user_id ON work_orders (user_id);
+
+-- History of the order status (who, when, note; approximate delivery time for En proceso).
+CREATE TABLE work_order_status_changes (
+    id            INTEGER     NOT NULL AUTO_INCREMENT,
+    work_order_id INTEGER     NOT NULL,
+    estado        INTEGER     NOT NULL COMMENT '0 Recibido | 1 En proceso | 2 Finalizado',
+    user_id       INTEGER     NOT NULL COMMENT 'user who changed the status',
+    observacion   TEXT,
+    fecha_entrega DATETIME(6)          COMMENT 'approximate delivery time (UTC), En proceso',
+    created_at    DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_work_order_status_changes PRIMARY KEY (id),
+    CONSTRAINT fk_work_order_status_changes_work_order_id_work_orders
+        FOREIGN KEY (work_order_id) REFERENCES work_orders (id) ON DELETE CASCADE,
+    CONSTRAINT fk_work_order_status_changes_user_id_users FOREIGN KEY (user_id) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_work_order_status_changes_user_id ON work_order_status_changes (user_id);
+CREATE INDEX ix_work_order_status_changes_work_order_id ON work_order_status_changes (work_order_id);
 
 -- Photos of the device taken at reception (up to 3 per order, limit enforced by the app).
 CREATE TABLE work_order_photos (
@@ -352,3 +321,55 @@ CREATE TABLE work_order_spare_parts (
 CREATE INDEX ix_work_order_spare_parts_spare_part_id ON work_order_spare_parts (spare_part_id);
 CREATE INDEX ix_work_order_spare_parts_technician_id ON work_order_spare_parts (technician_id);
 CREATE INDEX ix_work_order_spare_parts_work_order_id ON work_order_spare_parts (work_order_id);
+
+-- -----------------------------------------------------------------------------
+-- Sales (after work orders: the sale of a finalized order references it)
+-- -----------------------------------------------------------------------------
+CREATE TABLE sales (
+    id         INTEGER       NOT NULL AUTO_INCREMENT,
+    user_id    INTEGER       NOT NULL,
+    branch_id  INTEGER       NOT NULL COMMENT 'branch (sucursal) of the sale',
+    fecha      DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    total      DECIMAL(12,2) NOT NULL,
+    estado     VARCHAR(30)   NOT NULL COMMENT 'CONFIRMADA | ANULADA',
+    factura    BOOL          NOT NULL DEFAULT 0 COMMENT '1 = factura, 0 = comprobante de venta',
+    cliente_id INTEGER                COMMENT 'client (role CLIENTE); NULL = consumidor final',
+    metodo_pago    VARCHAR(30)        COMMENT 'EFECTIVO | TRANSFERENCIA | TARJETA; NULL = sale registered before payments were recorded',
+    recargo        DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'credit card surcharge (6 %)',
+    total_pagar    DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'total + recargo',
+    monto_recibido DECIMAL(12,2)      COMMENT 'cash received',
+    cambio         DECIMAL(12,2)      COMMENT 'change given back (cash)',
+    work_order_id  INTEGER            COMMENT 'sale of a finalized work order (no product lines)',
+    created_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_sales PRIMARY KEY (id),
+    CONSTRAINT fk_sales_user_id_users FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_sales_branch_id_branches FOREIGN KEY (branch_id) REFERENCES branches (id),
+    CONSTRAINT uq_sales_work_order_id UNIQUE (work_order_id),
+    CONSTRAINT fk_sales_cliente_id_users FOREIGN KEY (cliente_id) REFERENCES users (id),
+    CONSTRAINT fk_sales_work_order_id_work_orders FOREIGN KEY (work_order_id) REFERENCES work_orders (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_sales_branch_id ON sales (branch_id);
+CREATE INDEX ix_sales_cliente_id ON sales (cliente_id);
+CREATE INDEX ix_sales_fecha ON sales (fecha);
+CREATE INDEX ix_sales_user_id ON sales (user_id);
+
+CREATE TABLE sale_details (
+    id              INTEGER       NOT NULL AUTO_INCREMENT,
+    sale_id         INTEGER       NOT NULL,
+    product_id      INTEGER       NOT NULL,
+    inventory_id    INTEGER       NOT NULL COMMENT 'inventory the units were taken from',
+    cantidad        INTEGER       NOT NULL,
+    precio_unitario DECIMAL(12,2) NOT NULL COMMENT 'historical price at sale time',
+    subtotal        DECIMAL(12,2) NOT NULL,
+    CONSTRAINT pk_sale_details PRIMARY KEY (id),
+    CONSTRAINT ck_sale_details_cantidad_positive CHECK (cantidad > 0),
+    CONSTRAINT fk_sale_details_sale_id_sales FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE,
+    CONSTRAINT fk_sale_details_product_id_products FOREIGN KEY (product_id) REFERENCES products (id),
+    CONSTRAINT fk_sale_details_inventory_id_inventory FOREIGN KEY (inventory_id) REFERENCES inventory (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_sale_details_inventory_id ON sale_details (inventory_id);
+CREATE INDEX ix_sale_details_product_id ON sale_details (product_id);
+CREATE INDEX ix_sale_details_sale_id ON sale_details (sale_id);

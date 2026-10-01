@@ -3,14 +3,15 @@
 -- Reverse dependency order, so foreign key checks can stay enabled.
 -- =============================================================================
 
+DROP TABLE IF EXISTS sale_details;
+DROP TABLE IF EXISTS sales;
+DROP TABLE IF EXISTS work_order_status_changes;
 DROP TABLE IF EXISTS work_order_photos;
 DROP TABLE IF EXISTS work_order_spare_parts;
 DROP TABLE IF EXISTS work_orders;
 DROP TABLE IF EXISTS spare_parts;
 DROP TABLE IF EXISTS models;
 DROP TABLE IF EXISTS brands;
-DROP TABLE IF EXISTS sale_details;
-DROP TABLE IF EXISTS sales;
 DROP TABLE IF EXISTS stock_movements;
 DROP TABLE IF EXISTS inventory;
 DROP TABLE IF EXISTS products;

@@ -101,6 +101,17 @@ class ReportLabReceiptRenderer(ReceiptRenderer):
         story += [Spacer(1, 3 * mm), info, Spacer(1, 4 * mm)]
 
         rows = [[Paragraph(f"<b>{h}</b>", small) for h in ("SKU", "Producto", "Cant.", "P. unit.", "Subtotal")]]
+        order = sale.work_order
+        if order is not None:  # sale of a finalized work order: one line for the repair
+            rows.append(
+                [
+                    Paragraph(f"OT-{order.num_orden:06d}", small),
+                    Paragraph(f"Reparación {order.marca.nombre} {order.modelo.nombre}", small),
+                    Paragraph("1", right),
+                    Paragraph(_money(sale.total), right),
+                    Paragraph(_money(sale.total), right),
+                ]
+            )
         for d in sale.details:
             rows.append(
                 [
@@ -127,6 +138,11 @@ class ReportLabReceiptRenderer(ReceiptRenderer):
         if sale.recargo:
             totals.append(["Recargo tarjeta de crédito (6 %)", _money(sale.recargo)])
         totals.append(["<b>TOTAL A PAGAR</b>", f"<b>{_money(sale.total_pagar or sale.total)}</b>"])
+        if order is not None and order.anticipo:
+            totals += [
+                ["Anticipo (orden de trabajo)", _money(order.anticipo)],
+                ["Saldo cobrado", _money((sale.total_pagar or sale.total) - order.anticipo)],
+            ]
         if sale.metodo_pago is not None:
             totals.append(["Método de pago", PAYMENT_LABELS[sale.metodo_pago]])
         if sale.monto_recibido is not None:

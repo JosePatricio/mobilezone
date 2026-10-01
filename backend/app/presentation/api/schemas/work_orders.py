@@ -6,7 +6,7 @@ from typing import Annotated
 
 from pydantic import Field, StringConstraints, computed_field
 
-from app.domain.value_objects.enums import WORK_ORDER_STATUS_LABELS, WorkOrderStatus
+from app.domain.value_objects.enums import WORK_ORDER_STATUS_LABELS, PaymentMethod, WorkOrderStatus
 from app.domain.value_objects.work_orders import (
     DISPLAY_TYPE_LABELS,
     ENTRY_REASON_LABELS,
@@ -50,7 +50,6 @@ class WorkOrderRequest(RequestSchema):
         default=None, description='Patrón "1-5-9-6" (puntos 1..9 por filas) o PIN numérico'
     )
     observacion: Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=5000)] = None
-    estado: WorkOrderStatus = WorkOrderStatus.ESTADO_0
     presupuesto: Money = Decimal("0")
     anticipo: Money = Decimal("0")
     fecha_entrega: datetime | None = Field(
@@ -98,8 +97,50 @@ class WorkOrderPhotoResponse(Schema):
         return media_url(self.ruta)
 
 
+Note = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=1000)]
+
+
 class WorkOrderStatusRequest(RequestSchema):
+    """Recibido (0) / En proceso (1). Finalizado uses ``POST /work-orders/{id}/finalize``."""
+
     estado: WorkOrderStatus
+    fecha_entrega: datetime | None = Field(
+        default=None, description="Hora aproximada de entrega (obligatoria para En proceso; sin zona = hora local)"
+    )
+    observacion: Note = None
+
+
+class FinalizeWorkOrderRequest(RequestSchema):
+    """Closes the order (no more changes) and registers the sale of the repair."""
+
+    branch_id: int = Field(description="Sucursal donde se registra la venta")
+    metodo_pago: PaymentMethod = Field(description="Pago del saldo: EFECTIVO, TRANSFERENCIA o TARJETA (+6 % del saldo)")
+    monto_recibido: Money | None = Field(default=None, description="Solo efectivo: monto recibido para el cambio")
+    observacion: Note = None
+
+
+class StatusChangeResponse(Schema):
+    id: int
+    estado: int
+    observacion: str | None
+    fecha_entrega: datetime | None
+    user: UserSummary
+    created_at: datetime
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def estado_label(self) -> str:
+        return WORK_ORDER_STATUS_LABELS[WorkOrderStatus(self.estado)]
+
+
+class WorkOrderSaleRef(Schema):
+    """Sale registered when the order was finalized."""
+
+    id: int
+    fecha: datetime
+    total: Decimal
+    total_pagar: Decimal
+    metodo_pago: PaymentMethod | None
 
 
 class BalanceRequest(RequestSchema):
@@ -174,6 +215,8 @@ class WorkOrderResponse(WorkOrderListItem):
     bloqueo_valor: str | None
     codigo_publico: str = Field(description="Código de la página pública de estado (QR)")
     photos: list[WorkOrderPhotoResponse]
+    status_changes: list[StatusChangeResponse] = Field(description="Historial de estados")
+    sale: WorkOrderSaleRef | None = Field(description="Venta registrada al finalizar")
     spare_parts: list[WorkOrderSparePartResponse]
     spare_parts_total: Decimal
     created_at: datetime

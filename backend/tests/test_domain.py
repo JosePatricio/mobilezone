@@ -175,10 +175,13 @@ class TestWorkOrderBalance:
 
     def test_status_is_centralized(self):
         order = WorkOrder(user_id=1, cliente_id=2, marca_id=1, modelo_id=1)
-        order.change_status(2)
-        assert order.status == WorkOrderStatus.ESTADO_2
+        order.change_status(0, user_id=1)
+        assert order.status == WorkOrderStatus.RECIBIDO
         with pytest.raises(ValidationError):
-            order.change_status(3)
+            order.change_status(3, user_id=1)
+        with pytest.raises(ValidationError) as exc:  # Finalizado only through finalize (it registers a sale)
+            order.change_status(2, user_id=1)
+        assert exc.value.code == "FINALIZE_REQUIRED"
 
     def test_spare_parts_total(self):
         order = WorkOrder(user_id=1, cliente_id=2, marca_id=1, modelo_id=1)

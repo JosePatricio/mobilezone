@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Can, usePermission } from '@/modules/auth/components/Can';
-import { Button, Card, ErrorState, Loading, PageHeader, StatusBadge, useConfirm, useToast } from '@/shared/components';
+import { Button, Card, ErrorState, Loading, PageHeader, useConfirm, useToast } from '@/shared/components';
 import { getErrorMessage } from '@/shared/services/apiError';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatDate, formatDateTime, formatOrderNumber, formatWarrantyDays, fullName } from '@/shared/utils/format';
@@ -12,50 +12,32 @@ import { BalanceSummary } from '../components/BalanceSummary';
 import { OrderQr } from '../components/OrderQr';
 import { PatternLock } from '../components/PatternLock';
 import { PrintableOrder } from '../components/PrintableOrder';
+import { StatusControl } from '../components/StatusControl';
 import { useWorkOrderCatalogs } from '../hooks/useWorkOrderCatalogs';
-import { statusTone, useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
 import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
-import type { AddSparePartRequest, WorkOrderSparePart } from '../types';
+import { WORK_ORDER_STATUS, type AddSparePartRequest, type WorkOrderSparePart } from '../types';
 
 export function WorkOrderDetailPage() {
   const id = Number(useParams().id);
   const canUpdate = usePermission(P.WORK_ORDERS_UPDATE);
-  const canRemovePart = usePermission(P.WORK_ORDERS_SPARE_PARTS_REMOVE);
-  const { statuses, label } = useWorkOrderStatuses();
+  const canRemovePartPermission = usePermission(P.WORK_ORDERS_SPARE_PARTS_REMOVE);
   const { catalogs, labelOf } = useWorkOrderCatalogs();
   const confirm = useConfirm();
   const toast = useToast();
   const queryClient = useQueryClient();
   const [adding, setAdding] = useState(false);
-  const [newStatus, setNewStatus] = useState<string>('');
 
   const query = useQuery({ queryKey: [WORK_ORDERS_KEY, 'detail', id], queryFn: () => workOrderApi.get(id) });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: [WORK_ORDERS_KEY] });
-  const statusMutation = useMutation({ mutationFn: (estado: number) => workOrderApi.setStatus(id, estado), onSuccess: invalidate });
   const addPart = useMutation({ mutationFn: (body: AddSparePartRequest) => workOrderApi.addSparePart(id, body), onSuccess: invalidate });
   const removePart = useMutation({ mutationFn: (itemId: number) => workOrderApi.removeSparePart(id, itemId), onSuccess: invalidate });
 
   if (query.isLoading) return <Loading />;
   if (query.isError || !query.data) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
   const order = query.data;
-
-  const onChangeStatus = async () => {
-    const estado = Number(newStatus);
-    if (newStatus === '' || estado === order.estado) return;
-    const ok = await confirm({
-      title: 'Cambiar estado',
-      message: `La orden #${formatOrderNumber(order.num_orden)} pasará de "${order.estado_label}" a "${label(estado)}". ¿Desea continuar?`,
-      confirmLabel: 'Cambiar estado',
-    });
-    if (!ok) return;
-    try {
-      await statusMutation.mutateAsync(estado);
-      setNewStatus('');
-      toast.success('Estado actualizado.');
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    }
-  };
+  // A finalized order is closed: nothing can be modified.
+  const finalized = order.estado === WORK_ORDER_STATUS.FINALIZADO;
+  const canRemovePart = canRemovePartPermission && !finalized;
 
   const onRemovePart = async (item: WorkOrderSparePart) => {
     const ok = await confirm({
@@ -85,7 +67,7 @@ export function WorkOrderDetailPage() {
             <Button variant="secondary" onClick={() => window.print()}>
               Imprimir orden
             </Button>
-            {canUpdate && (
+            {canUpdate && !finalized && (
               <Link to={`/work-orders/${order.id}/edit`} className="btn btn-primary btn-md">
                 Editar
               </Link>
@@ -95,6 +77,20 @@ export function WorkOrderDetailPage() {
       >
         Registrada por <strong>{fullName(order.user)}</strong> · {formatDate(order.fecha)}
       </PageHeader>
+      {finalized && (
+        <div className="alert alert-info" role="status">
+          Orden finalizada: ya no se puede modificar.
+          {order.sale && (
+            <>
+              {' '}
+              Venta registrada:{' '}
+              <Link to={`/sales/${order.sale.id}`}>
+                #{order.sale.id} · {formatMoney(order.sale.total_pagar)}
+              </Link>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="detail-grid">
         <Card title="Cliente">
@@ -146,35 +142,13 @@ export function WorkOrderDetailPage() {
             <dd className="pre-line">{order.observacion ?? '—'}</dd>
             <dt>Estado</dt>
             <dd>
-              <StatusBadge label={order.estado_label} tone={statusTone(order.estado)} />
+              <StatusControl order={order} canUpdate={canUpdate} />
             </dd>
             <dt>Técnico</dt>
             <dd>{order.tecnico ? fullName(order.tecnico) : 'Sin asignar'}</dd>
             <dt>Fecha de entrega</dt>
             <dd>{order.fecha_entrega ? formatDateTime(order.fecha_entrega) : 'Por confirmar'}</dd>
           </dl>
-          {canUpdate && (
-            <div className="inline-form">
-              <select
-                className="input"
-                aria-label="Nuevo estado"
-                value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value)}
-              >
-                <option value="">Cambiar estado…</option>
-                {statuses
-                  .filter((s) => s.value !== order.estado)
-                  .map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-              </select>
-              <Button size="sm" onClick={onChangeStatus} disabled={newStatus === ''} loading={statusMutation.isPending}>
-                Aplicar
-              </Button>
-            </div>
-          )}
         </Card>
 
         <Card title="Valores">
@@ -198,16 +172,33 @@ export function WorkOrderDetailPage() {
         <Card title="Estado en línea (QR)">
           <OrderQr codigo={order.codigo_publico} />
         </Card>
+
+        <Card title="Historial de estados">
+          <ol className="status-history">
+            {[...order.status_changes].reverse().map((change) => (
+              <li key={change.id}>
+                <strong>{change.estado_label}</strong>
+                <small className="muted">
+                  {formatDateTime(change.created_at)} · {fullName(change.user)}
+                </small>
+                {change.fecha_entrega && <span>Entrega aproximada: {formatDateTime(change.fecha_entrega)}</span>}
+                {change.observacion && <span className="pre-line">{change.observacion}</span>}
+              </li>
+            ))}
+          </ol>
+        </Card>
       </div>
 
       <Card
         title="Repuestos"
         actions={
-          <Can permission={P.WORK_ORDERS_SPARE_PARTS_ADD}>
-            <Button size="sm" onClick={() => setAdding(true)}>
-              Agregar repuesto
-            </Button>
-          </Can>
+          !finalized && (
+            <Can permission={P.WORK_ORDERS_SPARE_PARTS_ADD}>
+              <Button size="sm" onClick={() => setAdding(true)}>
+                Agregar repuesto
+              </Button>
+            </Can>
+          )
         }
       >
         {order.spare_parts.length === 0 ? (
