@@ -73,7 +73,7 @@ class User(Activatable):
 
     nombre: str
     apellido: str
-    email: str
+    email: str | None = None  # required to log in; optional for clients
     rol_id: int | None = None
     password: str | None = None
     identificacion: str | None = None
@@ -93,7 +93,8 @@ class User(Activatable):
     def __post_init__(self) -> None:
         self.nombre = require_text(self.nombre, "nombre", 100)
         self.apellido = require_text(self.apellido, "apellido", 100)
-        self.email = require_text(self.email, "email", 255).lower()
+        email = optional_text(self.email)
+        self.email = require_text(email, "email", 255).lower() if email else None
         self.identificacion = normalize_identificacion(self.identificacion)
         self.celular = normalize_celular(self.celular)
         self.provincia, self.ciudad = validate_location(self.provincia, self.ciudad)

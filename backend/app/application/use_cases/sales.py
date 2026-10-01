@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from datetime import date
+from dataclasses import dataclass
+from datetime import date, datetime, time, timedelta, timezone, tzinfo
+from decimal import Decimal
 
 from app.application.dto import ConfirmSaleData, SaleItemData, UpdateSaleData
 from app.application.services.receipts import ReceiptRenderer
@@ -187,7 +189,27 @@ class CancelSaleUseCase(_SaleValidation):
         return sale
 
 
+def day_range(tz: tzinfo, desde: date, hasta: date) -> tuple[datetime, datetime]:
+    """Local calendar days [desde, hasta] → aware datetimes [start, end) in the shop time zone."""
+    start = datetime.combine(desde, time.min, tzinfo=tz)
+    end = datetime.combine(hasta + timedelta(days=1), time.min, tzinfo=tz)
+    return start, end
+
+
+@dataclass(frozen=True)
+class SalesSummary:
+    fecha: date
+    cantidad: int
+    total: Decimal
+
+
 class SaleQueries(UseCase):
+    """Dates are local calendar days of the shop (``tz``); sales are stored in UTC."""
+
+    def __init__(self, uow: UnitOfWork, tz: tzinfo = timezone.utc) -> None:
+        super().__init__(uow)
+        self.tz = tz
+
     def get(self, sale_id: int) -> Sale:
         return _get_sale(self.uow, sale_id)
 
@@ -198,10 +220,20 @@ class SaleQueries(UseCase):
         estado: SaleStatus | None = None,
         fecha_desde: date | None = None,
         fecha_hasta: date | None = None,
+        identificacion: str | None = None,
     ) -> Page[Sale]:
+        desde = day_range(self.tz, fecha_desde, fecha_desde)[0] if fecha_desde else None
+        hasta = day_range(self.tz, fecha_hasta, fecha_hasta)[1] if fecha_hasta else None
         return self.uow.sales.list(
-            page, user_id=user_id, estado=estado, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta
+            page, user_id=user_id, estado=estado, desde=desde, hasta=hasta, identificacion=identificacion
         )
+
+    def today_summary(self, actor: User) -> SalesSummary:
+        """Confirmed sales of the user today (local day) and the amount charged."""
+        today = datetime.now(self.tz).date()
+        desde, hasta = day_range(self.tz, today, today)
+        cantidad, total = self.uow.sales.summary(user_id=actor.id, desde=desde, hasta=hasta)  # type: ignore[arg-type]
+        return SalesSummary(fecha=today, cantidad=cantidad, total=total)
 
 
 class GetSaleReceiptUseCase(UseCase):

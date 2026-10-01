@@ -12,7 +12,6 @@ import type { NamedRef } from '@/shared/types/api';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatMoney, fromCents } from '@/shared/utils/money';
 import { canConfirm, cartReducer, cartTotal, lineExceedsStock, lineSubtotalCents, type CartLine } from '../hooks/saleCart';
-import { downloadReceipt } from '../receipt';
 import { SALES_KEY, saleApi } from '../services/saleApi';
 import { customerLabel, documentLabel, type Sale, type SaleCustomer } from '../types';
 import { PaymentDialog, type PaymentResult } from './PaymentDialog';
@@ -102,12 +101,8 @@ export function SaleEditor({ sale, initialLines }: Props) {
       const saved = await mutation.mutateAsync(payment);
       setPaying(false);
       toast.success(editing ? `Venta #${saved.id} modificada.` : `Venta #${saved.id} registrada.`);
-      try {
-        await downloadReceipt(saved.id);
-      } catch {
-        toast.error('La venta se guardó, pero no se pudo generar el comprobante PDF. Descárguelo desde el detalle.');
-      }
-      navigate(`/sales/${saved.id}`);
+      // Back to the list with the receipt open (shown in the app, nothing is downloaded).
+      navigate(`/sales?comprobante=${saved.id}`);
     } catch (err) {
       setPaying(false);
       const apiError = toApiError(err);

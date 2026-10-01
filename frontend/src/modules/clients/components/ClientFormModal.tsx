@@ -13,7 +13,7 @@ import {
 } from '@/shared/components';
 import { getErrorMessage } from '@/shared/services/apiError';
 import { zCelular, zIdentificacion } from '@/shared/utils/identification';
-import { type FormShape, zodForm, applyServerErrors, zOptionalText, zText } from '@/shared/utils/validation';
+import { type FormShape, zodForm, applyServerErrors, zOptionalText, zText, zOptionalEmail } from '@/shared/utils/validation';
 import type { Client, ClientRequest } from '../types';
 
 /** Client fields (also used by the quick registration in the sales screen). */
@@ -22,7 +22,7 @@ export const clientSchema = z
     nombre: zText(100),
     apellido: zText(100),
     identificacion: zIdentificacion,
-    email: z.string().trim().min(1, 'Campo obligatorio').email('Email inválido'),
+    email: zOptionalEmail,
     celular: zCelular,
     provincia: zOptionalText(100),
     ciudad: zOptionalText(100),
@@ -124,7 +124,7 @@ export function ClientFormModal({ client, onClose, onSubmit, withPhoto = true }:
           error={errors.identificacion?.message}
           {...register('identificacion')}
         />
-        <Input label="Email" type="email" required error={errors.email?.message} {...register('email')} />
+        <Input label="Email" type="email" hint="Opcional" error={errors.email?.message} {...register('email')} />
         <Input label="Celular" type="tel" inputMode="tel" error={errors.celular?.message} {...register('celular')} />
         <LocationFields register={register} setValue={setValue} errors={errors} provincia={provincia} />
         <Checkbox label="Activo" toggle {...register('estado')} />

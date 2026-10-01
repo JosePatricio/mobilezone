@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { usePermission } from '@/modules/auth/components/Can';
-import { Button, Card, ErrorState, Loading, PageHeader, ProductThumb, StatusBadge, useToast } from '@/shared/components';
+import { Button, Card, ErrorState, Loading, PageHeader, ProductThumb, StatusBadge } from '@/shared/components';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatDateTime, fullName } from '@/shared/utils/format';
 import { formatMoney } from '@/shared/utils/money';
 import { useDeleteSale } from '../hooks/useDeleteSale';
-import { downloadReceipt } from '../receipt';
+import { ReceiptViewer } from '../components/ReceiptViewer';
 import { SALES_KEY, saleApi } from '../services/saleApi';
 import { PAYMENT_METHOD_LABELS, customerLabel, documentLabel } from '../types';
 
@@ -15,26 +15,14 @@ export function SaleDetailPage() {
   const id = Number(useParams().id);
   const canUpdate = usePermission(P.SALES_UPDATE);
   const canDelete = usePermission(P.SALES_CANCEL);
-  const toast = useToast();
   const { remove, isPending } = useDeleteSale();
-  const [downloading, setDownloading] = useState(false);
+  const [viewing, setViewing] = useState(false);
   const query = useQuery({ queryKey: [SALES_KEY, 'detail', id], queryFn: () => saleApi.get(id) });
 
   if (query.isLoading) return <Loading />;
   if (query.isError || !query.data) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
   const sale = query.data;
   const editable = sale.estado === 'CONFIRMADA';
-
-  const onReceipt = async () => {
-    setDownloading(true);
-    try {
-      await downloadReceipt(sale.id);
-    } catch {
-      toast.error('No se pudo generar el comprobante PDF.');
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   return (
     <>
@@ -45,7 +33,7 @@ export function SaleDetailPage() {
             <Link to="/sales" className="btn btn-secondary btn-md">
               Volver
             </Link>
-            <Button variant="secondary" onClick={onReceipt} loading={downloading}>
+            <Button variant="secondary" onClick={() => setViewing(true)}>
               Comprobante PDF
             </Button>
             {canUpdate && editable && (
@@ -156,6 +144,7 @@ export function SaleDetailPage() {
           </table>
         </div>
       </Card>
+      <ReceiptViewer saleId={viewing ? sale.id : null} onClose={() => setViewing(false)} />
     </>
   );
 }

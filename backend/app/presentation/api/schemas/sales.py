@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import Field
@@ -62,3 +62,9 @@ class SaleResponse(Schema):
     details: list[SaleDetailResponse]
     created_at: datetime
     updated_at: datetime
+
+
+class SalesSummaryResponse(Schema):
+    fecha: date
+    cantidad: int
+    total: Decimal = Field(description="Monto cobrado (total a pagar) de las ventas confirmadas")

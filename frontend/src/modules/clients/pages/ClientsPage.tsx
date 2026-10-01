@@ -45,7 +45,7 @@ export function ClientsPage() {
             <strong>
               {r.nombre} {r.apellido}
             </strong>
-            <small className="muted">{r.email}</small>
+            {r.email && <small className="muted">{r.email}</small>}
           </div>
         </div>
       ),

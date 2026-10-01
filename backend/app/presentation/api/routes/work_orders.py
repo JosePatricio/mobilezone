@@ -3,11 +3,15 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Response, UploadFile, status
 
-from app.application.dto import WorkOrderData, WorkOrderFilters, WorkOrderSparePartData
+from app.application.dto import WorkOrderClientData, WorkOrderData, WorkOrderFilters, WorkOrderSparePartData
+from app.application.use_cases.users import ClientUseCases
 from app.application.use_cases.work_orders import (
     AddSparePartToWorkOrderUseCase,
+    AddWorkOrderPhotoUseCase,
+    PublicWorkOrderStatusUseCase,
+    RemoveWorkOrderPhotoUseCase,
     CalculateWorkOrderBalanceUseCase,
     ChangeWorkOrderStatusUseCase,
     CreateWorkOrderUseCase,
@@ -18,13 +22,25 @@ from app.application.use_cases.work_orders import (
 from app.domain.entities import User
 from app.domain.value_objects.enums import WORK_ORDER_STATUS_LABELS
 from app.domain.value_objects.permissions import Perm
-from app.presentation.api.dependencies import CurrentUser, PageDep, UowDep, require_permissions
+from app.presentation.api.dependencies import (
+    CurrentUser,
+    PageDep,
+    StorageDep,
+    UowDep,
+    read_upload,
+    require_any_permission,
+    require_permissions,
+)
 from app.presentation.api.schemas.common import PageResponse
+from app.presentation.api.schemas.users import ClientSummary
 from app.presentation.api.schemas.work_orders import (
     AddWorkOrderSparePartRequest,
     BalanceRequest,
     BalanceResponse,
+    PublicWorkOrderResponse,
+    WorkOrderCatalogsResponse,
     WorkOrderListItem,
+    WorkOrderPhotoResponse,
     WorkOrderRequest,
     WorkOrderResponse,
     WorkOrderSparePartResponse,
@@ -33,13 +49,34 @@ from app.presentation.api.schemas.work_orders import (
 )
 
 router = APIRouter(prefix="/work-orders", tags=["work-orders"])
+public_router = APIRouter(prefix="/public/work-orders", tags=["public"])
 
 CanView = Annotated[User, Depends(require_permissions(Perm.WORK_ORDERS_VIEW))]
 CanUpdate = Annotated[User, Depends(require_permissions(Perm.WORK_ORDERS_UPDATE))]
+CanEdit = Annotated[User, Depends(require_any_permission(Perm.WORK_ORDERS_CREATE, Perm.WORK_ORDERS_UPDATE))]
 
 
 def _data(body: WorkOrderRequest) -> WorkOrderData:
-    return WorkOrderData(**{**body.model_dump(), "estado": int(body.estado)})
+    values = body.model_dump(mode="json", exclude={"cliente", "presupuesto", "anticipo", "fecha"})
+    return WorkOrderData(
+        **values,
+        cliente=WorkOrderClientData(**body.cliente.model_dump()),
+        presupuesto=body.presupuesto,
+        anticipo=body.anticipo,
+        fecha=body.fecha,
+    )
+
+
+@router.get("/catalogs", response_model=WorkOrderCatalogsResponse)
+def list_catalogs(_: CurrentUser):
+    """Options of the order form: entry reasons, display types, warranty, lock types and statuses."""
+    return WorkOrderCatalogsResponse.build()
+
+
+@router.get("/customers/lookup", response_model=ClientSummary)
+def lookup_customer(identificacion: str, uow: UowDep, _: CanEdit):
+    """Client by cédula / RUC to fill the order form (404 = new client, typed in the form)."""
+    return ClientSummary.model_validate(ClientUseCases(uow).find_by_identificacion(identificacion))
 
 
 @router.get("/statuses", response_model=list[WorkOrderStatusOption])
@@ -100,6 +137,27 @@ def update_work_order(work_order_id: int, body: WorkOrderRequest, uow: UowDep, a
 def change_work_order_status(work_order_id: int, body: WorkOrderStatusRequest, uow: UowDep, _: CanUpdate):
     order = ChangeWorkOrderStatusUseCase(uow).execute(work_order_id, int(body.estado))
     return WorkOrderResponse.model_validate(order)
+
+
+@router.post(
+    "/{work_order_id}/photos", response_model=WorkOrderPhotoResponse, status_code=status.HTTP_201_CREATED
+)
+def add_photo(work_order_id: int, file: UploadFile, uow: UowDep, storage: StorageDep, _: CanEdit):
+    """Photo of the device (JPG, PNG or WEBP, max 2 MB). Up to 3 per order."""
+    content = read_upload(file)
+    return WorkOrderPhotoResponse.model_validate(AddWorkOrderPhotoUseCase(uow, storage).execute(work_order_id, content))
+
+
+@router.delete("/{work_order_id}/photos/{photo_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_photo(work_order_id: int, photo_id: int, uow: UowDep, storage: StorageDep, _: CanEdit) -> Response:
+    RemoveWorkOrderPhotoUseCase(uow, storage).execute(work_order_id, photo_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@public_router.get("/{codigo}", response_model=PublicWorkOrderResponse)
+def public_work_order_status(codigo: str, uow: UowDep):
+    """Public status page opened from the QR of the order. No authentication; limited data."""
+    return PublicWorkOrderResponse.model_validate(PublicWorkOrderStatusUseCase(uow).execute(codigo))
 
 
 @router.post(

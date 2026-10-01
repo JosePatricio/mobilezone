@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Generic, Iterator, TypeVar
 
 from app.domain.entities import (
@@ -153,9 +154,15 @@ class SaleRepository(Repository[Sale]):
         *,
         user_id: int | None = None,
         estado: SaleStatus | None = None,
-        fecha_desde: date | None = None,
-        fecha_hasta: date | None = None,
-    ) -> Page[Sale]: ...
+        desde: datetime | None = None,
+        hasta: datetime | None = None,
+        identificacion: str | None = None,
+    ) -> Page[Sale]:
+        """``desde`` inclusive / ``hasta`` exclusive (UTC); ``identificacion`` = client cédula / RUC (prefix)."""
+
+    @abstractmethod
+    def summary(self, *, user_id: int, desde: datetime, hasta: datetime) -> tuple[int, Decimal]:
+        """Number of confirmed sales of the user in the range and the amount charged (total_pagar)."""
 
 
 class BrandRepository(Repository[Brand]):
@@ -189,6 +196,9 @@ class SparePartRepository(Repository[SparePart]):
 class WorkOrderRepository(Repository[WorkOrder]):
     @abstractmethod
     def get_by_num_orden(self, num_orden: int) -> WorkOrder | None: ...
+
+    @abstractmethod
+    def get_by_codigo_publico(self, codigo: str) -> WorkOrder | None: ...
 
     @abstractmethod
     def list(

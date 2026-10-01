@@ -28,8 +28,8 @@ class _UserValidation(CrudUseCases[User]):
     def _repo(self) -> Repository[User]:
         return self.uow.users
 
-    def _ensure_unique(self, email: str, identificacion: str | None, current_id: int | None = None) -> None:
-        existing = self.uow.users.get_by_email(email.strip().lower())
+    def _ensure_unique(self, email: str | None, identificacion: str | None, current_id: int | None = None) -> None:
+        existing = self.uow.users.get_by_email(email.strip().lower()) if email else None
         if existing is not None and existing.id != current_id:
             raise ConflictError(
                 "Ya existe un usuario con ese email.", code="EMAIL_ALREADY_EXISTS", details={"field": "email"}
@@ -118,12 +118,22 @@ class UserUseCases(_UserValidation):
             user = self._build(data)
             self._ensure_unique(user.email, user.identificacion)
             user.set_branches(self._resolve_branches(role, data.branch_ids))
-            # Clients never log in (no password); every other role needs one.
+            # Clients never log in (no password, email optional); every other role needs both.
             if role.nombre != SystemRole.CLIENTE.value:
+                self._require_email(user)
                 password = data.password or self._default_password(role, user)
                 user.password = self.hasher.hash(_validate_password(password))
             self.uow.users.add(user)
         return user
+
+    @staticmethod
+    def _require_email(user: User) -> None:
+        if not user.email:
+            raise ValidationError(
+                "El email es obligatorio: es el usuario para iniciar sesión.",
+                code="REQUIRED_FIELD",
+                details={"field": "email"},
+            )
 
     @staticmethod
     def _default_password(role: Role, user: User) -> str:
@@ -156,7 +166,9 @@ class UserUseCases(_UserValidation):
             user.set_branches(self._resolve_branches(role, data.branch_ids))
             if role.nombre == SystemRole.CLIENTE.value:
                 user.password = None
-            elif data.password:
+                return user
+            self._require_email(user)
+            if data.password:
                 user.password = self.hasher.hash(_validate_password(data.password))
             elif not user.password:  # e.g. a client promoted to seller
                 user.password = self.hasher.hash(_validate_password(self._default_password(role, user)))

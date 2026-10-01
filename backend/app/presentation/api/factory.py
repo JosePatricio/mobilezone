@@ -65,6 +65,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         catalog.brands,
         catalog.models,
         work_orders.router,
+        work_orders.public_router,
         catalog.spare_parts,
     ):
         api.include_router(router)

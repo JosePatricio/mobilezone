@@ -3,7 +3,9 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { visibleNavigation } from '@/app/router/navigation';
 import { useAuth } from '@/app/store/AuthProvider';
 import { Avatar, useConfirm } from '@/shared/components';
+import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { fullName } from '@/shared/utils/format';
+import { TodaySales } from './TodaySales';
 
 export function MainLayout() {
   const { user, logout, hasAnyPermission } = useAuth();
@@ -39,6 +41,7 @@ export function MainLayout() {
           <span>MobileZone</span>
         </Link>
         <div className="app-user">
+          {hasAnyPermission([P.SALES_CREATE, P.SALES_VIEW]) && <TodaySales />}
           <Avatar src={user?.foto_url} alt={fullName(user)} size="sm" />
           <div className="app-user-info">
             <strong>{fullName(user)}</strong>

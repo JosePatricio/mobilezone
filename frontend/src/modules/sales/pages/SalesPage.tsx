@@ -1,11 +1,23 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { usePermission } from '@/modules/auth/components/Can';
-import { Avatar, Button, DataList, DatePicker, PageHeader, Select, StatusBadge, type Column } from '@/shared/components';
+import {
+  Avatar,
+  Button,
+  DataList,
+  DatePicker,
+  PageHeader,
+  SearchInput,
+  Select,
+  StatusBadge,
+  type Column,
+} from '@/shared/components';
+import { useDebounce } from '@/shared/hooks/useDebounce';
 import { useListParams } from '@/shared/hooks/useListParams';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
-import { formatDateTime, fullName } from '@/shared/utils/format';
+import { formatDateTime, fullName, todayIso } from '@/shared/utils/format';
 import { formatMoney, toCents } from '@/shared/utils/money';
+import { ReceiptViewer } from '../components/ReceiptViewer';
 import { useDeleteSale } from '../hooks/useDeleteSale';
 import { SALES_KEY, saleApi } from '../services/saleApi';
 import { PAYMENT_METHOD_LABELS, customerName, documentLabel, type Sale } from '../types';
@@ -17,10 +29,19 @@ export function SalesPage() {
   const canUpdate = usePermission(P.SALES_UPDATE);
   const canDelete = usePermission(P.SALES_CANCEL);
   const { remove } = useDeleteSale();
-  const list = useListParams({ estado: '', fecha_desde: '', fecha_hasta: '' });
+  // By default only today's sales; the date filters can widen the range.
+  const today = todayIso();
+  const list = useListParams({ estado: '', fecha_desde: today, fecha_hasta: today, identificacion: '' });
+  const identificacion = useDebounce(list.filters.identificacion);
+  const params = { ...list.params, identificacion: identificacion.trim() };
+  // ?comprobante=<id>: opens the receipt right after confirming a sale.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const receiptId = Number(searchParams.get('comprobante')) || null;
+  const showReceipt = (id: number | null) =>
+    setSearchParams(id ? { comprobante: String(id) } : {}, { replace: true });
   const query = useQuery({
-    queryKey: [SALES_KEY, 'list', list.params],
-    queryFn: () => saleApi.list(list.params),
+    queryKey: [SALES_KEY, 'list', params],
+    queryFn: () => saleApi.list(params),
     placeholderData: keepPreviousData,
     enabled: canView,
   });
@@ -70,6 +91,17 @@ export function SalesPage() {
       ),
     },
     {
+      key: 'comprobante',
+      header: 'Comprobante',
+      render: (r) => (
+        <span onClick={(e) => e.stopPropagation()}>
+          <Button size="sm" variant="secondary" aria-label={`Ver comprobante de la venta #${r.id}`} onClick={() => showReceipt(r.id)}>
+            PDF
+          </Button>
+        </span>
+      ),
+    },
+    {
       key: 'acciones',
       header: 'Acciones',
       align: 'right',
@@ -97,6 +129,12 @@ export function SalesPage() {
       {canView ? (
         <>
           <div className="toolbar">
+            <SearchInput
+              label="Cédula / RUC del cliente"
+              placeholder="Cédula / RUC del cliente"
+              value={list.filters.identificacion}
+              onChange={(value) => list.setFilter('identificacion', value.replace(/\D/g, ''))}
+            />
             <Select
               aria-label="Filtrar por estado"
               value={list.filters.estado}
@@ -117,6 +155,18 @@ export function SalesPage() {
               value={list.filters.fecha_hasta}
               onChange={(e) => list.setFilter('fecha_hasta', e.target.value)}
             />
+            {(list.filters.fecha_desde !== today || list.filters.fecha_hasta !== today) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  list.setFilter('fecha_desde', today);
+                  list.setFilter('fecha_hasta', today);
+                }}
+              >
+                Hoy
+              </Button>
+            )}
           </div>
           <DataList
             query={query}
@@ -129,6 +179,7 @@ export function SalesPage() {
       ) : (
         <p className="muted">Puede registrar ventas desde “Nueva venta”.</p>
       )}
+      <ReceiptViewer saleId={receiptId} onClose={() => showReceipt(null)} />
     </>
   );
 }

@@ -265,3 +265,52 @@ def test_upgrade_004_adds_payments_and_renames_permission(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_005_work_orders_and_optional_email(mysql_engine: Engine):
+    """v4 database (0001 + 002 + 003 + 004) with work orders → upgrade 005."""
+    from pathlib import Path
+
+    from app.infrastructure.database.sql_scripts import UPGRADE_002, UPGRADE_003, UPGRADE_004, UPGRADE_005
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in (initial, UPGRADE_002, UPGRADE_003, UPGRADE_004):
+                run_script(conn, script)
+            q = conn.exec_driver_sql
+            q(
+                "INSERT INTO users (nombre, apellido, email, password, rol_id) VALUES "
+                "('A','A','a@x.com','h',(SELECT id FROM roles WHERE nombre='ADMIN'))"
+            )
+            q("INSERT INTO brands (nombre) VALUES ('Samsung')")
+            q("INSERT INTO models (brand_id, nombre) VALUES ((SELECT id FROM brands), 'A10')")
+            for garantia in (1, 0):
+                q(
+                    "INSERT INTO work_orders (user_id, cliente_id, marca_id, modelo_id, estado, garantia, "
+                    "presupuesto, anticipo, saldo, fecha) VALUES (1, 1, (SELECT id FROM brands), "
+                    f"(SELECT id FROM models), 0, {garantia}, 10, 0, 10, '2026-09-01')"
+                )
+
+        with mysql_engine.begin() as conn:
+            run_script(conn, UPGRADE_005)
+
+        with mysql_engine.connect() as conn:
+            q = conn.exec_driver_sql
+            rows = q(
+                "SELECT tipo_garantia, motivo_ingreso, bloqueo_tipo, codigo_publico FROM work_orders ORDER BY id"
+            ).all()
+            assert [r[0] for r in rows] == ["GARANTIA_LOCAL", "SIN_GARANTIA"]
+            assert all(r[1] == "OTROS" and r[2] == "NINGUNO" and len(r[3]) == 24 for r in rows)
+            assert rows[0][3] != rows[1][3]
+            columns = set(q("SHOW COLUMNS FROM work_orders").scalars())
+            assert "garantia" not in columns
+            assert q("SELECT COUNT(*) FROM work_order_photos").scalar() == 0
+            nullable = q("SELECT IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() "
+                         "AND TABLE_NAME = 'users' AND COLUMN_NAME = 'email'").scalar()
+            assert nullable == "YES"
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

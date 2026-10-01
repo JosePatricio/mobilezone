@@ -80,7 +80,7 @@ export function NewCustomerForm({ identificacion, onCreated, onCancel }: Props) 
         error={errors.identificacion?.message}
         {...register('identificacion')}
       />
-      <Input label="Email" type="email" required error={errors.email?.message} {...register('email')} />
+      <Input label="Email" type="email" hint="Opcional" error={errors.email?.message} {...register('email')} />
       <Input label="Celular" type="tel" inputMode="tel" error={errors.celular?.message} {...register('celular')} />
       <div className="field">
         <span className="field-label">Rol</span>

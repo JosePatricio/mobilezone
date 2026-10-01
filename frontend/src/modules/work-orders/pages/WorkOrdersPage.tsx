@@ -18,7 +18,7 @@ export function WorkOrdersPage() {
   const { statuses } = useWorkOrderStatuses();
   const technicians = useQuery({ queryKey: ['users', 'technicians'], queryFn: userApi.technicians, staleTime: 60_000 });
   const list = useListParams({ num_orden: '', estado: '', tecnico_id: '', fecha_desde: '', fecha_hasta: '' });
-  // The search box filters by client (name / email).
+  // The search box filters by client (name, email or cédula).
   const params = { ...list.params, cliente: list.params.search, search: undefined };
   const query = useQuery({
     queryKey: [WORK_ORDERS_KEY, 'list', params],
@@ -28,9 +28,20 @@ export function WorkOrdersPage() {
 
   const columns: Column<WorkOrderListItem>[] = [
     { key: 'num', header: 'N.º Orden', render: (r) => formatOrderNumber(r.num_orden), sortValue: (r) => r.num_orden },
-    { key: 'cliente', header: 'Cliente', render: (r) => fullName(r.cliente), sortValue: (r) => fullName(r.cliente) },
+    {
+      key: 'cliente',
+      header: 'Cliente',
+      render: (r) => (
+        <>
+          {fullName(r.cliente)}
+          {r.cliente.identificacion && <small className="muted d-block">{r.cliente.identificacion}</small>}
+        </>
+      ),
+      sortValue: (r) => fullName(r.cliente),
+    },
     { key: 'marca', header: 'Marca', render: (r) => r.marca.nombre },
     { key: 'modelo', header: 'Modelo', render: (r) => r.modelo.nombre },
+    { key: 'motivo', header: 'Motivo', render: (r) => r.motivo_ingreso_label, sortValue: (r) => r.motivo_ingreso_label },
     { key: 'tecnico', header: 'Técnico', render: (r) => (r.tecnico ? fullName(r.tecnico) : 'Sin asignar') },
     {
       key: 'estado',
@@ -38,8 +49,8 @@ export function WorkOrdersPage() {
       render: (r) => <StatusBadge label={r.estado_label} tone={statusTone(r.estado)} />,
       sortValue: (r) => r.estado,
     },
-    { key: 'garantia', header: 'Garantía', render: (r) => (r.garantia ? 'Sí' : 'No') },
-    { key: 'presupuesto', header: 'Presupuesto', align: 'right', render: (r) => formatMoney(r.presupuesto) },
+    { key: 'garantia', header: 'Garantía', render: (r) => r.tipo_garantia_label },
+    { key: 'presupuesto', header: 'Costo', align: 'right', render: (r) => formatMoney(r.presupuesto) },
     { key: 'anticipo', header: 'Anticipo', align: 'right', render: (r) => formatMoney(r.anticipo) },
     { key: 'saldo', header: 'Saldo', align: 'right', render: (r) => formatMoney(r.saldo), sortValue: (r) => toCents(r.saldo) },
     { key: 'fecha', header: 'Fecha', render: (r) => formatDate(r.fecha), sortValue: (r) => r.fecha },
@@ -76,7 +87,7 @@ export function WorkOrdersPage() {
           value={list.filters.num_orden}
           onChange={(e) => list.setFilter('num_orden', e.target.value.replace(/\D/g, ''))}
         />
-        <SearchInput value={list.search} onChange={list.setSearch} placeholder="Buscar cliente…" label="Buscar cliente" />
+        <SearchInput value={list.search} onChange={list.setSearch} placeholder="Cliente o cédula…" label="Buscar cliente" />
         <Select
           aria-label="Filtrar por estado"
           value={list.filters.estado}

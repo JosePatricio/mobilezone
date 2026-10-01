@@ -42,10 +42,12 @@ from app.domain.entities import (
     StockMovement,
     User,
     WorkOrder,
+    WorkOrderPhoto,
     WorkOrderSparePart,
 )
 from app.domain.entities.base import utcnow
 from app.domain.value_objects.enums import PaymentMethod, SaleStatus, StockMovementType
+from app.domain.value_objects.work_orders import DisplayType, EntryReason, LockType, WarrantyType
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -121,7 +123,7 @@ users_table = Table(
     Column("id", Integer, primary_key=True),
     Column("nombre", String(100), nullable=False),
     Column("apellido", String(100), nullable=False),
-    Column("email", String(255), nullable=False, unique=True),
+    Column("email", String(255), unique=True),  # login; optional for clients (NULL)
     Column("password", String(255)),  # bcrypt hash; NULL for clients (no login)
     Column("identificacion", String(13), unique=True),  # cédula (10) / RUC (13)
     Column("celular", String(20)),
@@ -284,7 +286,14 @@ work_orders_table = Table(
     Column("modelo_id", ForeignKey("models.id"), nullable=False),
     Column("observacion", Text),
     Column("estado", Integer, nullable=False, default=0, server_default=FALSE, index=True),
-    Column("garantia", Boolean, nullable=False, default=False, server_default=FALSE),
+    Column("motivo_ingreso", _str_enum(EntryReason), nullable=False),
+    Column("tipo_display", _str_enum(DisplayType)),  # only for CAMBIO_DISPLAY
+    Column(
+        "tipo_garantia", _str_enum(WarrantyType), nullable=False, server_default=text("'SIN_GARANTIA'")
+    ),
+    Column("bloqueo_tipo", _str_enum(LockType), nullable=False, server_default=text("'NINGUNO'")),
+    Column("bloqueo_valor", String(20)),  # pattern "1-5-9-6" or PIN
+    Column("codigo_publico", String(32), nullable=False, unique=True),  # public status page (QR)
     Column("color", String(50)),
     Column("presupuesto", MONEY, nullable=False),
     Column("anticipo", MONEY, nullable=False),
@@ -293,6 +302,15 @@ work_orders_table = Table(
     *_timestamps(),
     CheckConstraint("estado IN (0, 1, 2)", name="estado_valid"),
     CheckConstraint("presupuesto >= 0 AND anticipo >= 0", name="amounts_non_negative"),
+)
+
+work_order_photos_table = Table(
+    "work_order_photos",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("work_order_id", ForeignKey("work_orders.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("ruta", String(255), nullable=False),  # relative path in the media storage
+    Column("created_at", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
 )
 
 work_order_spare_parts_table = Table(
@@ -400,6 +418,7 @@ def start_mappers() -> None:
             "technician": relationship(User, lazy="joined"),
         },
     )
+    mapper_registry.map_imperatively(WorkOrderPhoto, work_order_photos_table)
     wo = work_orders_table.c
     mapper_registry.map_imperatively(
         WorkOrder,
@@ -415,6 +434,12 @@ def start_mappers() -> None:
                 lazy="selectin",
                 cascade="all, delete-orphan",
                 order_by=work_order_spare_parts_table.c.id,
+            ),
+            "photos": relationship(
+                WorkOrderPhoto,
+                lazy="selectin",
+                cascade="all, delete-orphan",
+                order_by=work_order_photos_table.c.id,
             ),
         },
     )

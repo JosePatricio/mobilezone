@@ -33,6 +33,14 @@ export const zOptionalText = (max: number) =>
     .optional()
     .transform((v) => (v ? v : null));
 
+/** Optional email ("" = none). Clients do not need one; they never log in. */
+export const zOptionalEmail = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v ? v : null))
+  .refine((v) => v === null || z.string().email().safeParse(v).success, 'Email inválido');
+
 export const zMoney = z
   .string()
   .trim()

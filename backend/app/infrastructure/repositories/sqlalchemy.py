@@ -1,7 +1,8 @@
 """SQLAlchemy implementations of the domain repositories."""
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Generic, TypeVar
 
 from sqlalchemy import Select, and_, func, or_, select
@@ -49,8 +50,9 @@ def _like(value: str) -> str:
     return f"%{escaped}%"
 
 
-def _day_start(d: date) -> datetime:
-    return datetime.combine(d, time.min, tzinfo=timezone.utc)
+def _utc_naive(value: datetime) -> datetime:
+    """Datetimes are stored as naive UTC."""
+    return value.astimezone(timezone.utc).replace(tzinfo=None) if value.tzinfo else value
 
 
 class SqlAlchemyRepository(Generic[T]):
@@ -275,18 +277,35 @@ class SqlAlchemyStockMovementRepository(ports.StockMovementRepository):
 class SqlAlchemySaleRepository(SqlAlchemyRepository[Sale], ports.SaleRepository):
     entity = Sale
 
-    def list(self, page, *, user_id=None, estado: SaleStatus | None = None, fecha_desde=None, fecha_hasta=None):
+    def list(self, page, *, user_id=None, estado: SaleStatus | None = None, desde=None, hasta=None, identificacion=None):
         c = sales_table.c
         stmt = select(Sale)
         if user_id is not None:
             stmt = stmt.where(c.user_id == user_id)
         if estado is not None:
             stmt = stmt.where(c.estado == estado)
-        if fecha_desde is not None:
-            stmt = stmt.where(c.fecha >= _day_start(fecha_desde))
-        if fecha_hasta is not None:
-            stmt = stmt.where(c.fecha < _day_start(fecha_hasta + timedelta(days=1)))
+        if desde is not None:
+            stmt = stmt.where(c.fecha >= _utc_naive(desde))
+        if hasta is not None:
+            stmt = stmt.where(c.fecha < _utc_naive(hasta))
+        if identificacion:
+            clients = select(users_table.c.id).where(
+                users_table.c.identificacion.like(f"{identificacion.strip()}%")
+            )
+            stmt = stmt.where(c.cliente_id.in_(clients))
         return self._paginate(stmt.order_by(c.fecha.desc(), c.id.desc()), page)
+
+    def summary(self, *, user_id, desde, hasta):
+        c = sales_table.c
+        row = self.session.execute(
+            select(func.count(), func.coalesce(func.sum(c.total_pagar), 0)).where(
+                c.user_id == user_id,
+                c.estado == SaleStatus.CONFIRMADA,
+                c.fecha >= _utc_naive(desde),
+                c.fecha < _utc_naive(hasta),
+            )
+        ).one()
+        return int(row[0]), Decimal(row[1])
 
 
 class SqlAlchemyBrandRepository(SqlAlchemyRepository[Brand], ports.BrandRepository):
@@ -355,6 +374,9 @@ class SqlAlchemyWorkOrderRepository(SqlAlchemyRepository[WorkOrder], ports.WorkO
     def get_by_num_orden(self, num_orden: int) -> WorkOrder | None:
         return self.session.scalars(select(WorkOrder).where(work_orders_table.c.num_orden == num_orden)).first()
 
+    def get_by_codigo_publico(self, codigo: str) -> WorkOrder | None:
+        return self.session.scalars(select(WorkOrder).where(work_orders_table.c.codigo_publico == codigo)).first()
+
     def list(
         self,
         page,
@@ -378,6 +400,7 @@ class SqlAlchemyWorkOrderRepository(SqlAlchemyRepository[WorkOrder], ports.WorkO
                 or_(
                     func.lower(u.c.nombre + " " + u.c.apellido).like(pattern, escape="\\"),
                     func.lower(u.c.email).like(pattern, escape="\\"),
+                    u.c.identificacion.like(pattern, escape="\\"),
                 )
             )
         if cliente_id is not None:

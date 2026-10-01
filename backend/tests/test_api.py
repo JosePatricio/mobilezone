@@ -260,12 +260,16 @@ class TestWorkOrders:
         client_user = factory.user(SystemRole.CLIENTE)
         brand, model = factory.brand_and_model()
         payload = {
-            "cliente_id": client_user.id,
+            "cliente": {
+                "identificacion": client_user.identificacion,
+                "nombre": client_user.nombre,
+                "apellido": client_user.apellido,
+            },
             "marca_id": brand.id,
             "modelo_id": model.id,
+            "motivo_ingreso": "DIAGNOSTICO",
             "observacion": "No enciende",
             "color": "Negro",
-            "garantia": False,
             "presupuesto": "100.00",
             "anticipo": "30.00",
         }

@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
+import { todayIso } from '@/shared/utils/format';
 import { fakeAuth, renderWithProviders } from '@/test/utils';
 import type { Sale } from '../types';
 import { SalesPage } from './SalesPage';
@@ -28,10 +29,15 @@ const sale = (id: number, estado: Sale['estado']): Sale => ({
 });
 
 const cancelled: number[] = [];
+const listCalls: Record<string, unknown>[] = [];
 vi.mock('../services/saleApi', () => ({
   SALES_KEY: 'sales',
   saleApi: {
-    list: () => Promise.resolve({ items: [sale(1, 'CONFIRMADA'), sale(2, 'ANULADA')], total: 2, page: 1, size: 20, pages: 1 }),
+    list: (params: Record<string, unknown>) => {
+      listCalls.push(params);
+      return Promise.resolve({ items: [sale(1, 'CONFIRMADA'), sale(2, 'ANULADA')], total: 2, page: 1, size: 20, pages: 1 });
+    },
+    receipt: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })),
     cancel: (id: number) => {
       cancelled.push(id);
       return Promise.resolve(sale(id, 'ANULADA'));
@@ -68,5 +74,27 @@ describe('SalesPage', () => {
     await screen.findByRole('table');
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Eliminar' })).not.toBeInTheDocument();
+  });
+
+  it("shows only today's sales by default and filters by client cédula", async () => {
+    listCalls.length = 0;
+    renderWithProviders(<SalesPage />, { auth: fakeAuth({ permissionCodes: ['sales.view'] }) });
+    await screen.findByRole('table');
+    expect(listCalls[0]).toMatchObject({ fecha_desde: todayIso(), fecha_hasta: todayIso() });
+    expect(screen.getByLabelText('Desde')).toHaveValue(todayIso());
+
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Cédula / RUC del cliente' }), '1712a');
+    await vi.waitFor(() => expect(listCalls[listCalls.length - 1]).toMatchObject({ identificacion: '1712' }));
+  });
+
+  it('opens the PDF receipt from its column inside the app', async () => {
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:receipt'), revokeObjectURL: vi.fn() });
+    renderWithProviders(<SalesPage />, { auth: fakeAuth({ permissionCodes: ['sales.view'] }) });
+    const table = await screen.findByRole('table');
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toContain('Comprobante');
+    await userEvent.click(within(table).getByRole('button', { name: 'Ver comprobante de la venta #1' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Comprobante · Venta #1' });
+    const frame = await within(dialog).findByTitle('Comprobante PDF');
+    expect(frame).toHaveAttribute('src', 'blob:receipt');
   });
 });

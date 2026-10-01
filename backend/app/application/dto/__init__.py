@@ -108,7 +108,7 @@ class UserData:
 
     nombre: str
     apellido: str
-    email: str
+    email: str | None  # required except for clients
     rol_id: int
     password: str | None = None  # on update, None keeps the current password
     identificacion: str | None = None
@@ -123,7 +123,7 @@ class UserData:
 class ClientData:
     nombre: str
     apellido: str
-    email: str
+    email: str | None
     identificacion: str
     celular: str | None = None
     provincia: str | None = None
@@ -140,16 +140,31 @@ class RoleData:
 
 
 @dataclass(frozen=True)
+class WorkOrderClientData:
+    """The client of a work order, identified by cédula / RUC. It is created when it
+    does not exist (role CLIENTE, no password, no email needed)."""
+
+    identificacion: str
+    nombre: str
+    apellido: str
+    celular: str | None = None
+
+
+@dataclass(frozen=True)
 class WorkOrderData:
-    cliente_id: int
+    cliente: WorkOrderClientData
     marca_id: int
     modelo_id: int
-    presupuesto: Decimal
+    motivo_ingreso: str
+    presupuesto: Decimal  # costo de reparación
     anticipo: Decimal
+    tipo_display: str | None = None  # only for CAMBIO_DISPLAY
+    tipo_garantia: str = "SIN_GARANTIA"
+    bloqueo_tipo: str = "NINGUNO"  # NINGUNO | PATRON | PIN
+    bloqueo_valor: str | None = None
     tecnico_id: int | None = None
     observacion: str | None = None
     estado: int = 0
-    garantia: bool = False
     color: str | None = None
     fecha: date | None = None
 

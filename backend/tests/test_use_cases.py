@@ -7,6 +7,7 @@ import pytest
 
 from app.application.dto import (
     ConfirmSaleData,
+    WorkOrderClientData,
     SaleItemData,
     StockAdjustmentData,
     WorkOrderData,
@@ -132,13 +133,14 @@ def test_manual_stock_adjustment_never_negative(uow, factory):
 
 
 class TestWorkOrders:
-    def _data(self, factory, **overrides) -> WorkOrderData:
-        client = factory.user(SystemRole.CLIENTE)
+    def _data(self, factory, client=None, **overrides) -> WorkOrderData:
+        client = client or factory.user(SystemRole.CLIENTE)
         brand, model = factory.brand_and_model()
         values = dict(
-            cliente_id=client.id,
+            cliente=WorkOrderClientData(client.identificacion, client.nombre, client.apellido),
             marca_id=brand.id,
             modelo_id=model.id,
+            motivo_ingreso="DIAGNOSTICO",
             presupuesto=Decimal("100"),
             anticipo=Decimal("30"),
         )
@@ -161,8 +163,10 @@ class TestWorkOrders:
 
     def test_client_must_be_a_client(self, uow, factory):
         tech = factory.user(SystemRole.TECNICO)
+        with uow.transaction():
+            tech.identificacion = "1700000001"  # cédula of a non-client user
         with pytest.raises(ValidationError) as exc:
-            CreateWorkOrderUseCase(uow).execute(self._data(factory, cliente_id=tech.id), tech)
+            CreateWorkOrderUseCase(uow).execute(self._data(factory, client=tech), tech)
         assert exc.value.code == "INVALID_CLIENT"
 
     def test_model_must_belong_to_brand(self, uow, factory):

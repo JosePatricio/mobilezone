@@ -635,3 +635,58 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
   font-size: 0.78rem;
   line-height: 1.4;
 }
+
+/* PDF receipt viewer */
+.receipt-frame { width: 100%; height: min(70vh, 720px); border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+
+/* Today's sales of the logged seller (header) */
+.today-sales { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; padding: 4px 10px; border-radius: 8px; background: var(--success-soft); color: var(--success); }
+.today-sales strong { font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .today-sales small { display: none; } }
+
+/* Work orders v5 */
+.form-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 640px) { .form-grid-3 { grid-template-columns: 1fr; } }
+.lookup-row { display: flex; gap: 8px; align-items: flex-start; }
+.lookup-row .field { flex: 0 1 260px; }
+.lookup-row > .btn { margin-top: 24px; }
+
+.lock-types { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; }
+.radio { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+
+.pattern-lock svg { width: 220px; max-width: 100%; aspect-ratio: 1; touch-action: none; user-select: none; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 12px; cursor: crosshair; }
+.pattern-lock-readonly svg { width: 150px; cursor: default; }
+.pattern-dot { fill: var(--muted); transition: r .1s; outline: none; }
+.pattern-dot:focus-visible { stroke: var(--primary); stroke-width: 3; }
+.pattern-dot.active { fill: var(--primary); }
+.pattern-line { fill: none; stroke: var(--primary); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+.pattern-line-live { opacity: .3; }
+.pattern-order { fill: #fff; font-size: 13px; font-weight: 700; pointer-events: none; }
+.pattern-actions { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+
+.photo-slots { display: flex; flex-wrap: wrap; gap: 12px; }
+.photo-slot { margin: 0; width: 140px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.photo-slot img { width: 140px; height: 140px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface-alt); }
+.photo-slot-empty { height: 140px; justify-content: center; border: 2px dashed var(--border); border-radius: var(--radius); background: var(--surface-alt); color: var(--muted); cursor: pointer; font: inherit; }
+.photo-slot-empty:hover { border-color: var(--primary); color: var(--primary); }
+.photo-gallery a img { width: 120px; height: 120px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--border); }
+.photo-gallery { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.combobox { position: relative; }
+.combobox-trigger { display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left; cursor: pointer; background: var(--surface); }
+.combobox-popup { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% - 2px); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 6px; }
+.combobox-list { list-style: none; margin: 6px 0 0; padding: 0; max-height: 240px; overflow-y: auto; }
+.combobox-list li { padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+.combobox-list li.active { background: var(--primary-soft); }
+.combobox-list li[aria-selected='true'] { font-weight: 600; }
+.combobox-empty { cursor: default; }
+
+.qr-box { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.qr-box img { width: 180px; height: 180px; image-rendering: pixelated; }
+.qr-box a { word-break: break-all; font-size: 12px; }
+
+/* Public order status page (QR) */
+.public-page { min-height: 100vh; background: var(--bg); display: flex; justify-content: center; padding: 24px 16px; }
+.public-card { width: 100%; max-width: 480px; }
+.public-card .app-brand { margin-bottom: 16px; color: var(--text); }
+.d-block { display: block; }

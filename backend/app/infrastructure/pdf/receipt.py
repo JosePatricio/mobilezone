@@ -28,6 +28,17 @@ def _money(value: Decimal | None) -> str:
     return f"$ {value:,.2f}" if value is not None else "—"
 
 
+MONTHS_ES = (
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+)
+
+
+def format_datetime_es(value) -> str:
+    """"1 Octubre 2026, 16:20" (same format as the frontend)."""
+    return f"{value.day} {MONTHS_ES[value.month - 1]} {value.year}, {value:%H:%M}"
+
+
 class ReportLabReceiptRenderer(ReceiptRenderer):
     def __init__(self, company_name: str = "MobileZone", timezone_name: str = "America/Guayaquil") -> None:
         self.company_name = company_name
@@ -56,7 +67,7 @@ class ReportLabReceiptRenderer(ReceiptRenderer):
         fecha = sale.fecha
         if fecha is not None and fecha.tzinfo is None:
             fecha = fecha.replace(tzinfo=timezone.utc)  # stored in UTC
-        fecha_txt = fecha.astimezone(self.tz).strftime("%d/%m/%Y %H:%M") if fecha else "—"
+        fecha_txt = format_datetime_es(fecha.astimezone(self.tz)) if fecha else "—"
 
         story = [
             Paragraph(self.company_name, title),

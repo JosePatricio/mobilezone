@@ -1,21 +1,32 @@
-En modulos usuarios
-Cuando es vendedor, por defecto su contraseña sera su cedula/ruc
-Validar que no se exista cedulas o ruc repetidos
+En modulo de ventas 
+El pdf, deberia estar habil en otra columna en la tabla de ventas, es decir que no abra el explorador para guardar el pdf, debe estar disponibe en la tabla
 
-En modulo inventario
-El vendedor puede modificar el stock, si el producto y en el sucursal ya existe debe sumar , es decir el boton agregar debe estar habilitado
+En la tabla por defector mostrar solo las ventas del dia actual, y ovbiamente dejar habilitada los filtros de fechas
+Cambiar el formati de fecha , ejemplo 01/10/2026, 16:20, que aparezca> 1 Octubre 2026 , 16:20
+
+Aumentar un filtro para buscar venta por cedula de cliente
+
+En el header de todo, que aparezca la cantidad total en ventas durante el dia del vendedor , puede ser a lado izquierdo del nombre de vendedor.
 
 
-En modulo Productos
-El vendedor si deberia tener acceso a agregar mas productos
+Modulo Ordenes de trabajo
+Interfaz 
+Cliente
+Cedula, nombres, apellidos, celular
+Datos del celular
+Marca, Modelo, Color, motivo de ingreso (opciones > Cambio display, PIN de carga, Bateria, Tapa, Cristal de camara, Glass, Diagnostico, Flex botones, Reemplazo mainboard, Frp Google, Isp, ByPass, Otros (En este dropbox implementa un buscador tambien para facilitar buscar estas mismas opciones)) .
 
-En modulo Ventas 
-Poner campo vendedor como primera columna y que aparezca la imagen en vez del nombre, y implementa un title en la imagen, cuando se pone el mouse en la foto que aparezca el nombre.
+Si en motivo de ingreso si escoge Cambio de display abajo debe aparecer mas opciones (INCELL, OLED y ORIGINAL) (seria otro campo extra para esto).
 
-Otra columna para poder modificar la venta, por que puede haber devoluciones, validar el tema de stocks (Boton eliminar y Boton eliminar en la misma columna)
+Campo tipo de garantia.
+Campo Patron/PIN (sELECTOR)
+Selecciona Patron, habilitar un dibujador un patron con el mouse, haz una matriz de 3*3 , como circulos de 3*3, y que en esos circulos se pueda trazar un patron. como las que tiene los telefonos android
+Si selecciona PIN. habilita un campo numerico
+Campo Observaciones
+Debe permitir ingresar 3 fotos 
+Costo de reparacion
+Anticipo $
+Saldo $
+Debe guardar el id del usuario que genero esa orden
+Generar un QR (este qr sera un link donde se podra ver el estado de la orden, sera publico)
 
-En el modal Confirmar venta. Agregar el precios que va a pagar y abajo una opcion que diga metodo de pago , opciones Transferencia, Efectivo y Tarjeta de credito, si selecciona Tarjeta sumar un 6% del precio final. 
-Si selecciona efectivo, que abajo aparezca un input de cuanto estoy recibiendo, para que a lado me salga el cambio oel vuelto que debo entregar.
-
-Y el texto ya existente, que aparezca abajo como footer, reduce un poco el tamaño de ese texto.
-Finalmente genera un PDF que sera nuestro comprobante

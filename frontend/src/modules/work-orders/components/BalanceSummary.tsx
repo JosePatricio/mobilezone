@@ -9,7 +9,7 @@ interface Props {
 }
 
 /**
- * Presupuesto:  $100
+ * Costo de reparación:  $100
  * Anticipo:      $30
  * ------------------
  * Saldo:         $70
@@ -19,7 +19,7 @@ export function BalanceSummary({ presupuesto, anticipo, saldo }: Props) {
   const invalid = toCents(value) < 0;
   return (
     <dl className="balance" aria-label="Resumen de valores">
-      <dt>Presupuesto</dt>
+      <dt>Costo de reparación</dt>
       <dd>{formatMoney(presupuesto)}</dd>
       <dt>Anticipo</dt>
       <dd>{formatMoney(anticipo)}</dd>

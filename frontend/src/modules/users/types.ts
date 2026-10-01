@@ -12,7 +12,8 @@ export interface User extends Timestamps {
   id: Id;
   nombre: string;
   apellido: string;
-  email: string;
+  /** Login; null only for clients. */
+  email: string | null;
   identificacion: string | null;
   celular: string | null;
   provincia: string | null;

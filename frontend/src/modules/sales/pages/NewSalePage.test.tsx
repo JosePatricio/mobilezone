@@ -1,5 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import { vi } from 'vitest';
 import type { ClientRequest } from '@/modules/clients/types';
 import type { InventoryItem } from '@/modules/inventory/types';
@@ -282,20 +283,25 @@ describe('NewSalePage', () => {
     expect(saleCalls[0]).toMatchObject({ metodo_pago: 'EFECTIVO', monto_recibido: '30.00' });
   });
 
-  it('downloads the PDF receipt after confirming the sale', async () => {
-    const createObjectURL = vi.fn(() => 'blob:receipt');
+  it('opens the receipt in the sales list after confirming, without downloading a file', async () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
-    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
     confirmImpl = () => Promise.resolve({ id: 42 });
-    renderPage();
+    const Probe = () => <p data-testid="location">{useLocation().pathname + useLocation().search}</p>;
+    renderWithProviders(
+      <Routes>
+        <Route path="/sales/new" element={<NewSalePage />} />
+        <Route path="/sales" element={<Probe />} />
+      </Routes>,
+      { auth: seller, route: '/sales/new' },
+    );
     await searchProduct('pan-a');
     await userEvent.click(screen.getByRole('button', { name: 'Confirmar venta' }));
     const dialog = await screen.findByRole('alertdialog');
     await userEvent.click(within(dialog).getByRole('radio', { name: 'Transferencia' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Confirmar venta' }));
 
-    await vi.waitFor(() => expect(click).toHaveBeenCalled());
-    expect(createObjectURL).toHaveBeenCalled();
+    expect(await screen.findByTestId('location')).toHaveTextContent('/sales?comprobante=42');
+    expect(click).not.toHaveBeenCalled(); // no "save as" download
     expect(saleCalls[0]).toMatchObject({ metodo_pago: 'TRANSFERENCIA', monto_recibido: null });
     click.mockRestore();
   });

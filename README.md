@@ -181,13 +181,14 @@ uvicorn main:app --reload --port 8000
 | `002_productos_usuarios_ventas.sql` | con `tipo_usuario`, `precio` y rol `USUARIO` (versión 1) |
 | `003_sucursales_inventario.sql` | sin sucursales ni inventario (versión 2) |
 | `004_pagos_permisos.sql` | sin método de pago en ventas (versión 3) |
+| `005_ordenes_trabajo.sql` | órdenes de trabajo sin motivo de ingreso, fotos ni QR (versión 4) |
 
 Con Alembic (aplica solo lo que falta):
 
 ```powershell
 cd backend
 .venv\Scripts\activate
-alembic current           # p. ej. 0003 = falta el 004; sin versión = ejecute primero "alembic stamp <versión>"
+alembic current           # p. ej. 0004 = falta el 005; sin versión = ejecute primero "alembic stamp <versión>"
 alembic upgrade head
 python -m app.infrastructure.database.seed
 ```
@@ -199,6 +200,8 @@ o importe los scripts desde phpMyAdmin y luego ejecute `alembic stamp head` y el
 - 004: las ventas existentes quedan sin método de pago ("No registrado") y `total_pagar` = total; el permiso
   `sales.any_branch` pasa a llamarse `branches.any`; el rol VENDEDOR recibe `products.create`, `inventory.manage` y
   `sales.update`.
+- 005: el email pasa a ser opcional (solo clientes); las órdenes existentes reciben motivo **Otros**, un código
+  público para el QR y `garantia = sí` pasa a **Garantía del local**; se crea la tabla de fotos (máx. 3 por orden).
 
 ### 3. Frontend (terminal 2)
 
@@ -232,6 +235,9 @@ cd frontend
 yarn build                # genera frontend/dist
 yarn preview              # sirve el build en http://localhost:4173 para probarlo
 ```
+
+El QR de cada orden apunta a `<dirección de la app>/orden/<código>` (página pública, sin login). Si el personal abre
+la app con `localhost` o una IP local, defina `VITE_PUBLIC_URL` (antes del build) con la dirección pública.
 
 Para producción, publique `frontend/dist` en un servidor web y defina `VITE_API_BASE_URL` (antes del build)
 con la URL pública de la API; agregue ese origen a `CORS_ORIGINS` en `backend/.env`.

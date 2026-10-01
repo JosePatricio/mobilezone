@@ -142,7 +142,7 @@ export function CustomerLookupModal({ onClose, onSelect }: Props) {
             <dt>Cédula / RUC</dt>
             <dd>{found.identificacion}</dd>
             <dt>Email</dt>
-            <dd>{found.email}</dd>
+            <dd>{found.email ?? '—'}</dd>
             <dt>Celular</dt>
             <dd>{found.celular ?? '—'}</dd>
             <dt>Ciudad</dt>

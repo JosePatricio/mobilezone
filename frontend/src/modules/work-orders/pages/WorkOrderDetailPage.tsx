@@ -9,6 +9,9 @@ import { formatDate, formatDateTime, formatOrderNumber, fullName } from '@/share
 import { formatMoney } from '@/shared/utils/money';
 import { AddSparePartModal } from '../components/AddSparePartModal';
 import { BalanceSummary } from '../components/BalanceSummary';
+import { OrderQr } from '../components/OrderQr';
+import { PatternLock } from '../components/PatternLock';
+import { useWorkOrderCatalogs } from '../hooks/useWorkOrderCatalogs';
 import { statusTone, useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
 import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
 import type { AddSparePartRequest, WorkOrderSparePart } from '../types';
@@ -18,6 +21,7 @@ export function WorkOrderDetailPage() {
   const canUpdate = usePermission(P.WORK_ORDERS_UPDATE);
   const canRemovePart = usePermission(P.WORK_ORDERS_SPARE_PARTS_REMOVE);
   const { statuses, label } = useWorkOrderStatuses();
+  const { catalogs, labelOf } = useWorkOrderCatalogs();
   const confirm = useConfirm();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -85,20 +89,22 @@ export function WorkOrderDetailPage() {
           </>
         }
       >
-        Registrada por {fullName(order.user)} · {formatDate(order.fecha)}
+        Registrada por <strong>{fullName(order.user)}</strong> · {formatDate(order.fecha)}
       </PageHeader>
 
       <div className="detail-grid">
         <Card title="Cliente">
           <dl className="detail-list">
+            <dt>Cédula / RUC</dt>
+            <dd>{order.cliente.identificacion ?? '—'}</dd>
             <dt>Nombre</dt>
             <dd>{fullName(order.cliente)}</dd>
-            <dt>Email</dt>
-            <dd>{order.cliente.email}</dd>
+            <dt>Celular</dt>
+            <dd>{order.cliente.celular ?? '—'}</dd>
           </dl>
         </Card>
 
-        <Card title="Equipo">
+        <Card title="Datos del celular">
           <dl className="detail-list">
             <dt>Marca</dt>
             <dd>{order.marca.nombre}</dd>
@@ -106,14 +112,29 @@ export function WorkOrderDetailPage() {
             <dd>{order.modelo.nombre}</dd>
             <dt>Color</dt>
             <dd>{order.color ?? '—'}</dd>
+            <dt>Motivo de ingreso</dt>
+            <dd>
+              {order.motivo_ingreso_label}
+              {order.tipo_display ? ` · ${labelOf(catalogs.tipos_display, order.tipo_display)}` : ''}
+            </dd>
             <dt>Garantía</dt>
-            <dd>{order.garantia ? 'Sí' : 'No'}</dd>
+            <dd>{order.tipo_garantia_label}</dd>
+            <dt>Desbloqueo</dt>
+            <dd>
+              {order.bloqueo_tipo === 'PATRON' ? (
+                <PatternLock value={order.bloqueo_valor} readOnly />
+              ) : order.bloqueo_tipo === 'PIN' ? (
+                <code>{order.bloqueo_valor}</code>
+              ) : (
+                'Sin bloqueo'
+              )}
+            </dd>
           </dl>
         </Card>
 
         <Card title="Trabajo">
           <dl className="detail-list">
-            <dt>Observación</dt>
+            <dt>Observaciones</dt>
             <dd className="pre-line">{order.observacion ?? '—'}</dd>
             <dt>Estado</dt>
             <dd>
@@ -148,6 +169,24 @@ export function WorkOrderDetailPage() {
 
         <Card title="Valores">
           <BalanceSummary presupuesto={order.presupuesto} anticipo={order.anticipo} saldo={order.saldo} />
+        </Card>
+
+        <Card title="Fotos del equipo">
+          {order.photos.length === 0 ? (
+            <p className="muted">Sin fotos.</p>
+          ) : (
+            <div className="photo-gallery">
+              {order.photos.map((photo, i) => (
+                <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer">
+                  <img src={photo.url} alt={`Foto ${i + 1} del equipo`} />
+                </a>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card title="Estado en línea (QR)">
+          <OrderQr codigo={order.codigo_publico} />
         </Card>
       </div>
 

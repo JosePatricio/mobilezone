@@ -13,6 +13,7 @@ DROP_TABLES = "99_drop_tables.sql"
 UPGRADE_002 = "upgrades/002_productos_usuarios_ventas.sql"
 UPGRADE_003 = "upgrades/003_sucursales_inventario.sql"
 UPGRADE_004 = "upgrades/004_pagos_permisos.sql"
+UPGRADE_005 = "upgrades/005_ordenes_trabajo.sql"
 
 
 def read_statements(script: str | Path) -> list[str]:

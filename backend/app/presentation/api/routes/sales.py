@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from zoneinfo import ZoneInfo
+
+from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.application.dto import ClientData, ConfirmSaleData, SaleItemData, UpdateSaleData
 from app.application.use_cases.sales import (
@@ -17,9 +19,15 @@ from app.application.use_cases.users import ClientUseCases
 from app.domain.entities import User
 from app.domain.value_objects.enums import SaleStatus
 from app.domain.value_objects.permissions import Perm
-from app.presentation.api.dependencies import PageDep, ReceiptRendererDep, UowDep, require_permissions
+from app.presentation.api.dependencies import (
+    PageDep,
+    ReceiptRendererDep,
+    UowDep,
+    require_any_permission,
+    require_permissions,
+)
 from app.presentation.api.schemas.common import PageResponse
-from app.presentation.api.schemas.sales import CreateSaleRequest, SaleResponse, UpdateSaleRequest
+from app.presentation.api.schemas.sales import CreateSaleRequest, SaleResponse, SalesSummaryResponse, UpdateSaleRequest
 from app.presentation.api.schemas.users import ClientRequest, ClientResponse
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -31,8 +39,13 @@ def _items(body) -> list[SaleItemData]:
 CanView = Annotated[User, Depends(require_permissions(Perm.SALES_VIEW))]
 
 
+def _tz(request: Request) -> ZoneInfo:
+    return ZoneInfo(request.app.state.settings.timezone)
+
+
 @router.get("", response_model=PageResponse[SaleResponse])
 def list_sales(
+    request: Request,
     uow: UowDep,
     page: PageDep,
     _: CanView,
@@ -40,9 +53,21 @@ def list_sales(
     estado: SaleStatus | None = None,
     fecha_desde: date | None = None,
     fecha_hasta: date | None = None,
+    identificacion: str | None = None,
 ):
-    result = SaleQueries(uow).list(page, user_id, estado, fecha_desde, fecha_hasta)
+    """Dates are local days of the shop (settings.timezone). ``identificacion`` = client cédula / RUC."""
+    result = SaleQueries(uow, _tz(request)).list(page, user_id, estado, fecha_desde, fecha_hasta, identificacion)
     return PageResponse[SaleResponse].from_page(result, SaleResponse)
+
+
+@router.get("/summary/today", response_model=SalesSummaryResponse)
+def today_summary(
+    request: Request,
+    uow: UowDep,
+    actor: Annotated[User, Depends(require_any_permission(Perm.SALES_CREATE, Perm.SALES_VIEW))],
+):
+    """Sales of the authenticated user today (shown in the header)."""
+    return SalesSummaryResponse.model_validate(SaleQueries(uow, _tz(request)).today_summary(actor))
 
 
 @router.get("/customers/lookup", response_model=ClientResponse)

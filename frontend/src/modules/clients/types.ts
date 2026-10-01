@@ -5,7 +5,8 @@ export interface Client extends Timestamps {
   id: Id;
   nombre: string;
   apellido: string;
-  email: string;
+  /** Optional for clients (they never log in). */
+  email: string | null;
   /** Cédula (10 digits) or RUC (13 digits) */
   identificacion: string | null;
   celular: string | null;
@@ -19,7 +20,7 @@ export interface Client extends Timestamps {
 export interface ClientRequest {
   nombre: string;
   apellido: string;
-  email: string;
+  email: string | null;
   identificacion: string;
   celular: string | null;
   provincia: string | null;

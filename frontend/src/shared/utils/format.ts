@@ -1,11 +1,21 @@
-const dateFormatter = new Intl.DateTimeFormat('es', { day: '2-digit', month: '2-digit', year: 'numeric' });
-const dateTimeFormatter = new Intl.DateTimeFormat('es', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
+const MONTHS = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+];
+
+const pad = (n: number) => String(n).padStart(2, '0');
+/** "1 Octubre 2026" */
+const dateText = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 
 /** Parses "YYYY-MM-DD" as a local date (avoids timezone shifts). */
 function parse(value: string): Date {
@@ -17,18 +27,19 @@ function parse(value: string): Date {
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '—';
   const date = parse(value);
-  return Number.isNaN(date.getTime()) ? '—' : dateFormatter.format(date);
+  return Number.isNaN(date.getTime()) ? '—' : dateText(date);
 }
 
+/** "1 Octubre 2026, 16:20" (local time). */
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) return '—';
   const date = parse(value);
-  return Number.isNaN(date.getTime()) ? '—' : dateTimeFormatter.format(date);
+  return Number.isNaN(date.getTime()) ? '—' : `${dateText(date)}, ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export function todayIso(): string {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function formatOrderNumber(num: number | null | undefined): string {

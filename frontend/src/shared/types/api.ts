@@ -35,5 +35,5 @@ export interface UserRef {
   id: Id;
   nombre: string;
   apellido: string;
-  email: string;
+  email: string | null;
 }

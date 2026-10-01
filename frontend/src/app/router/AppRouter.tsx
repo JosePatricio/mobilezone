@@ -21,6 +21,7 @@ import { UsersPage } from '@/modules/users/pages/UsersPage';
 import { WorkOrderDetailPage } from '@/modules/work-orders/pages/WorkOrderDetailPage';
 import { WorkOrderFormPage } from '@/modules/work-orders/pages/WorkOrderFormPage';
 import { WorkOrdersPage } from '@/modules/work-orders/pages/WorkOrdersPage';
+import { PublicWorkOrderPage } from '@/modules/work-orders/pages/PublicWorkOrderPage';
 import { EmptyState } from '@/shared/components';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { PermissionRoute, ProtectedRoute } from './guards';
@@ -29,6 +30,8 @@ export function AppRouter() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* Public status page of a work order (QR); no session needed. */}
+      <Route path="/orden/:codigo" element={<PublicWorkOrderPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>

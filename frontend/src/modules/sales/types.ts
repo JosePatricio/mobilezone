@@ -89,3 +89,9 @@ export function customerLabel(cliente: SaleCustomer | null): string {
   if (!cliente) return CONSUMIDOR_FINAL;
   return [customerName(cliente), cliente.identificacion, cliente.celular].filter(Boolean).join(', ');
 }
+
+export interface SalesSummary {
+  fecha: string;
+  cantidad: number;
+  total: Money;
+}

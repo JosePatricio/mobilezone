@@ -3,6 +3,7 @@
 -- Reverse dependency order, so foreign key checks can stay enabled.
 -- =============================================================================
 
+DROP TABLE IF EXISTS work_order_photos;
 DROP TABLE IF EXISTS work_order_spare_parts;
 DROP TABLE IF EXISTS work_orders;
 DROP TABLE IF EXISTS spare_parts;

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import EmailStr, Field, StringConstraints, computed_field
+from pydantic import BeforeValidator, EmailStr, Field, StringConstraints, computed_field
 
 from app.presentation.api.schemas.common import Name, RequestSchema, Schema, media_url
 
@@ -11,6 +11,10 @@ Identificacion = Annotated[
     str,
     StringConstraints(strip_whitespace=True, pattern=r"^\d{10}(\d{3})?$"),
     Field(description="Cédula (10) o RUC (13), validados con el algoritmo ecuatoriano"),
+]
+# Empty string from a form = no email (clients do not need one).
+OptionalEmail = Annotated[
+    EmailStr | None, BeforeValidator(lambda v: None if isinstance(v, str) and not v.strip() else v)
 ]
 Celular = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=20)]
 Provincia = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=100)]
@@ -45,7 +49,7 @@ class UserSummary(_WithPhoto):
     id: int
     nombre: str
     apellido: str
-    email: str
+    email: str | None
 
 
 class UserResponse(_WithPhoto):
@@ -54,7 +58,7 @@ class UserResponse(_WithPhoto):
     id: int
     nombre: str
     apellido: str
-    email: str
+    email: str | None
     identificacion: str | None
     celular: str | None
     provincia: str | None
@@ -83,7 +87,7 @@ class TokenResponse(Schema):
 class UserRequest(RequestSchema):
     nombre: Name
     apellido: Name
-    email: EmailStr
+    email: OptionalEmail = Field(default=None, description="Obligatorio salvo para el rol CLIENTE")
     password: str | None = Field(
         default=None,
         min_length=8,
@@ -102,7 +106,7 @@ class UserRequest(RequestSchema):
 class ClientRequest(RequestSchema):
     nombre: Name
     apellido: Name
-    email: EmailStr
+    email: OptionalEmail = None
     identificacion: Identificacion
     celular: Celular = None
     provincia: Provincia = None
@@ -122,7 +126,7 @@ class ClientResponse(_WithPhoto):
     id: int
     nombre: str
     apellido: str
-    email: str
+    email: str | None
     identificacion: str | None
     celular: str | None
     provincia: str | None

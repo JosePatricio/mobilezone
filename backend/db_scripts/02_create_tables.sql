@@ -69,7 +69,7 @@ CREATE TABLE users (
     id             INTEGER      NOT NULL AUTO_INCREMENT,
     nombre         VARCHAR(100) NOT NULL,
     apellido       VARCHAR(100) NOT NULL,
-    email          VARCHAR(255) NOT NULL,
+    email          VARCHAR(255)          COMMENT 'login; NULL allowed for clients (they do not log in)',
     password       VARCHAR(255)          COMMENT 'bcrypt hash; NULL for clients (no login)',
     identificacion VARCHAR(13)           COMMENT 'cedula (10 digits) or RUC (13 digits)',
     celular        VARCHAR(20),
@@ -283,7 +283,12 @@ CREATE TABLE work_orders (
     modelo_id   INTEGER       NOT NULL,
     observacion TEXT,
     estado      INTEGER       NOT NULL DEFAULT 0 COMMENT '0 | 1 | 2 (meaning pending definition)',
-    garantia    BOOL          NOT NULL DEFAULT 0,
+    motivo_ingreso VARCHAR(30) NOT NULL COMMENT 'CAMBIO_DISPLAY | PIN_CARGA | BATERIA | TAPA | ... | OTROS',
+    tipo_display   VARCHAR(30)          COMMENT 'INCELL | OLED | ORIGINAL (only for CAMBIO_DISPLAY)',
+    tipo_garantia  VARCHAR(30) NOT NULL DEFAULT 'SIN_GARANTIA' COMMENT 'SIN_GARANTIA | GARANTIA_LOCAL | GARANTIA_FABRICA',
+    bloqueo_tipo   VARCHAR(30) NOT NULL DEFAULT 'NINGUNO' COMMENT 'NINGUNO | PATRON | PIN',
+    bloqueo_valor  VARCHAR(20)          COMMENT 'pattern as dots 1..9 (e.g. 1-5-9-6) or numeric PIN',
+    codigo_publico VARCHAR(32) NOT NULL COMMENT 'unguessable code of the public status page (QR)',
     color       VARCHAR(50),
     presupuesto DECIMAL(12,2) NOT NULL,
     anticipo    DECIMAL(12,2) NOT NULL,
@@ -293,6 +298,7 @@ CREATE TABLE work_orders (
     updated_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT pk_work_orders PRIMARY KEY (id),
     CONSTRAINT uq_work_orders_num_orden UNIQUE (num_orden),
+    CONSTRAINT uq_work_orders_codigo_publico UNIQUE (codigo_publico),
     CONSTRAINT ck_work_orders_estado_valid CHECK (estado IN (0, 1, 2)),
     CONSTRAINT ck_work_orders_amounts_non_negative CHECK (presupuesto >= 0 AND anticipo >= 0),
     CONSTRAINT fk_work_orders_user_id_users FOREIGN KEY (user_id) REFERENCES users (id),
@@ -307,6 +313,19 @@ CREATE INDEX ix_work_orders_estado ON work_orders (estado);
 CREATE INDEX ix_work_orders_fecha ON work_orders (fecha);
 CREATE INDEX ix_work_orders_tecnico_id ON work_orders (tecnico_id);
 CREATE INDEX ix_work_orders_user_id ON work_orders (user_id);
+
+-- Photos of the device taken at reception (up to 3 per order, limit enforced by the app).
+CREATE TABLE work_order_photos (
+    id            INTEGER      NOT NULL AUTO_INCREMENT,
+    work_order_id INTEGER      NOT NULL,
+    ruta          VARCHAR(255) NOT NULL COMMENT 'relative path in the media storage',
+    created_at    DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_work_order_photos PRIMARY KEY (id),
+    CONSTRAINT fk_work_order_photos_work_order_id_work_orders
+        FOREIGN KEY (work_order_id) REFERENCES work_orders (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_work_order_photos_work_order_id ON work_order_photos (work_order_id);
 
 -- Spare parts used in work orders (one part can be used in many orders).
 CREATE TABLE work_order_spare_parts (
