@@ -144,7 +144,7 @@ export function WorkOrderDetailPage() {
             <dd>
               <StatusControl order={order} canUpdate={canUpdate} />
             </dd>
-            <dt>Técnico</dt>
+            <dt>Vendedor</dt>
             <dd>{order.tecnico ? fullName(order.tecnico) : 'Sin asignar'}</dd>
             <dt>Fecha de entrega</dt>
             <dd>{order.fecha_entrega ? formatDateTime(order.fecha_entrega) : 'Por confirmar'}</dd>
@@ -212,7 +212,7 @@ export function WorkOrderDetailPage() {
                   <th className="text-right">Cantidad</th>
                   <th className="text-right">Precio</th>
                   <th className="text-right">Subtotal</th>
-                  <th>Técnico</th>
+                  <th>Vendedor</th>
                   <th>Fecha</th>
                   {canRemovePart && <th aria-label="Acciones" />}
                 </tr>
@@ -230,7 +230,7 @@ export function WorkOrderDetailPage() {
                     <td data-label="Subtotal" className="text-right">
                       {formatMoney(item.subtotal)}
                     </td>
-                    <td data-label="Técnico">{fullName(item.technician)}</td>
+                    <td data-label="Vendedor">{fullName(item.technician)}</td>
                     <td data-label="Fecha">{formatDateTime(item.fecha)}</td>
                     {canRemovePart && (
                       <td className="text-right">

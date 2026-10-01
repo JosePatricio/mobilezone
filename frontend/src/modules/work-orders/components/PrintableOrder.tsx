@@ -84,7 +84,7 @@ export function PrintableOrder({ order }: { order: WorkOrder }) {
           <dd>{formatWarrantyDays(order.garantia_dias)}</dd>
           <dt>Estado</dt>
           <dd>{order.estado_label}</dd>
-          <dt>Técnico</dt>
+          <dt>Vendedor</dt>
           <dd>{fullName(technician)}</dd>
         </dl>
         <div className="print-qr">

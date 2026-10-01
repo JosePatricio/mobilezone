@@ -43,7 +43,7 @@ export function WorkOrdersPage() {
     { key: 'marca', header: 'Marca', render: (r) => r.marca.nombre },
     { key: 'modelo', header: 'Modelo', render: (r) => r.modelo.nombre },
     { key: 'motivo', header: 'Motivo', render: (r) => r.motivo_ingreso_label, sortValue: (r) => r.motivo_ingreso_label },
-    { key: 'tecnico', header: 'Técnico', render: (r) => (r.tecnico ? fullName(r.tecnico) : 'Sin asignar') },
+    { key: 'tecnico', header: 'Vendedor', render: (r) => (r.tecnico ? fullName(r.tecnico) : 'Sin asignar') },
     { key: 'garantia', header: 'Garantía', render: (r) => formatWarrantyDays(r.garantia_dias), sortValue: (r) => r.garantia_dias },
     { key: 'presupuesto', header: 'Costo', align: 'right', render: (r) => formatMoney(r.presupuesto) },
     { key: 'anticipo', header: 'Anticipo', align: 'right', render: (r) => formatMoney(r.anticipo) },
@@ -104,11 +104,11 @@ export function WorkOrdersPage() {
           placeholder="Todos los estados"
         />
         <Select
-          aria-label="Filtrar por técnico"
+          aria-label="Filtrar por vendedor"
           value={list.filters.tecnico_id}
           onChange={(e) => list.setFilter('tecnico_id', e.target.value)}
           options={(technicians.data ?? []).map((t) => ({ value: t.id, label: fullName(t) }))}
-          placeholder="Todos los técnicos"
+          placeholder="Todos los vendedores"
         />
         <DatePicker aria-label="Desde" value={list.filters.fecha_desde} onChange={(e) => list.setFilter('fecha_desde', e.target.value)} />
         <DatePicker aria-label="Hasta" value={list.filters.fecha_hasta} onChange={(e) => list.setFilter('fecha_hasta', e.target.value)} />

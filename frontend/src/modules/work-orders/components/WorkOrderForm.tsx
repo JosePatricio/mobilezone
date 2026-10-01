@@ -405,7 +405,7 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
             <PhotoSlots value={photos} onChange={setPhotos} />
           </div>
           <div className="field">
-            <span className="field-label">Técnico</span>
+            <span className="field-label">Vendedor</span>
             <p className="readonly-value">{technician}</p>
           </div>
           <Input
