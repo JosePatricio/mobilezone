@@ -14,6 +14,8 @@ UPGRADE_002 = "upgrades/002_productos_usuarios_ventas.sql"
 UPGRADE_003 = "upgrades/003_sucursales_inventario.sql"
 UPGRADE_004 = "upgrades/004_pagos_permisos.sql"
 UPGRADE_005 = "upgrades/005_ordenes_trabajo.sql"
+UPGRADE_006 = "upgrades/006_ordenes_vendedor.sql"
+UPGRADE_007 = "upgrades/007_modelo_tecnico.sql"
 
 
 def read_statements(script: str | Path) -> list[str]:

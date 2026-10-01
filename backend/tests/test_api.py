@@ -419,7 +419,9 @@ class TestUsersAndRoles:
         )
         assert created.status_code == 201
 
-    def test_technicians_endpoint(self, client, admin_headers, factory):
+    def test_technicians_endpoint_lists_staff(self, client, admin_headers, factory):
         tech = factory.user(SystemRole.TECNICO)
-        body = client.get(f"{API}/users/technicians", headers=admin_headers).json()
-        assert [t["id"] for t in body] == [tech.id]
+        seller = factory.user(SystemRole.VENDEDOR)
+        customer = factory.user(SystemRole.CLIENTE)
+        ids = {t["id"] for t in client.get(f"{API}/users/technicians", headers=admin_headers).json()}
+        assert {tech.id, seller.id} <= ids and customer.id not in ids

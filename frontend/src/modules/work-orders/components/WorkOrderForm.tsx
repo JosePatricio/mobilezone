@@ -1,27 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
-import { Controller, useForm, useWatch } from 'react-hook-form';
-import { useQuery } from '@tanstack/react-query';
+import { Controller, useForm, useWatch, type FieldValues, type Path, type UseFormSetError } from 'react-hook-form';
 import { z } from 'zod';
 import { useAuth } from '@/app/store/AuthProvider';
 import { BRANDS_KEY, brandApi } from '@/modules/brands/services/brandApi';
 import { MODELS_KEY, modelApi } from '@/modules/models/services/modelApi';
-import { userApi } from '@/modules/users/services/userApi';
-import { hasRole, SYSTEM_ROLES } from '@/modules/users/types';
-import { Button, Card, DatePicker, Input, MoneyInput, Select, Textarea } from '@/shared/components';
+import { NewCustomerForm } from '@/modules/sales/components/NewCustomerForm';
+import { Button, Card, Input, Modal, MoneyInput, Select, Textarea } from '@/shared/components';
 import { Combobox } from '@/shared/components/Combobox';
 import { useOptions } from '@/shared/hooks/useCrud';
 import { getErrorMessage, toApiError } from '@/shared/services/apiError';
-import { PERMISSIONS as P } from '@/shared/types/permissions';
-import { fullName, todayIso } from '@/shared/utils/format';
+import { fromDateTimeLocal, fullName, toDateTimeLocal } from '@/shared/utils/format';
 import { cleanIdentificacion, isValidIdentificacion, zCelular, zIdentificacion } from '@/shared/utils/identification';
 import { calculateBalance, formatMoney, isValidMoney, toCents } from '@/shared/utils/money';
-import { type FormShape, zodForm, applyServerErrors, zMoney, zOptionalId, zOptionalText, zRequiredId, zText } from '@/shared/utils/validation';
+import { type FormShape, zodForm, applyServerErrors, zMoney, zOptionalEmail, zOptionalText, zRequiredId, zText } from '@/shared/utils/validation';
 import { useWorkOrderCatalogs } from '../hooks/useWorkOrderCatalogs';
 import { useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
 import { workOrderApi } from '../services/workOrderApi';
 import { DISPLAY_CHANGE, type LockType, type WorkOrder, type WorkOrderRequest } from '../types';
+import { ColorPalette } from './ColorPalette';
 import { MIN_PATTERN_DOTS, parsePattern, PatternLock } from './PatternLock';
 import { photoChanges, PhotoSlots, type PhotoChanges } from './PhotoSlots';
+
+export const MAX_WARRANTY_DAYS = 3650;
 
 export const workOrderSchema = z
   .object({
@@ -30,21 +30,31 @@ export const workOrderSchema = z
       nombre: zText(100),
       apellido: zText(100),
       celular: zCelular,
+      email: zOptionalEmail,
     }),
     marca_id: zRequiredId('Seleccione una marca'),
     modelo_id: zRequiredId('Seleccione un modelo'),
     color: zOptionalText(50),
+    modelo_tecnico: zOptionalText(50),
     motivo_ingreso: z.string().min(1, 'Seleccione el motivo de ingreso'),
     tipo_display: z.string().optional().transform((v) => (v ? v : null)),
-    tipo_garantia: z.string().min(1, 'Seleccione el tipo de garantía'),
+    garantia_dias: z.preprocess(
+      (v) => (v === '' || v === null || v === undefined ? 0 : Number(v)),
+      z
+        .number({ invalid_type_error: 'Ingrese el número de días' })
+        .int('Ingrese un número entero de días')
+        .min(0, 'No puede ser negativo')
+        .max(MAX_WARRANTY_DAYS, `Máximo ${MAX_WARRANTY_DAYS} días`),
+    ),
     bloqueo_tipo: z.enum(['NINGUNO', 'PATRON', 'PIN']),
-    bloqueo_valor: z.string().trim().optional().transform((v) => (v ? v : null)),
-    tecnico_id: zOptionalId,
+    // The pattern and the PIN are kept apart, so switching the lock type never erases them.
+    patron: z.string().optional(),
+    pin: z.string().trim().optional(),
     observacion: zOptionalText(5000),
     estado: z.coerce.number().int().min(0).max(2),
     presupuesto: zMoney,
     anticipo: zMoney,
-    fecha: z.string().min(1, 'Seleccione una fecha'),
+    fecha_entrega: z.string().optional(),
   })
   .superRefine((v, ctx) => {
     if (toCents(v.anticipo) > toCents(v.presupuesto)) {
@@ -53,17 +63,21 @@ export const workOrderSchema = z
     if (v.motivo_ingreso === DISPLAY_CHANGE && !v.tipo_display) {
       ctx.addIssue({ code: 'custom', path: ['tipo_display'], message: 'Seleccione el tipo de display' });
     }
-    if (v.bloqueo_tipo === 'PATRON' && parsePattern(v.bloqueo_valor).length < MIN_PATTERN_DOTS) {
-      ctx.addIssue({ code: 'custom', path: ['bloqueo_valor'], message: `Dibuje un patrón de al menos ${MIN_PATTERN_DOTS} puntos` });
+    if (v.bloqueo_tipo === 'PATRON' && parsePattern(v.patron).length < MIN_PATTERN_DOTS) {
+      ctx.addIssue({ code: 'custom', path: ['patron'], message: `Dibuje un patrón de al menos ${MIN_PATTERN_DOTS} puntos` });
     }
-    if (v.bloqueo_tipo === 'PIN' && !/^\d{4,12}$/.test(v.bloqueo_valor ?? '')) {
-      ctx.addIssue({ code: 'custom', path: ['bloqueo_valor'], message: 'El PIN debe tener entre 4 y 12 dígitos' });
+    if (v.bloqueo_tipo === 'PIN' && !/^\d{4,12}$/.test(v.pin ?? '')) {
+      ctx.addIssue({ code: 'custom', path: ['pin'], message: 'El PIN debe tener entre 4 y 12 dígitos' });
+    }
+    if (v.fecha_entrega && !fromDateTimeLocal(v.fecha_entrega)) {
+      ctx.addIssue({ code: 'custom', path: ['fecha_entrega'], message: 'Fecha de entrega inválida' });
     }
   })
-  .transform((v) => ({
+  .transform(({ patron, pin, ...v }) => ({
     ...v,
     tipo_display: v.motivo_ingreso === DISPLAY_CHANGE ? v.tipo_display : null,
-    bloqueo_valor: v.bloqueo_tipo === 'NINGUNO' ? null : v.bloqueo_valor,
+    bloqueo_valor: v.bloqueo_tipo === 'PATRON' ? (patron ?? null) : v.bloqueo_tipo === 'PIN' ? (pin ?? null) : null,
+    fecha_entrega: fromDateTimeLocal(v.fecha_entrega),
   }));
 type FormInput = FormShape<typeof workOrderSchema>;
 type FormOutput = z.output<typeof workOrderSchema>;
@@ -74,16 +88,17 @@ interface Props {
   onCancel: () => void;
 }
 
-type ClientLookup = 'idle' | 'searching' | 'found' | 'new';
+type ClientLookup = 'idle' | 'searching' | 'found' | 'missing';
 
 export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
-  const { user, hasPermission } = useAuth();
-  const canAssign = hasPermission(P.WORK_ORDERS_ASSIGN_TECHNICIAN);
-  const isTechnician = hasRole(user, SYSTEM_ROLES.TECNICO);
+  const { user } = useAuth();
   const { statuses } = useWorkOrderStatuses();
   const { catalogs } = useWorkOrderCatalogs();
   const [serverError, setServerError] = useState<string | null>(null);
   const [lookup, setLookup] = useState<ClientLookup>(order ? 'found' : 'idle');
+  const [registering, setRegistering] = useState<string | null>(null);
+  // A client that already has an email keeps it; otherwise it can be entered here.
+  const [clientHasEmail, setClientHasEmail] = useState(Boolean(order?.cliente.email));
   const [photos, setPhotos] = useState<PhotoChanges>(() => photoChanges(order?.photos));
 
   const {
@@ -103,21 +118,23 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
         nombre: order?.cliente.nombre ?? '',
         apellido: order?.cliente.apellido ?? '',
         celular: order?.cliente.celular ?? '',
+        email: order?.cliente.email ?? '',
       },
       marca_id: order?.marca_id ?? '',
       modelo_id: order?.modelo_id ?? '',
       color: order?.color ?? '',
+      modelo_tecnico: order?.modelo_tecnico ?? '',
       motivo_ingreso: order?.motivo_ingreso ?? '',
       tipo_display: order?.tipo_display ?? '',
-      tipo_garantia: order?.tipo_garantia ?? 'SIN_GARANTIA',
+      garantia_dias: order?.garantia_dias ?? 0,
       bloqueo_tipo: order?.bloqueo_tipo ?? 'NINGUNO',
-      bloqueo_valor: order?.bloqueo_valor ?? '',
-      tecnico_id: order?.tecnico_id ?? (isTechnician && user ? user.id : ''),
+      patron: order?.bloqueo_tipo === 'PATRON' ? (order.bloqueo_valor ?? '') : '',
+      pin: order?.bloqueo_tipo === 'PIN' ? (order.bloqueo_valor ?? '') : '',
       observacion: order?.observacion ?? '',
       estado: order?.estado ?? 0,
       presupuesto: order?.presupuesto ?? '0.00',
       anticipo: order?.anticipo ?? '0.00',
-      fecha: order?.fecha ?? todayIso(),
+      fecha_entrega: toDateTimeLocal(order?.fecha_entrega),
     },
   });
 
@@ -127,12 +144,6 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
   const [presupuesto, anticipo] = useWatch({ control, name: ['presupuesto', 'anticipo'] });
   const brands = useOptions(BRANDS_KEY, brandApi);
   const models = useOptions(MODELS_KEY, modelApi, { brand_id: Number(marcaId) }, Boolean(marcaId));
-  const technicians = useQuery({
-    queryKey: ['users', 'technicians'],
-    queryFn: userApi.technicians,
-    enabled: canAssign,
-    staleTime: 60_000,
-  });
 
   // Reset the model when the brand changes (models are filtered by brand).
   const previousBrand = useRef(marcaId);
@@ -141,7 +152,24 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
     previousBrand.current = marcaId;
   }, [marcaId, setValue]);
 
-  /** Looks the client up by cédula / RUC: an existing client fills the form, otherwise it is registered on save. */
+  const fillClient = (client: {
+    identificacion: string | null;
+    nombre: string;
+    apellido: string;
+    celular: string | null;
+    email?: string | null;
+  }) => {
+    setValue('cliente.identificacion', client.identificacion ?? '');
+    setValue('cliente.nombre', client.nombre);
+    setValue('cliente.apellido', client.apellido);
+    setValue('cliente.celular', client.celular ?? '');
+    setValue('cliente.email', client.email ?? '');
+    setClientHasEmail(Boolean(client.email));
+    clearErrors('cliente');
+    setLookup('found');
+  };
+
+  /** Looks the client up by cédula / RUC; when it does not exist, the registration modal opens. */
   const lookupClient = async () => {
     const identificacion = cleanIdentificacion(String(getValues('cliente.identificacion') ?? ''));
     if (!isValidIdentificacion(identificacion)) {
@@ -151,19 +179,17 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
     clearErrors('cliente');
     setLookup('searching');
     try {
-      const client = await workOrderApi.lookupCustomer(identificacion);
-      setValue('cliente.identificacion', identificacion);
-      setValue('cliente.nombre', client.nombre);
-      setValue('cliente.apellido', client.apellido);
-      setValue('cliente.celular', client.celular ?? '');
-      setLookup('found');
+      fillClient(await workOrderApi.lookupCustomer(identificacion));
     } catch (err) {
       const apiError = toApiError(err);
+      setValue('cliente.nombre', '');
+      setValue('cliente.apellido', '');
+      setValue('cliente.celular', '');
+      setValue('cliente.email', '');
+      setClientHasEmail(false);
       if (apiError.status === 404) {
-        setValue('cliente.nombre', '');
-        setValue('cliente.apellido', '');
-        setValue('cliente.celular', '');
-        setLookup('new');
+        setLookup('missing');
+        setRegistering(identificacion);
       } else {
         setLookup('idle');
         setError('cliente.identificacion', { type: 'server', message: apiError.message });
@@ -184,31 +210,26 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
     Number(marcaId) === order?.marca_id ? order?.modelo_id : undefined,
     order?.modelo.nombre,
   );
-  const technicianOptions = withCurrent(
-    (technicians.data ?? []).map((t) => ({ value: t.id, label: fullName(t) })),
-    order?.tecnico_id ?? undefined,
-    order?.tecnico ? fullName(order.tecnico) : undefined,
-  );
 
   const submit = handleSubmit(async (values) => {
     setServerError(null);
+    if (lookup !== 'found') {
+      setError('cliente.identificacion', { type: 'manual', message: 'Busque al cliente (Enter) o regístrelo' });
+      return;
+    }
     try {
-      await onSubmit(
-        {
-          ...values,
-          // Technicians without assign permission never send someone else's id; the backend decides.
-          tecnico_id: canAssign ? values.tecnico_id : isTechnician ? (user?.id ?? null) : (order?.tecnico_id ?? null),
-        },
-        photos,
-      );
+      await onSubmit(values, photos);
     } catch (err) {
-      if (!applyServerErrors(err, setError)) setServerError(getErrorMessage(err));
+      // The API reports the lock value as "bloqueo_valor": show it on the pattern or the PIN.
+      const mapLockField: UseFormSetError<FieldValues> = (field, error) =>
+        setError((field === 'bloqueo_valor' ? (bloqueo === 'PIN' ? 'pin' : 'patron') : field) as Path<FormInput>, error);
+      if (!applyServerErrors(err, mapLockField)) setServerError(getErrorMessage(err));
     }
   });
 
   const safeMoney = (v: unknown) => (typeof v === 'string' && isValidMoney(v) ? v : '0');
   const saldo = calculateBalance(safeMoney(presupuesto), safeMoney(anticipo));
-  const clientLocked = lookup === 'found';
+  const technician = order ? (order.tecnico ? fullName(order.tecnico) : 'Sin asignar') : `${fullName(user)} (usted)`;
 
   return (
     <form onSubmit={submit} noValidate>
@@ -241,27 +262,24 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
               Buscar
             </Button>
           </div>
-          {lookup === 'found' && <p className="field-hint full">Cliente registrado.</p>}
-          {lookup === 'new' && <p className="field-hint full">Cliente nuevo: se registrará al guardar la orden.</p>}
+          {lookup === 'missing' && (
+            <p className="field-hint full">
+              El cliente no está registrado.{' '}
+              <button type="button" className="link-button" onClick={() => setRegistering(cleanIdentificacion(String(getValues('cliente.identificacion') ?? '')))}>
+                Registrar cliente
+              </button>
+            </p>
+          )}
+          <Input label="Nombres" required readOnly error={errors.cliente?.nombre?.message} {...register('cliente.nombre')} />
+          <Input label="Apellidos" required readOnly error={errors.cliente?.apellido?.message} {...register('cliente.apellido')} />
+          <Input label="Celular" readOnly error={errors.cliente?.celular?.message} {...register('cliente.celular')} />
           <Input
-            label="Nombres"
-            required
-            readOnly={clientLocked}
-            error={errors.cliente?.nombre?.message}
-            {...register('cliente.nombre')}
-          />
-          <Input
-            label="Apellidos"
-            required
-            readOnly={clientLocked}
-            error={errors.cliente?.apellido?.message}
-            {...register('cliente.apellido')}
-          />
-          <Input
-            label="Celular"
-            inputMode="tel"
-            error={errors.cliente?.celular?.message}
-            {...register('cliente.celular')}
+            label="Email"
+            type="email"
+            readOnly={clientHasEmail}
+            hint={clientHasEmail ? undefined : 'Opcional: se guarda en el cliente'}
+            error={errors.cliente?.email?.message}
+            {...register('cliente.email')}
           />
         </div>
       </Card>
@@ -278,7 +296,21 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
             error={errors.modelo_id?.message}
             {...register('modelo_id')}
           />
-          <Input label="Color" error={errors.color?.message} {...register('color')} />
+          <Input
+            label="Modelo técnico"
+            placeholder="Ej.: SM-A105M"
+            hint="Código del modelo (Ajustes › Acerca del teléfono)"
+            autoComplete="off"
+            error={errors.modelo_tecnico?.message}
+            {...register('modelo_tecnico')}
+          />
+          <Controller
+            control={control}
+            name="color"
+            render={({ field, fieldState }) => (
+              <ColorPalette value={field.value as string} onChange={field.onChange} error={fieldState.error?.message} />
+            )}
+          />
           <Controller
             control={control}
             name="motivo_ingreso"
@@ -303,12 +335,16 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
               {...register('tipo_display')}
             />
           )}
-          <Select
-            label="Tipo de garantía"
-            required
-            options={catalogs.tipos_garantia}
-            error={errors.tipo_garantia?.message}
-            {...register('tipo_garantia')}
+          <Input
+            label="Tiempo de garantía (días)"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={MAX_WARRANTY_DAYS}
+            step={1}
+            hint="0 = sin garantía"
+            error={errors.garantia_dias?.message}
+            {...register('garantia_dias')}
           />
         </div>
       </Card>
@@ -317,11 +353,7 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
         <div className="lock-types" role="radiogroup" aria-label="Tipo de bloqueo">
           {catalogs.tipos_bloqueo.map((option) => (
             <label key={option.value} className="radio">
-              <input
-                type="radio"
-                value={option.value}
-                {...register('bloqueo_tipo', { onChange: () => setValue('bloqueo_valor', '') })}
-              />
+              <input type="radio" value={option.value} {...register('bloqueo_tipo')} />
               {option.label}
             </label>
           ))}
@@ -329,10 +361,12 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
         {bloqueo === 'PATRON' && (
           <Controller
             control={control}
-            name="bloqueo_valor"
+            name="patron"
             render={({ field, fieldState }) => (
               <div className="field">
-                <p className="field-hint">Dibuje el patrón con el mouse o el dedo, uniendo al menos {MIN_PATTERN_DOTS} puntos.</p>
+                <p className="field-hint">
+                  Dibuje el patrón con el mouse o el dedo (también punto por punto), uniendo al menos {MIN_PATTERN_DOTS} puntos.
+                </p>
                 <PatternLock value={(field.value as string) || null} onChange={field.onChange} />
                 <div className="pattern-actions">
                   <span className="muted">{field.value ? `Secuencia: ${field.value}` : 'Sin patrón'}</span>
@@ -359,9 +393,9 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
               inputMode="numeric"
               autoComplete="off"
               maxLength={12}
-              error={errors.bloqueo_valor?.message}
-              {...register('bloqueo_valor', {
-                onChange: (e) => setValue('bloqueo_valor', String(e.target.value).replace(/\D/g, '')),
+              error={errors.pin?.message}
+              {...register('pin', {
+                onChange: (e) => setValue('pin', String(e.target.value).replace(/\D/g, '')),
               })}
             />
           </div>
@@ -381,17 +415,17 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
             error={errors.estado?.message}
             {...register('estado')}
           />
-          {canAssign ? (
-            <Select label="Técnico" options={technicianOptions} placeholder="Sin asignar" error={errors.tecnico_id?.message} {...register('tecnico_id')} />
-          ) : (
-            <div className="field">
-              <span className="field-label">Técnico</span>
-              <p className="readonly-value">
-                {isTechnician ? `${fullName(user)} (usted)` : order?.tecnico ? fullName(order.tecnico) : 'Sin asignar'}
-              </p>
-            </div>
-          )}
-          <DatePicker label="Fecha" required error={errors.fecha?.message} {...register('fecha')} />
+          <div className="field">
+            <span className="field-label">Técnico</span>
+            <p className="readonly-value">{technician}</p>
+          </div>
+          <Input
+            label="Fecha de entrega"
+            type="datetime-local"
+            min={order ? undefined : toDateTimeLocal(new Date().toISOString())}
+            error={errors.fecha_entrega?.message}
+            {...register('fecha_entrega')}
+          />
         </div>
       </Card>
 
@@ -417,6 +451,20 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           {order ? 'Guardar cambios' : 'Crear orden'}
         </Button>
       </div>
+
+      <Modal open={registering !== null} title="Nuevo cliente" onClose={() => setRegistering(null)} size="lg">
+        {registering !== null && (
+          <NewCustomerForm
+            identificacion={registering}
+            create={workOrderApi.createCustomer}
+            onCancel={() => setRegistering(null)}
+            onCreated={(client) => {
+              setRegistering(null);
+              fillClient(client);
+            }}
+          />
+        )}
+      </Modal>
     </form>
   );
 }

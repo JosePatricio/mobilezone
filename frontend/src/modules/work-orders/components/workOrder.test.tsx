@@ -19,21 +19,22 @@ if (!('PointerEvent' in window)) {
 }
 
 const valid = {
-  cliente: { identificacion: '1712345675', nombre: 'Juan', apellido: 'Pérez', celular: '099 123 4567' },
+  cliente: { identificacion: '1712345675', nombre: 'Juan', apellido: 'Pérez', celular: '099 123 4567', email: '' },
   marca_id: '1',
   modelo_id: '2',
   color: 'Negro',
+  modelo_tecnico: ' SM-A105M ',
   motivo_ingreso: 'BATERIA',
   tipo_display: '',
-  tipo_garantia: 'SIN_GARANTIA',
+  garantia_dias: '30',
   bloqueo_tipo: 'NINGUNO',
-  bloqueo_valor: '',
-  tecnico_id: '',
+  patron: '',
+  pin: '',
   observacion: 'No carga',
   estado: '0',
   presupuesto: '100',
   anticipo: '30',
-  fecha: '2026-09-29',
+  fecha_entrega: '',
 };
 
 describe('work order balance', () => {
@@ -54,7 +55,10 @@ describe('work order form validation', () => {
     const result = workOrderSchema.parse(valid);
     expect(result.presupuesto).toBe('100.00');
     expect(result.marca_id).toBe(1);
-    expect(result.tecnico_id).toBeNull();
+    expect(result.garantia_dias).toBe(30);
+    expect(result.modelo_tecnico).toBe('SM-A105M');
+    expect(result.cliente.email).toBeNull();
+    expect(result.fecha_entrega).toBeNull();
     expect(result.cliente.celular).toBe('0991234567');
     expect(result.tipo_display).toBeNull();
     expect(result.bloqueo_valor).toBeNull();
@@ -82,10 +86,34 @@ describe('work order form validation', () => {
   });
 
   it('validates the pattern (4+ dots) and the PIN (4 to 12 digits)', () => {
-    expect(workOrderSchema.safeParse({ ...valid, bloqueo_tipo: 'PATRON', bloqueo_valor: '1-2-3' }).success).toBe(false);
-    expect(workOrderSchema.parse({ ...valid, bloqueo_tipo: 'PATRON', bloqueo_valor: '1-2-3-6' }).bloqueo_valor).toBe('1-2-3-6');
-    expect(workOrderSchema.safeParse({ ...valid, bloqueo_tipo: 'PIN', bloqueo_valor: '12' }).success).toBe(false);
-    expect(workOrderSchema.parse({ ...valid, bloqueo_tipo: 'PIN', bloqueo_valor: '1234' }).bloqueo_valor).toBe('1234');
+    expect(workOrderSchema.safeParse({ ...valid, bloqueo_tipo: 'PATRON', patron: '1-2-3' }).success).toBe(false);
+    expect(workOrderSchema.parse({ ...valid, bloqueo_tipo: 'PATRON', patron: '1-2-3-6' }).bloqueo_valor).toBe('1-2-3-6');
+    expect(workOrderSchema.safeParse({ ...valid, bloqueo_tipo: 'PIN', pin: '12' }).success).toBe(false);
+    expect(workOrderSchema.parse({ ...valid, bloqueo_tipo: 'PIN', pin: '1234' }).bloqueo_valor).toBe('1234');
+  });
+
+  it('sends only the value of the selected lock type (the other one is kept in the form)', () => {
+    const result = workOrderSchema.parse({ ...valid, bloqueo_tipo: 'PIN', pin: '1234', patron: '1-2-3-6' });
+    expect(result.bloqueo_valor).toBe('1234');
+    expect(result).not.toHaveProperty('patron');
+  });
+
+  it('accepts warranty days from 0 and rejects negative or decimal values', () => {
+    expect(workOrderSchema.parse({ ...valid, garantia_dias: '' }).garantia_dias).toBe(0);
+    expect(workOrderSchema.safeParse({ ...valid, garantia_dias: '-1' }).success).toBe(false);
+    expect(workOrderSchema.safeParse({ ...valid, garantia_dias: '1.5' }).success).toBe(false);
+  });
+
+  it('converts the delivery date (local date and time) to ISO', () => {
+    const result = workOrderSchema.parse({ ...valid, fecha_entrega: '2026-10-05T16:30' });
+    expect(result.fecha_entrega).toBe(new Date(2026, 9, 5, 16, 30).toISOString());
+  });
+
+  it('validates the client email when it is entered', () => {
+    expect(workOrderSchema.safeParse({ ...valid, cliente: { ...valid.cliente, email: 'no-es-email' } }).success).toBe(false);
+    expect(workOrderSchema.parse({ ...valid, cliente: { ...valid.cliente, email: 'juan@example.com' } }).cliente.email).toBe(
+      'juan@example.com',
+    );
   });
 
   it('rejects unknown statuses', () => {
@@ -133,6 +161,33 @@ describe('pattern lock', () => {
       await userEvent.keyboard('{Enter}');
     }
     expect(screen.getByRole('status')).toHaveTextContent('7-8-9');
+  });
+
+  it('keeps the drawn pattern and continues it dot by dot (it is never erased by a new touch)', () => {
+    function Harness() {
+      const [value, setValue] = useState('');
+      return (
+        <>
+          <PatternLock value={value} onChange={setValue} />
+          <output>{value}</output>
+        </>
+      );
+    }
+    render(<Harness />);
+    const svg = screen.getByRole('group');
+    const tap = (dot: number) => {
+      const at = { clientX: ((dot - 1) % 3) * 80 + 40, clientY: Math.floor((dot - 1) / 3) * 80 + 40, pointerId: 1 };
+      fireEvent.pointerDown(svg, at);
+      fireEvent.pointerUp(svg, at);
+    };
+    tap(1);
+    tap(2);
+    tap(6);
+    tap(9);
+    expect(screen.getByRole('status')).toHaveTextContent('1-2-6-9');
+    // Every dot of the pattern stays highlighted with its order number.
+    expect(svg.querySelectorAll('.pattern-dot.active')).toHaveLength(4);
+    expect(svg.querySelector('polyline')).not.toBeNull();
   });
 
   it('shows the stored pattern in read-only mode', () => {

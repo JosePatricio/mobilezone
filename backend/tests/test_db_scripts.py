@@ -314,3 +314,85 @@ def test_upgrade_005_work_orders_and_optional_email(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_006_warranty_days_and_seller_permissions(mysql_engine: Engine):
+    """v5 database (0001 + 002..005) with work orders and a configured VENDEDOR role → upgrade 006."""
+    from pathlib import Path
+
+    from app.infrastructure.database.sql_scripts import (
+        UPGRADE_002,
+        UPGRADE_003,
+        UPGRADE_004,
+        UPGRADE_005,
+        UPGRADE_006,
+    )
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in (initial, UPGRADE_002, UPGRADE_003, UPGRADE_004, UPGRADE_005):
+                run_script(conn, script)
+            q = conn.exec_driver_sql
+            for code in ("sales.view", "work_orders.view", "work_orders.assign_technician", "brands.view", "models.create"):
+                q(f"INSERT IGNORE INTO permissions (codigo) VALUES ('{code}')")
+            q(
+                "INSERT INTO role_permissions SELECT r.id, p.id FROM roles r JOIN permissions p "
+                "ON p.codigo IN ('sales.view', 'work_orders.assign_technician') WHERE r.nombre IN ('VENDEDOR', 'ADMIN')"
+            )
+            q(
+                "INSERT INTO users (nombre, apellido, email, password, rol_id) VALUES "
+                "('A','A','a@x.com','h',(SELECT id FROM roles WHERE nombre='ADMIN'))"
+            )
+            q("INSERT INTO brands (nombre) VALUES ('Samsung')")
+            q("INSERT INTO models (brand_id, nombre) VALUES ((SELECT id FROM brands), 'A10')")
+            for n, garantia in enumerate(("GARANTIA_FABRICA", "SIN_GARANTIA")):
+                q(
+                    "INSERT INTO work_orders (user_id, cliente_id, marca_id, modelo_id, estado, motivo_ingreso, "
+                    "tipo_garantia, codigo_publico, presupuesto, anticipo, saldo, fecha) VALUES (1, 1, "
+                    f"(SELECT id FROM brands), (SELECT id FROM models), 0, 'OTROS', '{garantia}', 'c{n}', 10, 0, 10, '2026-09-01')"
+                )
+
+        with mysql_engine.begin() as conn:
+            run_script(conn, UPGRADE_006)
+
+        with mysql_engine.connect() as conn:
+            q = conn.exec_driver_sql
+            assert [r[0] for r in q("SELECT garantia_dias FROM work_orders ORDER BY id")] == [30, 0]
+            columns = set(q("SHOW COLUMNS FROM work_orders").scalars())
+            assert "fecha_entrega" in columns and "tipo_garantia" not in columns
+            assert q("SELECT COUNT(*) FROM permissions WHERE codigo = 'work_orders.assign_technician'").scalar() == 0
+            vendedor = set(
+                q(
+                    "SELECT p.codigo FROM role_permissions rp JOIN roles r ON r.id = rp.role_id "
+                    "JOIN permissions p ON p.id = rp.permission_id WHERE r.nombre = 'VENDEDOR'"
+                ).scalars()
+            )
+            assert {"sales.view", "work_orders.view", "brands.view", "models.create"} <= vendedor
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_007_adds_technical_model(mysql_engine: Engine):
+    """v6 database (0001 + 002..006) → upgrade 007."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in (initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005, sql.UPGRADE_006):
+                run_script(conn, script)
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_007)
+        with mysql_engine.connect() as conn:
+            assert "modelo_tecnico" in set(conn.exec_driver_sql("SHOW COLUMNS FROM work_orders").scalars())
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

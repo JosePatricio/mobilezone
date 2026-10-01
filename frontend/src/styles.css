@@ -690,3 +690,36 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .public-card { width: 100%; max-width: 480px; }
 .public-card .app-brand { margin-bottom: 16px; color: var(--text); }
 .d-block { display: block; }
+
+/* Work orders v6 */
+.color-palette { display: flex; flex-wrap: wrap; gap: 8px; }
+.color-swatch { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; padding: 0; box-shadow: inset 0 0 0 2px #fff; }
+.color-swatch:hover { transform: scale(1.08); }
+.color-swatch.selected { border-color: var(--primary); box-shadow: inset 0 0 0 2px #fff, 0 0 0 3px var(--primary-soft); }
+.color-swatch:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.color-swatch-text { width: auto; border-radius: 16px; padding: 0 12px; background: var(--surface-alt); font-size: 12px; }
+.link-button { background: none; border: 0; padding: 0; color: var(--primary); cursor: pointer; font: inherit; text-decoration: underline; }
+
+/* Printable work order: hidden on screen, the only content printed */
+.print-sheet { display: none; }
+@media print {
+  @page { size: A4; margin: 14mm; }
+  body { background: #fff; }
+  body > :not(.print-sheet) { display: none !important; }
+  .print-sheet { display: block; color: #000; font-size: 12px; }
+  .print-sheet h1 { margin: 0; font-size: 22px; }
+  .print-sheet h2 { font-size: 13px; margin: 14px 0 6px; border-bottom: 1px solid #999; padding-bottom: 2px; text-transform: uppercase; }
+  .print-sheet dl { display: grid; grid-template-columns: 130px 1fr; gap: 3px 8px; margin: 0; }
+  .print-sheet dt { color: #444; }
+  .print-sheet dd { margin: 0; }
+  .print-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 8px; }
+  .print-header p { margin: 2px 0 0; }
+  .print-number { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .print-number strong { font-size: 18px; }
+  .print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  .print-qr { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; margin-top: 14px; }
+  .print-qr img { width: 130px; height: 130px; }
+  .print-url { word-break: break-all; font-size: 9px; }
+  .print-signatures { display: flex; justify-content: space-between; margin-top: 60px; gap: 40px; }
+  .print-signatures span { flex: 1; border-top: 1px solid #000; padding-top: 4px; text-align: center; }
+}

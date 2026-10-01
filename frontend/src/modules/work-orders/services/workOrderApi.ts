@@ -1,3 +1,4 @@
+import type { Client, ClientRequest } from '@/modules/clients/types';
 import { http } from '@/shared/services/httpClient';
 import type { Id, Page, QueryParams } from '@/shared/types/api';
 import { cleanParams } from '@/shared/utils/format';
@@ -31,6 +32,8 @@ export const workOrderApi = {
   /** Client by cédula / RUC (404 = new client). */
   lookupCustomer: (identificacion: string) =>
     http.get<WorkOrderClient>(`${BASE}/customers/lookup`, { params: { identificacion } }).then((r) => r.data),
+  /** Registers a new client (role CLIENTE) from the order screen. */
+  createCustomer: (body: ClientRequest) => http.post<Client>(`${BASE}/customers`, body).then((r) => r.data),
   addPhoto: (id: Id, file: File) => {
     const form = new FormData();
     form.append('file', file);

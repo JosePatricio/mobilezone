@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, UploadFile, status
+from zoneinfo import ZoneInfo
 
-from app.application.dto import WorkOrderClientData, WorkOrderData, WorkOrderFilters, WorkOrderSparePartData
+from fastapi import APIRouter, Depends, Request, Response, UploadFile, status
+
+from app.application.dto import ClientData, WorkOrderClientData, WorkOrderData, WorkOrderFilters, WorkOrderSparePartData
 from app.application.use_cases.users import ClientUseCases
 from app.application.use_cases.work_orders import (
     AddSparePartToWorkOrderUseCase,
@@ -32,7 +34,7 @@ from app.presentation.api.dependencies import (
     require_permissions,
 )
 from app.presentation.api.schemas.common import PageResponse
-from app.presentation.api.schemas.users import ClientSummary
+from app.presentation.api.schemas.users import ClientRequest, ClientResponse, ClientSummary
 from app.presentation.api.schemas.work_orders import (
     AddWorkOrderSparePartRequest,
     BalanceRequest,
@@ -56,14 +58,21 @@ CanUpdate = Annotated[User, Depends(require_permissions(Perm.WORK_ORDERS_UPDATE)
 CanEdit = Annotated[User, Depends(require_any_permission(Perm.WORK_ORDERS_CREATE, Perm.WORK_ORDERS_UPDATE))]
 
 
-def _data(body: WorkOrderRequest) -> WorkOrderData:
-    values = body.model_dump(mode="json", exclude={"cliente", "presupuesto", "anticipo", "fecha"})
+def _tz(request: Request) -> ZoneInfo:
+    return ZoneInfo(request.app.state.settings.timezone)
+
+
+def _data(body: WorkOrderRequest, tz: ZoneInfo) -> WorkOrderData:
+    values = body.model_dump(mode="json", exclude={"cliente", "presupuesto", "anticipo", "fecha_entrega"})
+    entrega = body.fecha_entrega
+    if entrega is not None and entrega.tzinfo is None:
+        entrega = entrega.replace(tzinfo=tz)  # a time without offset is the local time of the shop
     return WorkOrderData(
         **values,
         cliente=WorkOrderClientData(**body.cliente.model_dump()),
         presupuesto=body.presupuesto,
         anticipo=body.anticipo,
-        fecha=body.fecha,
+        fecha_entrega=entrega,
     )
 
 
@@ -77,6 +86,12 @@ def list_catalogs(_: CurrentUser):
 def lookup_customer(identificacion: str, uow: UowDep, _: CanEdit):
     """Client by cédula / RUC to fill the order form (404 = new client, typed in the form)."""
     return ClientSummary.model_validate(ClientUseCases(uow).find_by_identificacion(identificacion))
+
+
+@router.post("/customers", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
+def create_customer(body: ClientRequest, uow: UowDep, _: CanEdit):
+    """Registers a new client (role CLIENTE, no password) from the work order screen."""
+    return ClientResponse.model_validate(ClientUseCases(uow).create(ClientData(**body.model_dump())))
 
 
 @router.get("/statuses", response_model=list[WorkOrderStatusOption])
@@ -121,16 +136,20 @@ def get_work_order(work_order_id: int, uow: UowDep, _: CanView):
 
 @router.post("", response_model=WorkOrderResponse, status_code=status.HTTP_201_CREATED)
 def create_work_order(
+    request: Request,
     body: WorkOrderRequest,
     uow: UowDep,
     actor: Annotated[User, Depends(require_permissions(Perm.WORK_ORDERS_CREATE))],
 ):
-    return WorkOrderResponse.model_validate(CreateWorkOrderUseCase(uow).execute(_data(body), actor))
+    """The logged user is the technician; the order date is today (shop time zone)."""
+    tz = _tz(request)
+    return WorkOrderResponse.model_validate(CreateWorkOrderUseCase(uow, tz).execute(_data(body, tz), actor))
 
 
 @router.put("/{work_order_id}", response_model=WorkOrderResponse)
-def update_work_order(work_order_id: int, body: WorkOrderRequest, uow: UowDep, actor: CanUpdate):
-    return WorkOrderResponse.model_validate(UpdateWorkOrderUseCase(uow).execute(work_order_id, _data(body), actor))
+def update_work_order(request: Request, work_order_id: int, body: WorkOrderRequest, uow: UowDep, actor: CanUpdate):
+    order = UpdateWorkOrderUseCase(uow).execute(work_order_id, _data(body, _tz(request)), actor)
+    return WorkOrderResponse.model_validate(order)
 
 
 @router.patch("/{work_order_id}/status", response_model=WorkOrderResponse)

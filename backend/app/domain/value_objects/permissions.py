@@ -56,7 +56,6 @@ class Perm:
     WORK_ORDERS_VIEW = "work_orders.view"
     WORK_ORDERS_CREATE = "work_orders.create"
     WORK_ORDERS_UPDATE = "work_orders.update"
-    WORK_ORDERS_ASSIGN_TECHNICIAN = "work_orders.assign_technician"
     WORK_ORDERS_SPARE_PARTS_ADD = "work_orders.spare_parts.add"
     WORK_ORDERS_SPARE_PARTS_REMOVE = "work_orders.spare_parts.remove"
 
@@ -106,7 +105,6 @@ PERMISSION_CATALOG: dict[str, str] = {
     Perm.WORK_ORDERS_VIEW: "Ver órdenes de trabajo",
     Perm.WORK_ORDERS_CREATE: "Crear órdenes de trabajo",
     Perm.WORK_ORDERS_UPDATE: "Editar órdenes de trabajo y cambiar su estado",
-    Perm.WORK_ORDERS_ASSIGN_TECHNICIAN: "Asignar técnico a órdenes de trabajo",
     Perm.WORK_ORDERS_SPARE_PARTS_ADD: "Registrar repuestos en órdenes",
     Perm.WORK_ORDERS_SPARE_PARTS_REMOVE: "Quitar repuestos de órdenes",
     Perm.SPARE_PARTS_VIEW: "Ver repuestos",
@@ -120,8 +118,10 @@ ALL_PERMISSIONS: list[str] = list(PERMISSION_CATALOG)
 # Default roles created by the seed script (system roles, see SystemRole).
 DEFAULT_ROLES: dict[str, list[str]] = {
     "ADMIN": ALL_PERMISSIONS,
-    # Seller: Ventas (sell and modify sales), Productos (view and add) and Inventario
-    # (find a product in other branches and load stock in their own branches).
+    # Seller: Ventas (sell and modify sales), Productos (view and add), Inventario
+    # (find a product in other branches and load stock in their own branches),
+    # Órdenes de trabajo (the seller is the technician of the orders they register)
+    # and Marcas / Modelos (add the devices that arrive).
     "VENDEDOR": [
         Perm.PRODUCTS_VIEW,
         Perm.PRODUCTS_CREATE,
@@ -130,6 +130,18 @@ DEFAULT_ROLES: dict[str, list[str]] = {
         Perm.SALES_VIEW,
         Perm.SALES_CREATE,
         Perm.SALES_UPDATE,
+        Perm.WORK_ORDERS_VIEW,
+        Perm.WORK_ORDERS_CREATE,
+        Perm.WORK_ORDERS_UPDATE,
+        Perm.WORK_ORDERS_SPARE_PARTS_ADD,
+        Perm.WORK_ORDERS_SPARE_PARTS_REMOVE,
+        Perm.SPARE_PARTS_VIEW,
+        Perm.BRANDS_VIEW,
+        Perm.BRANDS_CREATE,
+        Perm.BRANDS_UPDATE,
+        Perm.MODELS_VIEW,
+        Perm.MODELS_CREATE,
+        Perm.MODELS_UPDATE,
     ],
     "TECNICO": [
         Perm.PRODUCTS_VIEW,

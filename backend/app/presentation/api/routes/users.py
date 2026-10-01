@@ -57,10 +57,10 @@ def list_technicians(
     _: Annotated[User, Depends(require_permissions(Perm.WORK_ORDERS_VIEW))],
     search: str | None = None,
 ):
-    """Active users with the TECNICO role, for work order selectors and filters."""
-    result = UserUseCases(uow, hasher).list(
-        PageRequest(1, MAX_PAGE_SIZE), search, estado=True, roles=[SystemRole.TECNICO.value]
-    )
+    """Active staff (every role except CLIENTE) for the "Técnico" filter of work orders:
+    the technician of an order is the user who registered it."""
+    staff = [r.nombre for r in uow.roles.list(PageRequest(1, MAX_PAGE_SIZE)).items if r.nombre != SystemRole.CLIENTE.value]
+    result = UserUseCases(uow, hasher).list(PageRequest(1, MAX_PAGE_SIZE), search, estado=True, roles=staff)
     return [UserSummary.model_validate(u) for u in result.items]
 
 

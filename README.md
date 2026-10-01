@@ -182,13 +182,15 @@ uvicorn main:app --reload --port 8000
 | `003_sucursales_inventario.sql` | sin sucursales ni inventario (versión 2) |
 | `004_pagos_permisos.sql` | sin método de pago en ventas (versión 3) |
 | `005_ordenes_trabajo.sql` | órdenes de trabajo sin motivo de ingreso, fotos ni QR (versión 4) |
+| `006_ordenes_vendedor.sql` | órdenes con tipo de garantía en lugar de días (versión 5) |
+| `007_modelo_tecnico.sql` | órdenes sin modelo técnico del teléfono (versión 6) |
 
 Con Alembic (aplica solo lo que falta):
 
 ```powershell
 cd backend
 .venv\Scripts\activate
-alembic current           # p. ej. 0004 = falta el 005; sin versión = ejecute primero "alembic stamp <versión>"
+alembic current           # p. ej. 0006 = falta el 007; sin versión = ejecute primero "alembic stamp <versión>"
 alembic upgrade head
 python -m app.infrastructure.database.seed
 ```
@@ -202,6 +204,10 @@ o importe los scripts desde phpMyAdmin y luego ejecute `alembic stamp head` y el
   `sales.update`.
 - 005: el email pasa a ser opcional (solo clientes); las órdenes existentes reciben motivo **Otros**, un código
   público para el QR y `garantia = sí` pasa a **Garantía del local**; se crea la tabla de fotos (máx. 3 por orden).
+- 006: el tipo de garantía pasa a **tiempo de garantía en días** (las órdenes con garantía quedan con 30 días, las
+  demás con 0); nueva **fecha de entrega**; el técnico es el usuario que registra la orden (se elimina el permiso
+  `work_orders.assign_technician`); el rol VENDEDOR recibe órdenes de trabajo, repuestos (ver), marcas y modelos.
+- 007: nuevo campo **modelo técnico** del teléfono en las órdenes (p. ej. SM-A105M).
 
 ### 3. Frontend (terminal 2)
 

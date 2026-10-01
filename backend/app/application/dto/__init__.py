@@ -5,7 +5,7 @@ They decouple use cases from the HTTP schemas of the presentation layer.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from app.domain.value_objects.enums import PaymentMethod
@@ -148,6 +148,7 @@ class WorkOrderClientData:
     nombre: str
     apellido: str
     celular: str | None = None
+    email: str | None = None
 
 
 @dataclass(frozen=True)
@@ -159,14 +160,14 @@ class WorkOrderData:
     presupuesto: Decimal  # costo de reparación
     anticipo: Decimal
     tipo_display: str | None = None  # only for CAMBIO_DISPLAY
-    tipo_garantia: str = "SIN_GARANTIA"
+    garantia_dias: int = 0  # tiempo de garantía (days)
     bloqueo_tipo: str = "NINGUNO"  # NINGUNO | PATRON | PIN
     bloqueo_valor: str | None = None
-    tecnico_id: int | None = None
     observacion: str | None = None
     estado: int = 0
     color: str | None = None
-    fecha: date | None = None
+    modelo_tecnico: str | None = None  # technical model code of the phone, e.g. SM-A105M
+    fecha_entrega: datetime | None = None  # timezone-aware
 
 
 @dataclass(frozen=True)

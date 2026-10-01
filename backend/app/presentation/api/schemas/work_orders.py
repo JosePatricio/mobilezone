@@ -11,15 +11,14 @@ from app.domain.value_objects.work_orders import (
     DISPLAY_TYPE_LABELS,
     ENTRY_REASON_LABELS,
     LOCK_TYPE_LABELS,
-    WARRANTY_TYPE_LABELS,
     DisplayType,
     EntryReason,
     LockType,
-    WarrantyType,
+    MAX_WARRANTY_DAYS,
 )
 from app.presentation.api.schemas.catalog import BrandSummary, DeviceModelSummary, SparePartSummary
 from app.presentation.api.schemas.common import Money, Name, RequestSchema, Schema, media_url
-from app.presentation.api.schemas.users import Celular, ClientSummary, Identificacion, UserSummary
+from app.presentation.api.schemas.users import Celular, ClientSummary, Identificacion, OptionalEmail, UserSummary
 
 
 class WorkOrderClientRequest(RequestSchema):
@@ -29,6 +28,7 @@ class WorkOrderClientRequest(RequestSchema):
     nombre: Name
     apellido: Name
     celular: Celular = None
+    email: OptionalEmail = Field(default=None, description="Se guarda en el cliente si aún no tiene email")
 
 
 class WorkOrderRequest(RequestSchema):
@@ -36,13 +36,15 @@ class WorkOrderRequest(RequestSchema):
     ``presupuesto`` is the repair cost (costo de reparación)."""
 
     cliente: WorkOrderClientRequest
-    tecnico_id: int | None = Field(default=None, description="Omitir para autoasignar al técnico autenticado")
     marca_id: int
     modelo_id: int
     color: Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=50)] = None
+    modelo_tecnico: Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=50)] = Field(
+        default=None, description="Modelo técnico del teléfono, p. ej. SM-A105M"
+    )
     motivo_ingreso: EntryReason
     tipo_display: DisplayType | None = Field(default=None, description="Obligatorio si el motivo es CAMBIO_DISPLAY")
-    tipo_garantia: WarrantyType = WarrantyType.SIN_GARANTIA
+    garantia_dias: int = Field(default=0, ge=0, le=MAX_WARRANTY_DAYS, description="Tiempo de garantía en días (0 = sin garantía)")
     bloqueo_tipo: LockType = LockType.NINGUNO
     bloqueo_valor: Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=20)] = Field(
         default=None, description='Patrón "1-5-9-6" (puntos 1..9 por filas) o PIN numérico'
@@ -51,7 +53,9 @@ class WorkOrderRequest(RequestSchema):
     estado: WorkOrderStatus = WorkOrderStatus.ESTADO_0
     presupuesto: Money = Decimal("0")
     anticipo: Money = Decimal("0")
-    fecha: date | None = None
+    fecha_entrega: datetime | None = Field(
+        default=None, description="Fecha y hora de entrega (ISO 8601; sin zona = hora local del local)"
+    )
 
 
 class WorkOrderStatusOption(Schema):
@@ -67,7 +71,6 @@ class CatalogOption(Schema):
 class WorkOrderCatalogsResponse(Schema):
     motivos_ingreso: list[CatalogOption]
     tipos_display: list[CatalogOption]
-    tipos_garantia: list[CatalogOption]
     tipos_bloqueo: list[CatalogOption]
     estados: list[WorkOrderStatusOption]
 
@@ -79,7 +82,6 @@ class WorkOrderCatalogsResponse(Schema):
         return cls(
             motivos_ingreso=options(ENTRY_REASON_LABELS),
             tipos_display=options(DISPLAY_TYPE_LABELS),
-            tipos_garantia=options(WARRANTY_TYPE_LABELS),
             tipos_bloqueo=options(LOCK_TYPE_LABELS),
             estados=[WorkOrderStatusOption(value=int(k), label=v) for k, v in WORK_ORDER_STATUS_LABELS.items()],
         )
@@ -145,12 +147,13 @@ class WorkOrderListItem(Schema):
     estado: int
     motivo_ingreso: EntryReason
     tipo_display: DisplayType | None
-    tipo_garantia: WarrantyType
+    garantia_dias: int
     color: str | None
     presupuesto: Decimal
     anticipo: Decimal
     saldo: Decimal
     fecha: date
+    fecha_entrega: datetime | None
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -162,15 +165,11 @@ class WorkOrderListItem(Schema):
     def motivo_ingreso_label(self) -> str:
         return ENTRY_REASON_LABELS[self.motivo_ingreso]
 
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def tipo_garantia_label(self) -> str:
-        return WARRANTY_TYPE_LABELS[self.tipo_garantia]
-
 
 class WorkOrderResponse(WorkOrderListItem):
     user: UserSummary = Field(description="Usuario que registró la orden")
     observacion: str | None
+    modelo_tecnico: str | None
     bloqueo_tipo: LockType
     bloqueo_valor: str | None
     codigo_publico: str = Field(description="Código de la página pública de estado (QR)")
@@ -192,9 +191,11 @@ class PublicWorkOrderResponse(Schema):
     color: str | None
     motivo_ingreso: EntryReason
     tipo_display: DisplayType | None
+    garantia_dias: int
     presupuesto: Decimal
     anticipo: Decimal
     saldo: Decimal
+    fecha_entrega: datetime | None
     updated_at: datetime
 
     @computed_field  # type: ignore[prop-decorator]

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import type { z } from 'zod';
 import { clientSchema } from '@/modules/clients/components/ClientFormModal';
-import type { Client } from '@/modules/clients/types';
+import type { Client, ClientRequest } from '@/modules/clients/types';
 import { Button, Input, LocationFields } from '@/shared/components';
 import { getErrorMessage } from '@/shared/services/apiError';
 import { type FormShape, zodForm, applyServerErrors } from '@/shared/utils/validation';
@@ -15,13 +15,15 @@ interface Props {
   identificacion: string;
   onCreated: (client: Client) => void;
   onCancel: () => void;
+  /** Endpoint that registers the client (sales by default; work orders use their own). */
+  create?: (body: ClientRequest) => Promise<Client>;
 }
 
 /**
- * Quick registration of a client from the sales screen. Same fields as a user; the role
+ * Quick registration of a client from the sales or work order screen. Same fields as a user; the role
  * is always CLIENTE (shown as text) and clients have no password. Available to sellers.
  */
-export function NewCustomerForm({ identificacion, onCreated, onCancel }: Props) {
+export function NewCustomerForm({ identificacion, onCreated, onCancel, create = saleApi.createCustomer }: Props) {
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -48,7 +50,7 @@ export function NewCustomerForm({ identificacion, onCreated, onCancel }: Props) 
   const submit = handleSubmit(async (values) => {
     setServerError(null);
     try {
-      onCreated(await saleApi.createCustomer(values));
+      onCreated(await create(values));
     } catch (err) {
       if (!applyServerErrors(err, setError)) setServerError(getErrorMessage(err));
     }

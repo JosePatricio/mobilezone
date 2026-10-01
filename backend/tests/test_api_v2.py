@@ -24,17 +24,29 @@ def _role_id(uow, name: str) -> int:
 
 # ------------------------------------------------------------------ roles / users
 class TestUsersAndRoles:
-    def test_vendedor_only_has_sales_and_products(self, client, factory):
+    def test_vendedor_permissions(self, client, factory):
         seller = factory.user(SystemRole.VENDEDOR)
         body = client.post(f"{API}/auth/login", json={"email": seller.email, "password": PASSWORD}).json()
         assert sorted(body["permissions"]) == [
+            "brands.create",
+            "brands.update",
+            "brands.view",
             "inventory.manage",
             "inventory.view",
+            "models.create",
+            "models.update",
+            "models.view",
             "products.create",
             "products.view",
             "sales.create",
             "sales.update",
             "sales.view",
+            "spare_parts.view",
+            "work_orders.create",
+            "work_orders.spare_parts.add",
+            "work_orders.spare_parts.remove",
+            "work_orders.update",
+            "work_orders.view",
         ]
         assert [b["nombre"] for b in body["user"]["branches"]] == ["Matriz"]
         assert body["user"]["role"]["nombre"] == "VENDEDOR"
@@ -42,7 +54,9 @@ class TestUsersAndRoles:
         assert client.get(f"{API}/products", headers=headers).status_code == 200
         assert client.get(f"{API}/sales", headers=headers).status_code == 200
         assert client.get(f"{API}/inventory", headers=headers).status_code == 200
-        for path in ("/clients", "/users", "/work-orders", "/categories", "/branches"):
+        for path in ("/work-orders", "/brands", "/models"):
+            assert client.get(f"{API}{path}", headers=headers).status_code == 200, path
+        for path in ("/clients", "/users", "/categories", "/branches"):
             assert client.get(f"{API}{path}", headers=headers).status_code == 403, path
 
     def test_create_user_with_new_fields(self, client, admin_headers, uow, factory):

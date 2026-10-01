@@ -1,4 +1,4 @@
-"""Work order catalogs: entry reason, display type, warranty type and device lock.
+"""Work order catalogs: entry reason, display type and device lock; warranty time rule.
 
 Labels are centralized here and exposed through ``GET /work-orders/catalogs`` so the
 frontend never hardcodes them.
@@ -61,19 +61,20 @@ DISPLAY_TYPE_LABELS: dict[DisplayType, str] = {
 }
 
 
-class WarrantyType(str, Enum):
-    """Tipo de garantía. Provisional catalog: rename / extend here."""
-
-    SIN_GARANTIA = "SIN_GARANTIA"
-    GARANTIA_LOCAL = "GARANTIA_LOCAL"
-    GARANTIA_FABRICA = "GARANTIA_FABRICA"
+MAX_WARRANTY_DAYS = 3650
 
 
-WARRANTY_TYPE_LABELS: dict[WarrantyType, str] = {
-    WarrantyType.SIN_GARANTIA: "Sin garantía",
-    WarrantyType.GARANTIA_LOCAL: "Garantía del local (reparación)",
-    WarrantyType.GARANTIA_FABRICA: "Garantía de fábrica / marca",
-}
+def validate_warranty_days(value: int | None) -> int:
+    """Tiempo de garantía in days (0 = sin garantía)."""
+    if value is None:
+        return 0
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= MAX_WARRANTY_DAYS:
+        raise ValidationError(
+            f"El tiempo de garantía debe ser un número de días entre 0 y {MAX_WARRANTY_DAYS}.",
+            code="INVALID_WARRANTY_DAYS",
+            details={"field": "garantia_dias"},
+        )
+    return value
 
 
 class LockType(str, Enum):

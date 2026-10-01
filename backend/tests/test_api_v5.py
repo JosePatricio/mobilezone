@@ -55,7 +55,7 @@ class TestWorkOrdersV5:
             "color": "Azul",
             "motivo_ingreso": "CAMBIO_DISPLAY",
             "tipo_display": "OLED",
-            "tipo_garantia": "GARANTIA_LOCAL",
+            "garantia_dias": 90,
             "bloqueo_tipo": "PATRON",
             "bloqueo_valor": "1-5-9-6",
             "observacion": "Pantalla rota",
@@ -77,7 +77,7 @@ class TestWorkOrdersV5:
             "OLED",
             "Cambio de display",
         )
-        assert order["tipo_garantia"] == "GARANTIA_LOCAL"
+        assert order["garantia_dias"] == 90
         assert (order["bloqueo_tipo"], order["bloqueo_valor"]) == ("PATRON", "1-5-9-6")
         assert order["saldo"] == "60.00"
         assert order["user"]["id"] and len(order["codigo_publico"]) == 24
@@ -116,7 +116,7 @@ class TestWorkOrdersV5:
         assert len(catalogs["motivos_ingreso"]) == 13
         assert [o["value"] for o in catalogs["tipos_display"]] == ["INCELL", "OLED", "ORIGINAL"]
         assert {o["value"] for o in catalogs["tipos_bloqueo"]} == {"NINGUNO", "PATRON", "PIN"}
-        assert catalogs["tipos_garantia"] and catalogs["estados"]
+        assert catalogs["estados"] and "tipos_garantia" not in catalogs
 
     def test_customer_lookup(self, client, factory):
         tech = factory.user(SystemRole.TECNICO)

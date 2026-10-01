@@ -13,6 +13,8 @@ constraints), InnoDB and `utf8mb4`. The scripts avoid MySQL-only syntax so they 
 | `upgrades/003_sucursales_inventario.sql` | Upgrades a version 2 database: branches, inventory per branch, user branches, provincia (run once) |
 | `upgrades/004_pagos_permisos.sql` | Upgrades a version 3 database: sale payments (method, card surcharge, change), `branches.any`, `sales.update` (run once) |
 | `upgrades/005_ordenes_trabajo.sql` | Upgrades a version 4 database: optional email, work order entry reason / display type / warranty type / lock, public QR code and photos (run once) |
+| `upgrades/006_ordenes_vendedor.sql` | Upgrades a version 5 database: warranty time in days, delivery date, technician = user who registers the order, seller permissions (run once) |
+| `upgrades/007_modelo_tecnico.sql` | Upgrades a version 6 database: technical model of the phone in work orders (run once) |
 
 ## Option A — Alembic + Python seed (recommended)
 
@@ -38,7 +40,7 @@ The SQL seed creates `admin@example.com` / `Admin12345`: change that password af
 `02_create_tables.sql` always holds the **current** full schema (new installations). Databases created with an older
 version are upgraded with the scripts in `upgrades/`, in order (Alembic runs them too: revision 0002 executes
 `upgrades/002_productos_usuarios_ventas.sql`, revision 0003 `upgrades/003_sucursales_inventario.sql`, revision 0004
-`upgrades/004_pagos_permisos.sql`, revision 0005 `upgrades/005_ordenes_trabajo.sql`; revision 0001
+`upgrades/004_pagos_permisos.sql`, revision 0005 `upgrades/005_ordenes_trabajo.sql`, revision 0006 `upgrades/006_ordenes_vendedor.sql`, revision 0007 `upgrades/007_modelo_tecnico.sql`; revision 0001
 runs the frozen copy in `migrations/sql/`).
 
 Upgrade 002: role replaces `users.tipo_usuario` (USUARIO → VENDEDOR, new CLIENTE role), new user fields
@@ -54,6 +56,10 @@ Upgrade 005: `users.email` nullable (clients registered from a work order need n
 `motivo_ingreso` (existing orders: OTROS), `tipo_display`, `tipo_garantia` (replaces `garantia`: 1 → GARANTIA_LOCAL),
 `bloqueo_tipo` / `bloqueo_valor` (pattern "1-5-9-6" or PIN) and a unique random `codigo_publico` (QR status page);
 new table `work_order_photos`.
+
+Upgrade 006: `work_orders.tipo_garantia` → `garantia_dias` (orders with a warranty get 30 days), new
+`fecha_entrega`; `work_orders.assign_technician` is removed (the technician is the user who registers the order);
+VENDEDOR gets work orders, spare parts (view), brands and models.
 
 DDL is not transactional in MySQL/MariaDB: **take a backup first**.
 

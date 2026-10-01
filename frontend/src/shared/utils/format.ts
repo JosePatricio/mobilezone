@@ -56,3 +56,24 @@ export function cleanParams<T extends Record<string, unknown>>(params: T): Parti
     Object.entries(params).filter(([, v]) => v !== '' && v !== undefined && v !== null),
   ) as Partial<T>;
 }
+
+/** ISO date-time → value of an <input type="datetime-local"> ("2026-10-05T16:30", local time). */
+export function toDateTimeLocal(value: string | null | undefined): string {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Value of an <input type="datetime-local"> (local time) → ISO 8601 in UTC; "" → null. */
+export function fromDateTimeLocal(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/** "30 días", "1 día", "Sin garantía". */
+export function formatWarrantyDays(days: number | null | undefined): string {
+  if (!days) return 'Sin garantía';
+  return `${days} ${days === 1 ? 'día' : 'días'}`;
+}

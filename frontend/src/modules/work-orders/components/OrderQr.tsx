@@ -7,8 +7,8 @@ export function publicOrderUrl(codigo: string): string {
   return `${base}/orden/${codigo}`;
 }
 
-/** QR code pointing to the public status page of the order. */
-export function OrderQr({ codigo }: { codigo: string }) {
+/** QR image (data URL) of the public status page; null while it is generated. */
+export function useOrderQr(codigo: string): { url: string; image: string | null } {
   const url = publicOrderUrl(codigo);
   const [image, setImage] = useState<string | null>(null);
 
@@ -22,6 +22,12 @@ export function OrderQr({ codigo }: { codigo: string }) {
     };
   }, [url]);
 
+  return { url, image };
+}
+
+/** QR code pointing to the public status page of the order. */
+export function OrderQr({ codigo }: { codigo: string }) {
+  const { url, image } = useOrderQr(codigo);
   return (
     <div className="qr-box">
       {image ? <img src={image} alt="Código QR del estado de la orden" /> : <span className="muted">Generando QR…</span>}

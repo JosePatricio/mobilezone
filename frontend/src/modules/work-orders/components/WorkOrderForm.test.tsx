@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { vi } from 'vitest';
@@ -39,17 +39,25 @@ const publicOrder: PublicWorkOrder = {
   motivo_ingreso: 'CAMBIO_DISPLAY',
   motivo_ingreso_label: 'Cambio de display',
   tipo_display: 'OLED',
+  garantia_dias: 30,
+  fecha_entrega: '2026-10-05T21:30:00Z',
   presupuesto: '80.00',
   anticipo: '20.00',
   saldo: '60.00',
   updated_at: '2026-10-01T21:20:00Z',
 };
 
+const createdCustomers: Record<string, unknown>[] = [];
+vi.mock('@/shared/components/LocationFields', () => ({ LocationFields: () => null }));
 vi.mock('../services/workOrderApi', () => ({
   WORK_ORDERS_KEY: 'work-orders',
   workOrderApi: {
     catalogs: () => Promise.resolve(catalogs),
     statuses: () => Promise.resolve(catalogs.estados),
+    createCustomer: (body: Record<string, unknown>) => {
+      createdCustomers.push(body);
+      return Promise.resolve({ id: 9, email: null, foto_url: null, estado: true, ...body });
+    },
     lookupCustomer: (identificacion: string) =>
       identificacion === '1712345675'
         ? Promise.resolve({ id: 7, nombre: 'Juan', apellido: 'Pérez', identificacion, celular: '0991234567' })
@@ -84,25 +92,54 @@ describe('WorkOrderForm', () => {
     expect(await screen.findByDisplayValue('Juan')).toHaveAttribute('readonly');
     expect(screen.getByLabelText(/Apellidos/)).toHaveValue('Pérez');
     expect(screen.getByLabelText(/Celular/)).toHaveValue('0991234567');
+    // The client has no email: it can be entered here.
+    expect(screen.getByLabelText(/^Email/)).not.toHaveAttribute('readonly');
+    // The logged user is the technician; there is no date field (today), only the delivery date.
+    expect(screen.getByText('Ana Pérez (usted)')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Fecha\s*\*?$/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Fecha de entrega')).toHaveAttribute('type', 'datetime-local');
+  });
+
+  it('chooses the color from the palette', async () => {
+    const onSubmit = renderForm(vi.fn(() => Promise.resolve()));
+    await userEvent.click(screen.getByRole('radio', { name: 'Azul' }));
+    expect(screen.getByRole('radio', { name: 'Azul' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('Color: Azul')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('registers a new client and sends the full order', async () => {
     const onSubmit = renderForm(vi.fn(() => Promise.resolve()));
     await userEvent.type(screen.getByLabelText(/Cédula \/ RUC/), '0102030400{Enter}');
-    expect(await screen.findByText(/Cliente nuevo/)).toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText(/Nombres/), 'Ana');
-    await userEvent.type(screen.getByLabelText(/Apellidos/), 'Mora');
+    // Not registered: the same registration form as in sales opens in a modal.
+    const modal = await screen.findByRole('dialog', { name: 'Nuevo cliente' });
+    expect(within(modal).getByLabelText(/Cédula o RUC/)).toHaveValue('0102030400');
+    await userEvent.type(within(modal).getByLabelText(/^Nombre/), 'Ana');
+    await userEvent.type(within(modal).getByLabelText(/^Apellido/), 'Mora');
+    await userEvent.click(within(modal).getByRole('button', { name: 'Registrar cliente' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(createdCustomers[0]).toMatchObject({ identificacion: '0102030400', nombre: 'Ana', apellido: 'Mora' });
+    expect(screen.getByLabelText(/Nombres/)).toHaveValue('Ana');
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Negro' }));
+    await userEvent.type(screen.getByLabelText(/Modelo técnico/), 'SM-A105M');
+    await userEvent.type(screen.getByLabelText(/^Email/), 'ana@example.com');
 
     await userEvent.selectOptions(screen.getByLabelText(/Marca/), await screen.findByRole('option', { name: 'Samsung' }));
-    await userEvent.selectOptions(screen.getByLabelText(/Modelo/), await screen.findByRole('option', { name: 'A10' }));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: /^Modelo/ }), await screen.findByRole('option', { name: 'A10' }));
 
     await userEvent.click(screen.getByRole('button', { name: /Motivo de ingreso/ }));
     await userEvent.click(await screen.findByRole('option', { name: 'Cambio de display' }));
     // The display type appears only for a display change.
     await userEvent.selectOptions(screen.getByLabelText(/Tipo de display/), 'OLED');
 
+    const warranty = screen.getByLabelText(/Tiempo de garantía/);
+    await userEvent.clear(warranty);
+    await userEvent.type(warranty, '90');
+
     await userEvent.click(screen.getByRole('radio', { name: 'PIN' }));
     await userEvent.type(screen.getByRole('textbox', { name: /^PIN/ }), '12a34');
+    fireEvent.change(screen.getByLabelText('Fecha de entrega'), { target: { value: '2026-10-05T16:30' } });
 
     const cost = screen.getByLabelText(/Costo de reparación/);
     await userEvent.clear(cost);
@@ -115,17 +152,21 @@ describe('WorkOrderForm', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Crear orden' }));
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0]).toMatchObject({
-      cliente: { identificacion: '0102030400', nombre: 'Ana', apellido: 'Mora', celular: null },
+      cliente: { identificacion: '0102030400', nombre: 'Ana', apellido: 'Mora', celular: null, email: 'ana@example.com' },
+      modelo_tecnico: 'SM-A105M',
       marca_id: 1,
       modelo_id: 2,
       motivo_ingreso: 'CAMBIO_DISPLAY',
       tipo_display: 'OLED',
-      tipo_garantia: 'SIN_GARANTIA',
+      color: 'Negro',
+      garantia_dias: 90,
       bloqueo_tipo: 'PIN',
       bloqueo_valor: '1234',
       presupuesto: '80.00',
       anticipo: '20.00',
+      fecha_entrega: new Date(2026, 9, 5, 16, 30).toISOString(),
     });
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('tecnico_id');
   });
 });
 
@@ -143,6 +184,7 @@ describe('PublicWorkOrderPage', () => {
     expect(await screen.findByText('Orden #000015')).toBeInTheDocument();
     expect(screen.getByText('Recibido')).toBeInTheDocument();
     expect(screen.getByText('Cambio de display (OLED)')).toBeInTheDocument();
+    expect(screen.getByText('30 días')).toBeInTheDocument();
   });
 
   it('reports an unknown code', async () => {

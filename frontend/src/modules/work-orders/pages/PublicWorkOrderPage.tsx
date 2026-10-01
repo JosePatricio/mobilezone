@@ -2,7 +2,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Card, ErrorState, Loading, StatusBadge } from '@/shared/components';
 import { toApiError } from '@/shared/services/apiError';
-import { formatDate, formatDateTime, formatOrderNumber } from '@/shared/utils/format';
+import { formatDate, formatDateTime, formatOrderNumber, formatWarrantyDays } from '@/shared/utils/format';
 import { formatMoney } from '@/shared/utils/money';
 import { statusTone } from '../hooks/useWorkOrderStatuses';
 import { workOrderApi } from '../services/workOrderApi';
@@ -55,6 +55,10 @@ export function PublicWorkOrderPage() {
               </dd>
               <dt>Fecha de ingreso</dt>
               <dd>{formatDate(order.fecha)}</dd>
+              <dt>Fecha de entrega</dt>
+              <dd>{order.fecha_entrega ? formatDateTime(order.fecha_entrega) : 'Por confirmar'}</dd>
+              <dt>Garantía</dt>
+              <dd>{formatWarrantyDays(order.garantia_dias)}</dd>
               <dt>Costo de reparación</dt>
               <dd>{formatMoney(order.presupuesto)}</dd>
               <dt>Anticipo</dt>

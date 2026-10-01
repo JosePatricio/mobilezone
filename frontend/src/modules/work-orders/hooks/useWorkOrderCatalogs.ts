@@ -5,7 +5,6 @@ import type { CatalogOption, WorkOrderCatalogs } from '../types';
 const EMPTY: WorkOrderCatalogs = {
   motivos_ingreso: [],
   tipos_display: [],
-  tipos_garantia: [],
   tipos_bloqueo: [
     { value: 'NINGUNO', label: 'Sin bloqueo' },
     { value: 'PATRON', label: 'Patrón' },

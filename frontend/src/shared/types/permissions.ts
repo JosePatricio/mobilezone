@@ -42,7 +42,6 @@ export const PERMISSIONS = {
   WORK_ORDERS_VIEW: 'work_orders.view',
   WORK_ORDERS_CREATE: 'work_orders.create',
   WORK_ORDERS_UPDATE: 'work_orders.update',
-  WORK_ORDERS_ASSIGN_TECHNICIAN: 'work_orders.assign_technician',
   WORK_ORDERS_SPARE_PARTS_ADD: 'work_orders.spare_parts.add',
   WORK_ORDERS_SPARE_PARTS_REMOVE: 'work_orders.spare_parts.remove',
   SPARE_PARTS_VIEW: 'spare_parts.view',

@@ -51,7 +51,6 @@ INSERT INTO permissions (codigo, descripcion) VALUES
     ('work_orders.view', 'Ver órdenes de trabajo'),
     ('work_orders.create', 'Crear órdenes de trabajo'),
     ('work_orders.update', 'Editar órdenes de trabajo y cambiar su estado'),
-    ('work_orders.assign_technician', 'Asignar técnico a órdenes de trabajo'),
     ('work_orders.spare_parts.add', 'Registrar repuestos en órdenes'),
     ('work_orders.spare_parts.remove', 'Quitar repuestos de órdenes'),
     ('spare_parts.view', 'Ver repuestos'),
@@ -76,7 +75,11 @@ INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p ON p.codigo IN (
     'products.view', 'products.create', 'inventory.view',
     'inventory.manage', 'sales.view', 'sales.create',
-    'sales.update'
+    'sales.update', 'work_orders.view', 'work_orders.create',
+    'work_orders.update', 'work_orders.spare_parts.add', 'work_orders.spare_parts.remove',
+    'spare_parts.view', 'brands.view', 'brands.create',
+    'brands.update', 'models.view', 'models.create',
+    'models.update'
 ) WHERE r.nombre = 'VENDEDOR';
 
 -- TECNICO

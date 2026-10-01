@@ -5,7 +5,7 @@ import { userApi } from '@/modules/users/services/userApi';
 import { Button, DataList, DatePicker, Input, PageHeader, SearchInput, Select, StatusBadge, type Column } from '@/shared/components';
 import { useListParams } from '@/shared/hooks/useListParams';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
-import { formatDate, formatOrderNumber, fullName } from '@/shared/utils/format';
+import { formatDate, formatDateTime, formatOrderNumber, formatWarrantyDays, fullName } from '@/shared/utils/format';
 import { formatMoney, toCents } from '@/shared/utils/money';
 import { statusTone, useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
 import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
@@ -49,11 +49,17 @@ export function WorkOrdersPage() {
       render: (r) => <StatusBadge label={r.estado_label} tone={statusTone(r.estado)} />,
       sortValue: (r) => r.estado,
     },
-    { key: 'garantia', header: 'Garantía', render: (r) => r.tipo_garantia_label },
+    { key: 'garantia', header: 'Garantía', render: (r) => formatWarrantyDays(r.garantia_dias), sortValue: (r) => r.garantia_dias },
     { key: 'presupuesto', header: 'Costo', align: 'right', render: (r) => formatMoney(r.presupuesto) },
     { key: 'anticipo', header: 'Anticipo', align: 'right', render: (r) => formatMoney(r.anticipo) },
     { key: 'saldo', header: 'Saldo', align: 'right', render: (r) => formatMoney(r.saldo), sortValue: (r) => toCents(r.saldo) },
-    { key: 'fecha', header: 'Fecha', render: (r) => formatDate(r.fecha), sortValue: (r) => r.fecha },
+    { key: 'fecha', header: 'Ingreso', render: (r) => formatDate(r.fecha), sortValue: (r) => r.fecha },
+    {
+      key: 'entrega',
+      header: 'Entrega',
+      render: (r) => (r.fecha_entrega ? formatDateTime(r.fecha_entrega) : '—'),
+      sortValue: (r) => r.fecha_entrega ?? '',
+    },
     {
       key: 'acciones',
       header: 'Acciones',

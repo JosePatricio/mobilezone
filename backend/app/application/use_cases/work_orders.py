@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import secrets
+from datetime import datetime, timezone, tzinfo
 from decimal import Decimal
 
 from app.application.dto import (
@@ -11,16 +12,16 @@ from app.application.dto import (
     WorkOrderSparePartData,
 )
 from app.application.services.files import FileStorage, validate_image
-from app.application.use_cases.base import UseCase, require_permission
+from app.application.use_cases.base import UseCase
 from app.domain.entities import User, WorkOrder, WorkOrderPhoto, WorkOrderSparePart, calculate_balance
 from app.domain.exceptions import ConflictError, NotFoundError, ValidationError
 from app.domain.repositories import UnitOfWork
 from app.domain.value_objects.enums import SystemRole, WorkOrderStatus
+from app.domain.entities.base import optional_text
 from app.domain.entities.user import normalize_celular
 from app.domain.value_objects.identificacion import normalize_identificacion
 from app.domain.value_objects.pagination import Page, PageRequest
-from app.domain.value_objects.permissions import Perm
-from app.domain.value_objects.work_orders import WarrantyType
+from app.domain.value_objects.work_orders import validate_warranty_days
 
 
 class CalculateWorkOrderBalanceUseCase:
@@ -71,6 +72,8 @@ class _WorkOrderValidation(UseCase):
                 raise ValidationError("El cliente está inactivo.", code="CLIENT_INACTIVE")
             if data.celular and not existing.celular:
                 existing.celular = normalize_celular(data.celular)
+            if data.email and not existing.email:
+                existing.email = self._unique_email(data.email)
             return existing
         role = self.uow.roles.get_by_nombre(SystemRole.CLIENTE.value)
         client = User(
@@ -78,29 +81,29 @@ class _WorkOrderValidation(UseCase):
             apellido=data.apellido,
             identificacion=identificacion,
             celular=data.celular,
+            email=self._unique_email(data.email) if data.email else None,
             rol_id=role.id if role else None,
         )
         self.uow.users.add(client)
         self.uow.flush()
         return client
 
+    def _unique_email(self, email: str) -> str:
+        """Email of the client (optional); it cannot belong to another user."""
+        value = email.strip().lower()
+        if self.uow.users.get_by_email(value) is not None:
+            raise ConflictError(
+                "Ya existe un usuario con ese email.", code="EMAIL_ALREADY_EXISTS", details={"field": "cliente.email"}
+            )
+        return value
+
     def _apply(self, order: WorkOrder, data: WorkOrderData) -> None:
         """Fields shared by create and update, validated by the entity rules."""
         order.set_entry(data.motivo_ingreso, data.tipo_display)
         order.set_lock(data.bloqueo_tipo, data.bloqueo_valor)
-        try:
-            order.tipo_garantia = WarrantyType(data.tipo_garantia)
-        except ValueError as exc:
-            raise ValidationError(
-                "Seleccione un tipo de garantía válido.", code="INVALID_OPTION", details={"field": "tipo_garantia"}
-            ) from exc
-
-    def _validate_technician(self, tecnico_id: int) -> None:
-        technician = self.uow.users.get(tecnico_id)
-        if technician is None or not technician.is_technician:
-            raise ValidationError("El técnico seleccionado no existe.", code="INVALID_TECHNICIAN")
-        if not technician.estado:
-            raise ValidationError("El técnico seleccionado está inactivo.", code="TECHNICIAN_INACTIVE")
+        order.garantia_dias = validate_warranty_days(data.garantia_dias)
+        order.fecha_entrega = data.fecha_entrega
+        order.modelo_tecnico = optional_text(data.modelo_tecnico)
 
     def _validate_device(self, marca_id: int, modelo_id: int) -> None:
         brand = self.uow.brands.get(marca_id)
@@ -112,37 +115,22 @@ class _WorkOrderValidation(UseCase):
         if model.brand_id != marca_id:
             raise ValidationError("El modelo no pertenece a la marca seleccionada.", code="MODEL_BRAND_MISMATCH")
 
-    def _resolve_technician(self, actor: User, requested: int | None, current: int | None, creating: bool) -> int | None:
-        """Technician rules (spec §12, §23).
-
-        * A technician creating an order without specifying one is assigned automatically.
-        * A technician may always assign the order to themself.
-        * Assigning anyone else (or unassigning) requires ``work_orders.assign_technician``;
-          without it, omitting the technician on update keeps the current one.
-        """
-        can_assign = actor.has_permission(Perm.WORK_ORDERS_ASSIGN_TECHNICIAN)
-        if creating and requested is None and actor.is_technician:
-            return actor.id
-        if not creating and (requested == current or (requested is None and not can_assign)):
-            return current
-        if requested is not None and requested == actor.id and actor.is_technician:
-            return requested
-        require_permission(actor, Perm.WORK_ORDERS_ASSIGN_TECHNICIAN)
-        if requested is not None:
-            self._validate_technician(requested)
-        return requested
-
 
 class CreateWorkOrderUseCase(_WorkOrderValidation):
+    """The logged user registers the order and is its technician; the date is today (shop time zone)."""
+
+    def __init__(self, uow: UnitOfWork, tz: tzinfo = timezone.utc) -> None:
+        super().__init__(uow)
+        self.tz = tz
+
     def execute(self, data: WorkOrderData, actor: User) -> WorkOrder:
         with self.uow.transaction():
             client = self._resolve_client(data.cliente)
             self._validate_device(data.marca_id, data.modelo_id)
-            tecnico_id = self._resolve_technician(actor, data.tecnico_id, None, creating=True)
             order = WorkOrder(
                 user_id=actor.id,  # type: ignore[arg-type]  # user who generates the order
                 cliente_id=client.id,  # type: ignore[arg-type]
-                tecnico_id=tecnico_id,
+                tecnico_id=actor.id,  # the logged user is the technician
                 marca_id=data.marca_id,
                 modelo_id=data.modelo_id,
                 motivo_ingreso=data.motivo_ingreso,  # type: ignore[arg-type]
@@ -152,7 +140,7 @@ class CreateWorkOrderUseCase(_WorkOrderValidation):
                 color=data.color,
                 presupuesto=data.presupuesto,
                 anticipo=data.anticipo,
-                fecha=data.fecha,
+                fecha=datetime.now(self.tz).date(),
                 codigo_publico=secrets.token_hex(12),  # unguessable code for the public status page (QR)
             )
             self._apply(order, data)
@@ -166,7 +154,6 @@ class UpdateWorkOrderUseCase(_WorkOrderValidation):
             order = _get_order(self.uow, work_order_id)
             client = self._resolve_client(data.cliente)
             self._validate_device(data.marca_id, data.modelo_id)
-            order.tecnico_id = self._resolve_technician(actor, data.tecnico_id, order.tecnico_id, creating=False)
             order.cliente_id = client.id  # type: ignore[assignment]
             order.marca_id, order.modelo_id = data.marca_id, data.modelo_id
             normalized = WorkOrder(
@@ -186,8 +173,6 @@ class UpdateWorkOrderUseCase(_WorkOrderValidation):
             self._apply(order, data)
             order.change_status(data.estado)
             order.set_amounts(data.presupuesto, data.anticipo)
-            if data.fecha is not None:
-                order.fecha = data.fecha
         return order
 
 

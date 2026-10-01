@@ -176,24 +176,23 @@ class TestWorkOrders:
             CreateWorkOrderUseCase(uow).execute(self._data(factory, modelo_id=other_model.id), tech)
         assert exc.value.code == "MODEL_BRAND_MISMATCH"
 
-    def test_technician_cannot_assign_other_technician(self, uow, factory):
-        tech = factory.user(SystemRole.TECNICO)
-        other = factory.user(SystemRole.TECNICO)
-        with pytest.raises(PermissionDeniedError):
-            CreateWorkOrderUseCase(uow).execute(self._data(factory, tecnico_id=other.id), tech)
+    def test_seller_is_the_technician_and_date_is_today(self, uow, factory):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
 
-    def test_authorized_user_assigns_technician(self, uow, factory):
-        clerk = factory.user(SystemRole.ADMIN)  # has work_orders.assign_technician
-        tech = factory.user(SystemRole.TECNICO)
-        order = CreateWorkOrderUseCase(uow).execute(self._data(factory, tecnico_id=tech.id), clerk)
-        assert order.tecnico_id == tech.id
-        assert order.user_id == clerk.id
+        tz = ZoneInfo("America/Guayaquil")
+        seller = factory.user(SystemRole.VENDEDOR)
+        order = CreateWorkOrderUseCase(uow, tz).execute(self._data(factory), seller)
+        assert order.tecnico_id == seller.id and order.user_id == seller.id
+        assert order.fecha == datetime.now(tz).date()
 
-    def test_assigned_user_must_be_technician(self, uow, factory):
-        clerk = factory.user(SystemRole.ADMIN)
-        with pytest.raises(ValidationError) as exc:
-            CreateWorkOrderUseCase(uow).execute(self._data(factory, tecnico_id=clerk.id), clerk)
-        assert exc.value.code == "INVALID_TECHNICIAN"
+    def test_update_keeps_the_technician(self, uow, factory):
+        seller = factory.user(SystemRole.VENDEDOR)
+        data = self._data(factory)
+        order = CreateWorkOrderUseCase(uow).execute(data, seller)
+        admin = factory.user(SystemRole.ADMIN)
+        updated = UpdateWorkOrderUseCase(uow).execute(order.id, data, admin)
+        assert updated.tecnico_id == seller.id
 
     def test_update_recomputes_saldo(self, uow, factory):
         tech = factory.user(SystemRole.TECNICO)

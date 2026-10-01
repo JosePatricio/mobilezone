@@ -120,6 +120,7 @@ class ClientSummary(Schema):
     apellido: str
     identificacion: str | None
     celular: str | None
+    email: str | None = None
 
 
 class ClientResponse(_WithPhoto):

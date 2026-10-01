@@ -5,12 +5,13 @@ import { Can, usePermission } from '@/modules/auth/components/Can';
 import { Button, Card, ErrorState, Loading, PageHeader, StatusBadge, useConfirm, useToast } from '@/shared/components';
 import { getErrorMessage } from '@/shared/services/apiError';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
-import { formatDate, formatDateTime, formatOrderNumber, fullName } from '@/shared/utils/format';
+import { formatDate, formatDateTime, formatOrderNumber, formatWarrantyDays, fullName } from '@/shared/utils/format';
 import { formatMoney } from '@/shared/utils/money';
 import { AddSparePartModal } from '../components/AddSparePartModal';
 import { BalanceSummary } from '../components/BalanceSummary';
 import { OrderQr } from '../components/OrderQr';
 import { PatternLock } from '../components/PatternLock';
+import { PrintableOrder } from '../components/PrintableOrder';
 import { useWorkOrderCatalogs } from '../hooks/useWorkOrderCatalogs';
 import { statusTone, useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
 import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
@@ -81,6 +82,9 @@ export function WorkOrderDetailPage() {
             <Link to="/work-orders" className="btn btn-secondary btn-md">
               Volver
             </Link>
+            <Button variant="secondary" onClick={() => window.print()}>
+              Imprimir orden
+            </Button>
             {canUpdate && (
               <Link to={`/work-orders/${order.id}/edit`} className="btn btn-primary btn-md">
                 Editar
@@ -101,6 +105,8 @@ export function WorkOrderDetailPage() {
             <dd>{fullName(order.cliente)}</dd>
             <dt>Celular</dt>
             <dd>{order.cliente.celular ?? '—'}</dd>
+            <dt>Email</dt>
+            <dd>{order.cliente.email ?? '—'}</dd>
           </dl>
         </Card>
 
@@ -110,6 +116,8 @@ export function WorkOrderDetailPage() {
             <dd>{order.marca.nombre}</dd>
             <dt>Modelo</dt>
             <dd>{order.modelo.nombre}</dd>
+            <dt>Modelo técnico</dt>
+            <dd>{order.modelo_tecnico ?? '—'}</dd>
             <dt>Color</dt>
             <dd>{order.color ?? '—'}</dd>
             <dt>Motivo de ingreso</dt>
@@ -118,7 +126,7 @@ export function WorkOrderDetailPage() {
               {order.tipo_display ? ` · ${labelOf(catalogs.tipos_display, order.tipo_display)}` : ''}
             </dd>
             <dt>Garantía</dt>
-            <dd>{order.tipo_garantia_label}</dd>
+            <dd>{formatWarrantyDays(order.garantia_dias)}</dd>
             <dt>Desbloqueo</dt>
             <dd>
               {order.bloqueo_tipo === 'PATRON' ? (
@@ -142,6 +150,8 @@ export function WorkOrderDetailPage() {
             </dd>
             <dt>Técnico</dt>
             <dd>{order.tecnico ? fullName(order.tecnico) : 'Sin asignar'}</dd>
+            <dt>Fecha de entrega</dt>
+            <dd>{order.fecha_entrega ? formatDateTime(order.fecha_entrega) : 'Por confirmar'}</dd>
           </dl>
           {canUpdate && (
             <div className="inline-form">
@@ -267,6 +277,7 @@ export function WorkOrderDetailPage() {
           }}
         />
       )}
+      <PrintableOrder order={order} />
     </>
   );
 }

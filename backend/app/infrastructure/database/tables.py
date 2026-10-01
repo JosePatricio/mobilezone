@@ -5,6 +5,8 @@ has no dependency on SQLAlchemy.
 """
 from __future__ import annotations
 
+from datetime import timezone
+
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -19,6 +21,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    TypeDecorator,
     UniqueConstraint,
     func,
     select,
@@ -47,7 +50,7 @@ from app.domain.entities import (
 )
 from app.domain.entities.base import utcnow
 from app.domain.value_objects.enums import PaymentMethod, SaleStatus, StockMovementType
-from app.domain.value_objects.work_orders import DisplayType, EntryReason, LockType, WarrantyType
+from app.domain.value_objects.work_orders import DisplayType, EntryReason, LockType
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -61,7 +64,25 @@ metadata = MetaData(naming_convention=NAMING_CONVENTION)
 mapper_registry = registry(metadata=metadata)
 
 MONEY = Numeric(12, 2)
-TIMESTAMP = DATETIME(fsp=6)  # stored in UTC
+class UtcDateTime(TypeDecorator):
+    """DATETIME(6) stored as naive UTC; Python values are timezone-aware (UTC).
+
+    Aware values are serialized with their offset, so clients show the right local time.
+    """
+
+    impl = DATETIME(fsp=6)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and value.tzinfo is not None:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
+
+    def process_result_value(self, value, dialect):
+        return value.replace(tzinfo=timezone.utc) if value is not None else None
+
+
+TIMESTAMP = UtcDateTime()  # stored in UTC
 
 TRUE = text("1")
 FALSE = text("0")
@@ -288,19 +309,20 @@ work_orders_table = Table(
     Column("estado", Integer, nullable=False, default=0, server_default=FALSE, index=True),
     Column("motivo_ingreso", _str_enum(EntryReason), nullable=False),
     Column("tipo_display", _str_enum(DisplayType)),  # only for CAMBIO_DISPLAY
-    Column(
-        "tipo_garantia", _str_enum(WarrantyType), nullable=False, server_default=text("'SIN_GARANTIA'")
-    ),
+    Column("garantia_dias", Integer, nullable=False, default=0, server_default=FALSE),  # tiempo de garantía
     Column("bloqueo_tipo", _str_enum(LockType), nullable=False, server_default=text("'NINGUNO'")),
     Column("bloqueo_valor", String(20)),  # pattern "1-5-9-6" or PIN
     Column("codigo_publico", String(32), nullable=False, unique=True),  # public status page (QR)
     Column("color", String(50)),
+    Column("modelo_tecnico", String(50)),  # technical model code of the phone, e.g. SM-A105M
     Column("presupuesto", MONEY, nullable=False),
     Column("anticipo", MONEY, nullable=False),
     Column("saldo", MONEY, nullable=False),
     Column("fecha", Date, nullable=False, index=True),
+    Column("fecha_entrega", TIMESTAMP),  # promised delivery date and time (UTC)
     *_timestamps(),
     CheckConstraint("estado IN (0, 1, 2)", name="estado_valid"),
+    CheckConstraint("garantia_dias >= 0", name="garantia_dias_non_negative"),
     CheckConstraint("presupuesto >= 0 AND anticipo >= 0", name="amounts_non_negative"),
 )
 

@@ -14,7 +14,6 @@ export interface CatalogOption {
 export interface WorkOrderCatalogs {
   motivos_ingreso: CatalogOption[];
   tipos_display: CatalogOption[];
-  tipos_garantia: CatalogOption[];
   tipos_bloqueo: CatalogOption[];
   estados: WorkOrderStatusOption[];
 }
@@ -28,6 +27,7 @@ export interface WorkOrderClient {
   apellido: string;
   identificacion: string | null;
   celular: string | null;
+  email?: string | null;
 }
 
 export interface WorkOrderListItem {
@@ -47,14 +47,17 @@ export interface WorkOrderListItem {
   motivo_ingreso: string;
   motivo_ingreso_label: string;
   tipo_display: string | null;
-  tipo_garantia: string;
-  tipo_garantia_label: string;
+  /** Tiempo de garantía in days (0 = sin garantía). */
+  garantia_dias: number;
   color: string | null;
   /** Costo de reparación */
   presupuesto: Money;
   anticipo: Money;
   saldo: Money;
+  /** Reception date (today when the order is registered). */
   fecha: string;
+  /** Promised delivery date and time (ISO 8601). */
+  fecha_entrega: string | null;
 }
 
 export interface WorkOrderSparePart {
@@ -80,6 +83,8 @@ export interface WorkOrder extends WorkOrderListItem, Timestamps {
   /** User who registered the order. */
   user: UserRef;
   observacion: string | null;
+  /** Technical model code of the phone, e.g. SM-A105M. */
+  modelo_tecnico: string | null;
   bloqueo_tipo: LockType;
   /** Pattern as dots 1..9 ("1-5-9-6") or numeric PIN. */
   bloqueo_valor: string | null;
@@ -90,24 +95,29 @@ export interface WorkOrder extends WorkOrderListItem, Timestamps {
   spare_parts_total: Money;
 }
 
-/** `user_id` comes from the session and `saldo` is computed by the backend. */
+/**
+ * `user_id` and the technician are the logged user, the date is today and `saldo`
+ * is computed by the backend.
+ */
 export interface WorkOrderRequest {
   /** Found by cédula / RUC; registered as a client when it does not exist. */
-  cliente: { identificacion: string; nombre: string; apellido: string; celular: string | null };
-  tecnico_id: Id | null;
+  /** The email is saved in the client only when it has none. */
+  cliente: { identificacion: string; nombre: string; apellido: string; celular: string | null; email: string | null };
   marca_id: Id;
   modelo_id: Id;
   color: string | null;
+  modelo_tecnico: string | null;
   motivo_ingreso: string;
   tipo_display: string | null;
-  tipo_garantia: string;
+  garantia_dias: number;
   bloqueo_tipo: LockType;
   bloqueo_valor: string | null;
   observacion: string | null;
   estado: number;
   presupuesto: Money;
   anticipo: Money;
-  fecha: string | null;
+  /** ISO 8601 */
+  fecha_entrega: string | null;
 }
 
 /** Public status page (QR): no client data and no unlock code. */
@@ -122,9 +132,11 @@ export interface PublicWorkOrder {
   motivo_ingreso: string;
   motivo_ingreso_label: string;
   tipo_display: string | null;
+  garantia_dias: number;
   presupuesto: Money;
   anticipo: Money;
   saldo: Money;
+  fecha_entrega: string | null;
   updated_at: string;
 }
 

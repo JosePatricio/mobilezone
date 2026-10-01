@@ -13,9 +13,9 @@ from app.domain.value_objects.work_orders import (
     DisplayType,
     EntryReason,
     LockType,
-    WarrantyType,
     validate_entry,
     validate_lock,
+    validate_warranty_days,
 )
 
 MAX_WORK_ORDER_PHOTOS = 3
@@ -95,14 +95,16 @@ class WorkOrder:
     modelo_id: int
     motivo_ingreso: EntryReason = EntryReason.OTROS
     tipo_display: DisplayType | None = None  # only for CAMBIO_DISPLAY
-    tipo_garantia: WarrantyType = WarrantyType.SIN_GARANTIA
+    garantia_dias: int = 0  # tiempo de garantía in days (0 = sin garantía)
     bloqueo_tipo: LockType = LockType.NINGUNO
     bloqueo_valor: str | None = None
-    fecha: date | None = None
-    tecnico_id: int | None = None  # responsible technician (users table, role TECNICO)
+    fecha: date | None = None  # reception date (local day of the shop)
+    fecha_entrega: datetime | None = None  # promised delivery date and time
+    tecnico_id: int | None = None  # technician: the user who registered the order
     observacion: str | None = None
     estado: int = WorkOrderStatus.ESTADO_0
     color: str | None = None
+    modelo_tecnico: str | None = None  # technical model code of the phone, e.g. SM-A105M
     presupuesto: Decimal = ZERO
     anticipo: Decimal = ZERO
     saldo: Decimal = ZERO
@@ -125,8 +127,9 @@ class WorkOrder:
         self.estado = int(WorkOrderStatus.parse(self.estado))
         self.observacion = optional_text(self.observacion)
         self.color = optional_text(self.color)
+        self.modelo_tecnico = optional_text(self.modelo_tecnico)
         self.set_entry(self.motivo_ingreso, self.tipo_display)  # type: ignore[arg-type]
-        self.tipo_garantia = WarrantyType(self.tipo_garantia)
+        self.garantia_dias = validate_warranty_days(self.garantia_dias)
         self.set_lock(self.bloqueo_tipo, self.bloqueo_valor)
         if self.fecha is None:
             self.fecha = utcnow().date()

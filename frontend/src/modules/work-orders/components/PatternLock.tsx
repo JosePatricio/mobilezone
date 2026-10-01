@@ -74,7 +74,10 @@ export function PatternLock({ value, onChange, readOnly = false, label = 'Patró
     svgRef.current?.setPointerCapture?.(e.pointerId);
     const p = toLocal(e);
     const dot = dotAt(p);
-    setDrawing(dot ? [dot] : []);
+    // The pattern drawn so far stays visible and is continued (dot by dot or in one stroke);
+    // it is only cleared with the "Borrar" button.
+    const base = parsePattern(value);
+    setDrawing(dot ? addDot(base, dot) : base);
     setPointer(p);
   };
   const onPointerMove = (e: PointerEvent<SVGSVGElement>) => {
@@ -86,7 +89,7 @@ export function PatternLock({ value, onChange, readOnly = false, label = 'Patró
   };
   const finish = () => {
     if (drawing === null) return;
-    if (drawing.length > 0) onChange?.(formatPattern(drawing));
+    if (drawing.length > 0 && formatPattern(drawing) !== (value ?? '')) onChange?.(formatPattern(drawing));
     setDrawing(null);
     setPointer(null);
   };
@@ -136,7 +139,7 @@ export function PatternLock({ value, onChange, readOnly = false, label = 'Patró
                 aria-label={readOnly ? undefined : `Punto ${dot}`}
                 onKeyDown={onDotKey(dot)}
               />
-              {readOnly && order >= 0 && (
+              {order >= 0 && (
                 <text className="pattern-order" x={c.x} y={c.y} dy="0.35em" textAnchor="middle">
                   {order + 1}
                 </text>
