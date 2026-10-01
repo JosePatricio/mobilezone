@@ -73,6 +73,7 @@ vi.mock('../services/saleApi', () => ({
       identificacion === customer.identificacion
         ? Promise.resolve(customer)
         : Promise.reject(new ApiError(404, 'CLIENT_NOT_FOUND', 'No se encontró ningún cliente con esa cédula / RUC.')),
+    receipt: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })),
     createCustomer: (body: ClientRequest) => {
       createdCustomers.push(body);
       return Promise.resolve({ ...customer, ...body, id: 8 });
@@ -161,7 +162,14 @@ describe('NewSalePage', () => {
 
     expect(await screen.findByText(/Stock insuficiente para el producto 'Pantalla B'/)).toBeInTheDocument();
     expect(saleCalls).toEqual([
-      { branch_id: 1, items: [{ inventory_id: 2, cantidad: 1 }], factura: false, cliente_id: null },
+      {
+        branch_id: 1,
+        items: [{ inventory_id: 2, cantidad: 1 }],
+        factura: false,
+        cliente_id: null,
+        metodo_pago: 'EFECTIVO',
+        monto_recibido: null,
+      },
     ]);
     expect(screen.getByText('Supera el stock disponible')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Confirmar venta' })).toBeDisabled();
@@ -188,7 +196,16 @@ describe('NewSalePage', () => {
 
     await searchProduct('pan-a');
     await confirmSale();
-    expect(saleCalls).toEqual([{ branch_id: 1, items: [{ inventory_id: 1, cantidad: 1 }], factura: true, cliente_id: 7 }]);
+    expect(saleCalls).toEqual([
+      {
+        branch_id: 1,
+        items: [{ inventory_id: 1, cantidad: 1 }],
+        factura: true,
+        cliente_id: 7,
+        metodo_pago: 'EFECTIVO',
+        monto_recibido: null,
+      },
+    ]);
 
     await userEvent.click(screen.getByRole('button', { name: 'Quitar cliente (Consumidor final)' }));
     expect(screen.getByLabelText('Cliente')).toHaveValue('Consumidor final');
@@ -237,5 +254,49 @@ describe('NewSalePage', () => {
       auth: fakeAuth({ permissionCodes: ['sales.create'], user: { ...seller.user!, branches: [] } }),
     });
     expect(screen.getByText('Sin sucursal asignada')).toBeInTheDocument();
+  });
+
+  it('card payment adds 6 % and cash shows the change', async () => {
+    renderPage();
+    await searchProduct('pan-b'); // 25.00
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar venta' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Confirmar venta' });
+    expect(within(dialog).getByTestId('payment-total')).toHaveTextContent('25,00');
+
+    await userEvent.click(within(dialog).getByRole('radio', { name: /Tarjeta de crédito/ }));
+    expect(within(dialog).getByTestId('payment-total')).toHaveTextContent('26,50');
+    expect(within(dialog).getByText(/recargo tarjeta 6 %/)).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Efectivo' }));
+    const recibido = within(dialog).getByLabelText('Monto recibido');
+    await userEvent.type(recibido, '20');
+    expect(within(dialog).getByText('El monto recibido no cubre el total')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Confirmar venta' })).toBeDisabled();
+    await userEvent.clear(recibido);
+    await userEvent.type(recibido, '30');
+    expect(within(dialog).getByTestId('payment-change')).toHaveTextContent('5,00');
+    // The previous summary is now a small footer.
+    expect(within(dialog).getByText(/Consumidor final en la sucursal Matriz/)).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirmar venta' }));
+    expect(saleCalls[0]).toMatchObject({ metodo_pago: 'EFECTIVO', monto_recibido: '30.00' });
+  });
+
+  it('downloads the PDF receipt after confirming the sale', async () => {
+    const createObjectURL = vi.fn(() => 'blob:receipt');
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() });
+    confirmImpl = () => Promise.resolve({ id: 42 });
+    renderPage();
+    await searchProduct('pan-a');
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar venta' }));
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Transferencia' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirmar venta' }));
+
+    await vi.waitFor(() => expect(click).toHaveBeenCalled());
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(saleCalls[0]).toMatchObject({ metodo_pago: 'TRANSFERENCIA', monto_recibido: null });
+    click.mockRestore();
   });
 });

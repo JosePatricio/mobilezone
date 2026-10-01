@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Generic, TypeVar
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.domain import repositories as ports
@@ -83,6 +83,20 @@ class SqlAlchemyUserRepository(SqlAlchemyRepository[User], ports.UserRepository)
 
     def get_by_identificacion(self, identificacion: str) -> User | None:
         return self.session.scalars(select(User).where(users_table.c.identificacion == identificacion)).first()
+
+    def find_same_person(self, identificacion: str) -> list[User]:
+        c = users_table.c
+        conditions = [c.identificacion == identificacion]
+        if len(identificacion) == 10:  # cédula → RUC of the same natural person
+            conditions.append(
+                and_(
+                    func.length(c.identificacion) == 13,
+                    func.substr(c.identificacion, 1, 10) == identificacion,
+                )
+            )
+        elif len(identificacion) == 13 and identificacion[2] in "012345":  # natural-person RUC → cédula
+            conditions.append(c.identificacion == identificacion[:10])
+        return list(self.session.scalars(select(User).where(or_(*conditions))))
 
     def list(self, page, *, search=None, roles: list[str] | None = None, estado=None, rol_id=None):
         c = users_table.c

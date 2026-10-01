@@ -10,7 +10,9 @@ export const inventoryApi = {
   list: (params: QueryParams = {}) =>
     http.get<Page<InventoryItem>>('/inventory', { params: cleanParams(params) }).then((r) => r.data),
   get: (id: Id) => http.get<InventoryItem>(`/inventory/${id}`).then((r) => r.data),
-  create: (body: InventoryRequest) => http.post<InventoryItem>('/inventory', body).then((r) => r.data),
+  /** Registers a product in a branch; if it is already there the units are added (`created` = false). */
+  create: (body: InventoryRequest) =>
+    http.post<InventoryItem>('/inventory', body).then((r) => ({ item: r.data, created: r.status === 201 })),
   adjustStock: (id: Id, body: StockAdjustmentRequest) =>
     http.patch<InventoryItem>(`/inventory/${id}/stock`, body).then((r) => r.data),
   movements: (id: Id, page = 1) =>

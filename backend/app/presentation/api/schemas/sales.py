@@ -5,8 +5,8 @@ from decimal import Decimal
 
 from pydantic import Field
 
-from app.domain.value_objects.enums import SaleStatus
-from app.presentation.api.schemas.common import RequestSchema, Schema
+from app.domain.value_objects.enums import PaymentMethod, SaleStatus
+from app.presentation.api.schemas.common import Money, RequestSchema, Schema
 from app.presentation.api.schemas.products import ProductSummary
 from app.presentation.api.schemas.users import BranchRef, ClientSummary, UserSummary
 
@@ -16,11 +16,20 @@ class SaleItemRequest(RequestSchema):
     cantidad: int = Field(gt=0)
 
 
-class CreateSaleRequest(RequestSchema):
-    branch_id: int = Field(description="Sucursal de la venta (asignada al vendedor)")
+class SaleDataRequest(RequestSchema):
     items: list[SaleItemRequest] = Field(min_length=1)
+    metodo_pago: PaymentMethod = Field(description="EFECTIVO, TRANSFERENCIA o TARJETA (+6 %)")
+    monto_recibido: Money | None = Field(default=None, description="Solo efectivo: monto recibido para calcular el cambio")
     factura: bool = Field(default=False, description="true = factura, false = comprobante de venta")
     cliente_id: int | None = Field(default=None, description="null = consumidor final")
+
+
+class CreateSaleRequest(SaleDataRequest):
+    branch_id: int = Field(description="Sucursal de la venta (asignada al vendedor)")
+
+
+class UpdateSaleRequest(SaleDataRequest):
+    """Complete new list of lines (returns reduce or remove lines). The branch cannot change."""
 
 
 class SaleDetailResponse(Schema):
@@ -43,6 +52,11 @@ class SaleResponse(Schema):
     total: Decimal
     estado: SaleStatus
     factura: bool
+    metodo_pago: PaymentMethod | None = Field(description="null en ventas anteriores al registro de pagos")
+    recargo: Decimal
+    total_pagar: Decimal
+    monto_recibido: Decimal | None
+    cambio: Decimal | None
     cliente_id: int | None
     cliente: ClientSummary | None = Field(description="null = consumidor final")
     details: list[SaleDetailResponse]

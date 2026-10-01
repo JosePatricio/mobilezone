@@ -7,6 +7,7 @@ from fastapi import Depends, Query, Request, UploadFile
 from fastapi.security import OAuth2PasswordBearer
 
 from app.application.services.files import MAX_IMAGE_BYTES, FileStorage
+from app.application.services.receipts import ReceiptRenderer
 from app.application.services.security import PasswordHasher, TokenService
 from app.application.use_cases.auth import GetAuthenticatedUserUseCase
 from app.application.use_cases.base import require_permission
@@ -40,6 +41,10 @@ def get_storage(request: Request) -> FileStorage:
     return request.app.state.file_storage
 
 
+def get_receipt_renderer(request: Request) -> ReceiptRenderer:
+    return request.app.state.receipt_renderer
+
+
 def read_upload(file: UploadFile) -> bytes:
     """Reads an uploaded file with a hard size cap (the use case validates the content).
 
@@ -53,6 +58,7 @@ def read_upload(file: UploadFile) -> bytes:
 
 UowDep = Annotated[UnitOfWork, Depends(get_uow)]
 StorageDep = Annotated[FileStorage, Depends(get_storage)]
+ReceiptRendererDep = Annotated[ReceiptRenderer, Depends(get_receipt_renderer)]
 HasherDep = Annotated[PasswordHasher, Depends(get_password_hasher)]
 TokensDep = Annotated[TokenService, Depends(get_token_service)]
 
@@ -76,6 +82,17 @@ def require_permissions(*codes: str) -> Callable[..., User]:
     def dependency(user: CurrentUser) -> User:
         for code in codes:
             require_permission(user, code)
+        return user
+
+    return dependency
+
+
+def require_any_permission(*codes: str) -> Callable[..., User]:
+    """The user must hold at least one of the listed permissions."""
+
+    def dependency(user: CurrentUser) -> User:
+        if not any(user.has_permission(code) for code in codes):
+            require_permission(user, codes[0])  # raises FORBIDDEN
         return user
 
     return dependency

@@ -80,7 +80,7 @@ class TestConfirmSale:
         with pytest.raises(PermissionDeniedError) as exc:
             ConfirmSaleUseCase(uow).execute(sale([SaleItemData(inv.id, 1)], other.id), seller)
         assert exc.value.code == "BRANCH_NOT_ASSIGNED"
-        admin = factory.user(SystemRole.ADMIN)  # sales.any_branch
+        admin = factory.user(SystemRole.ADMIN)  # branches.any
         ConfirmSaleUseCase(uow).execute(sale([SaleItemData(inv.id, 1)], other.id), admin)
 
     def test_insufficient_stock_rolls_back_everything(self, uow, factory):

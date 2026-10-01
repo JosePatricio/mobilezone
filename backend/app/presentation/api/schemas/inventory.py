@@ -46,7 +46,7 @@ class InventoryProduct(_WithImage):
 class InventoryRequest(RequestSchema):
     product_id: int
     branch_id: int
-    stock: int = Field(default=0, ge=0, description="Stock inicial en la sucursal")
+    stock: int = Field(default=0, ge=0, description="Unidades a ingresar (se suman si el producto ya está en la sucursal)")
 
 
 class InventoryResponse(Schema):

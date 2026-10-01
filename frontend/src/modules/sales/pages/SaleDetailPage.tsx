@@ -1,57 +1,38 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { usePermission } from '@/modules/auth/components/Can';
-import { PRODUCTS_KEY } from '@/modules/products/services/productApi';
-import {
-  Button,
-  Card,
-  ErrorState,
-  Loading,
-  PageHeader,
-  ProductThumb,
-  StatusBadge,
-  useConfirm,
-  useToast,
-} from '@/shared/components';
-import { getErrorMessage } from '@/shared/services/apiError';
+import { Button, Card, ErrorState, Loading, PageHeader, ProductThumb, StatusBadge, useToast } from '@/shared/components';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatDateTime, fullName } from '@/shared/utils/format';
 import { formatMoney } from '@/shared/utils/money';
+import { useDeleteSale } from '../hooks/useDeleteSale';
+import { downloadReceipt } from '../receipt';
 import { SALES_KEY, saleApi } from '../services/saleApi';
-import { customerLabel, documentLabel } from '../types';
+import { PAYMENT_METHOD_LABELS, customerLabel, documentLabel } from '../types';
 
 export function SaleDetailPage() {
   const id = Number(useParams().id);
-  const canCancel = usePermission(P.SALES_CANCEL);
-  const confirm = useConfirm();
+  const canUpdate = usePermission(P.SALES_UPDATE);
+  const canDelete = usePermission(P.SALES_CANCEL);
   const toast = useToast();
-  const queryClient = useQueryClient();
+  const { remove, isPending } = useDeleteSale();
+  const [downloading, setDownloading] = useState(false);
   const query = useQuery({ queryKey: [SALES_KEY, 'detail', id], queryFn: () => saleApi.get(id) });
-  const cancel = useMutation({
-    mutationFn: () => saleApi.cancel(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [SALES_KEY] });
-      queryClient.invalidateQueries({ queryKey: [PRODUCTS_KEY] });
-    },
-  });
 
   if (query.isLoading) return <Loading />;
   if (query.isError || !query.data) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
   const sale = query.data;
+  const editable = sale.estado === 'CONFIRMADA';
 
-  const onCancel = async () => {
-    const ok = await confirm({
-      title: 'Anular venta',
-      message: `¿Está seguro de que desea anular la venta #${sale.id}? El stock de los productos será restituido.`,
-      confirmLabel: 'Anular venta',
-      danger: true,
-    });
-    if (!ok) return;
+  const onReceipt = async () => {
+    setDownloading(true);
     try {
-      await cancel.mutateAsync();
-      toast.success('Venta anulada.');
-    } catch (err) {
-      toast.error(getErrorMessage(err));
+      await downloadReceipt(sale.id);
+    } catch {
+      toast.error('No se pudo generar el comprobante PDF.');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -64,9 +45,17 @@ export function SaleDetailPage() {
             <Link to="/sales" className="btn btn-secondary btn-md">
               Volver
             </Link>
-            {canCancel && sale.estado === 'CONFIRMADA' && (
-              <Button variant="danger" onClick={onCancel} loading={cancel.isPending}>
-                Anular venta
+            <Button variant="secondary" onClick={onReceipt} loading={downloading}>
+              Comprobante PDF
+            </Button>
+            {canUpdate && editable && (
+              <Link to={`/sales/${sale.id}/edit`} className="btn btn-primary btn-md">
+                Editar
+              </Link>
+            )}
+            {canDelete && editable && (
+              <Button variant="danger" onClick={() => void remove(sale)} loading={isPending}>
+                Eliminar
               </Button>
             )}
           </>
@@ -91,6 +80,8 @@ export function SaleDetailPage() {
               tone={sale.estado === 'CONFIRMADA' ? 'success' : 'danger'}
             />
           </dd>
+          <dt>Pago</dt>
+          <dd>{sale.metodo_pago ? PAYMENT_METHOD_LABELS[sale.metodo_pago] : 'No registrado'}</dd>
         </dl>
       </Card>
       <Card title="Productos">
@@ -131,12 +122,36 @@ export function SaleDetailPage() {
             <tfoot>
               <tr>
                 <td colSpan={3} className="text-right">
-                  <strong>TOTAL</strong>
+                  Subtotal
+                </td>
+                <td className="text-right">{formatMoney(sale.total)}</td>
+              </tr>
+              {Number(sale.recargo) > 0 && (
+                <tr>
+                  <td colSpan={3} className="text-right">
+                    Recargo tarjeta de crédito (6 %)
+                  </td>
+                  <td className="text-right">{formatMoney(sale.recargo)}</td>
+                </tr>
+              )}
+              <tr>
+                <td colSpan={3} className="text-right">
+                  <strong>TOTAL A PAGAR</strong>
                 </td>
                 <td className="text-right total-cell">
-                  <strong>{formatMoney(sale.total)}</strong>
+                  <strong>{formatMoney(sale.total_pagar)}</strong>
                 </td>
               </tr>
+              {sale.monto_recibido !== null && (
+                <tr>
+                  <td colSpan={3} className="text-right">
+                    Recibido / cambio
+                  </td>
+                  <td className="text-right">
+                    {formatMoney(sale.monto_recibido)} / {formatMoney(sale.cambio)}
+                  </td>
+                </tr>
+              )}
             </tfoot>
           </table>
         </div>

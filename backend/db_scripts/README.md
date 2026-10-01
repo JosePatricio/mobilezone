@@ -11,6 +11,7 @@ constraints), InnoDB and `utf8mb4`. The scripts avoid MySQL-only syntax so they 
 | `99_drop_tables.sql` | Drops every table (destructive) |
 | `upgrades/002_productos_usuarios_ventas.sql` | Upgrades a version 1 database (run once, after a backup) |
 | `upgrades/003_sucursales_inventario.sql` | Upgrades a version 2 database: branches, inventory per branch, user branches, provincia (run once) |
+| `upgrades/004_pagos_permisos.sql` | Upgrades a version 3 database: sale payments (method, card surcharge, change), `branches.any`, `sales.update` (run once) |
 
 ## Option A — Alembic + Python seed (recommended)
 
@@ -35,7 +36,8 @@ The SQL seed creates `admin@example.com` / `Admin12345`: change that password af
 
 `02_create_tables.sql` always holds the **current** full schema (new installations). Databases created with an older
 version are upgraded with the scripts in `upgrades/`, in order (Alembic runs them too: revision 0002 executes
-`upgrades/002_productos_usuarios_ventas.sql`, revision 0003 `upgrades/003_sucursales_inventario.sql`; revision 0001
+`upgrades/002_productos_usuarios_ventas.sql`, revision 0003 `upgrades/003_sucursales_inventario.sql`, revision 0004
+`upgrades/004_pagos_permisos.sql`; revision 0001
 runs the frozen copy in `migrations/sql/`).
 
 Upgrade 002: role replaces `users.tipo_usuario` (USUARIO → VENDEDOR, new CLIENTE role), new user fields

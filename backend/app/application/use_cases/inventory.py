@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from app.application.dto import BranchData, InventoryData, StockAdjustmentData
 from app.application.use_cases.base import CrudUseCases
+from app.application.use_cases.branch_access import ensure_branch_access
 from app.domain.entities import Branch, Inventory, StockMovement, User
-from app.domain.exceptions import ConflictError, NotFoundError, ValidationError
+from app.domain.exceptions import ConflictError, NotFoundError
 from app.domain.repositories import Repository
 from app.domain.value_objects.enums import StockMovementType
 from app.domain.value_objects.pagination import Page, PageRequest
@@ -69,36 +70,31 @@ class InventoryUseCases(CrudUseCases[Inventory]):
             active_products=active_products,
         )
 
-    def create(self, data: InventoryData, actor: User) -> Inventory:
-        """Registers a product in a branch, optionally with initial stock (audited as an adjustment)."""
+    def create(self, data: InventoryData, actor: User) -> tuple[Inventory, bool]:
+        """Registers a product in a branch with its stock. When the product is already in
+        that branch the units are **added** to its stock. Returns ``(inventory, created)``.
+
+        Users operate only in their assigned branches (unless ``branches.any``).
+        """
         with self.uow.transaction():
-            if self.uow.products.get(data.product_id) is None:
+            product = self.uow.products.get(data.product_id)
+            if product is None:
                 raise NotFoundError("Producto no encontrado.", code="PRODUCT_NOT_FOUND")
-            branch = self.uow.branches.get(data.branch_id)
-            if branch is None:
-                raise NotFoundError("Sucursal no encontrada.", code="BRANCH_NOT_FOUND")
-            if not branch.estado:
-                raise ValidationError("La sucursal seleccionada está inactiva.", code="BRANCH_INACTIVE")
-            if self.uow.inventory.get_by_product_and_branch(data.product_id, data.branch_id) is not None:
-                raise ConflictError(
-                    "El producto ya está registrado en esa sucursal.", code="INVENTORY_ALREADY_EXISTS"
-                )
-            inventory = Inventory(product_id=data.product_id, branch_id=data.branch_id, stock=data.stock)
-            self.uow.inventory.add(inventory)
-            if inventory.stock > 0:
+            ensure_branch_access(self.uow, actor, data.branch_id)
+            inventory = self.uow.inventory.get_by_product_and_branch(data.product_id, data.branch_id)
+            created = inventory is None
+            if created:
+                inventory = Inventory(product_id=data.product_id, branch_id=data.branch_id, stock=0)
+                self.uow.inventory.add(inventory)
                 self.uow.flush()
-                self.uow.stock_movements.add(
-                    StockMovement(
-                        product_id=inventory.product_id,
-                        inventory_id=inventory.id,
-                        tipo=StockMovementType.AJUSTE,
-                        cantidad=inventory.stock,
-                        stock_resultante=inventory.stock,
-                        user_id=actor.id,
-                        motivo="Stock inicial",
-                    )
+            else:
+                inventory = self.uow.inventory.get_for_update(inventory.id)  # type: ignore[arg-type,union-attr]
+            if data.stock > 0:
+                inventory.increase_stock(data.stock)  # type: ignore[union-attr]
+                self._movement(
+                    inventory, data.stock, actor, "Stock inicial" if created else "Ingreso de stock"  # type: ignore[arg-type]
                 )
-        return inventory
+        return inventory, created  # type: ignore[return-value]
 
     def adjust_stock(self, inventory_id: int, data: StockAdjustmentData, actor: User) -> Inventory:
         """Manual entry (+) or exit (-) of units; stock can never become negative."""
@@ -106,26 +102,32 @@ class InventoryUseCases(CrudUseCases[Inventory]):
             inventory = self.uow.inventory.get_for_update(inventory_id)
             if inventory is None:
                 raise NotFoundError("Inventario no encontrado.", code=self.not_found_code)
+            ensure_branch_access(self.uow, actor, inventory.branch_id)
             inventory.adjust_stock(data.cantidad)
-            self.uow.stock_movements.add(
-                StockMovement(
-                    product_id=inventory.product_id,
-                    inventory_id=inventory.id,
-                    tipo=StockMovementType.AJUSTE,
-                    cantidad=data.cantidad,
-                    stock_resultante=inventory.stock,
-                    user_id=actor.id,
-                    motivo=(data.motivo or "").strip() or None,
-                )
-            )
+            self._movement(inventory, data.cantidad, actor, (data.motivo or "").strip() or None)
         return inventory
 
-    def delete(self, entity_id: int) -> None:
-        if self.get(entity_id).stock > 0:
+    def _movement(self, inventory: Inventory, cantidad: int, actor: User, motivo: str | None) -> None:
+        self.uow.stock_movements.add(
+            StockMovement(
+                product_id=inventory.product_id,
+                inventory_id=inventory.id,
+                tipo=StockMovementType.AJUSTE,
+                cantidad=cantidad,
+                stock_resultante=inventory.stock,
+                user_id=actor.id,
+                motivo=motivo,
+            )
+        )
+
+    def remove(self, inventory_id: int, actor: User) -> None:
+        inventory = self.get(inventory_id)
+        ensure_branch_access(self.uow, actor, inventory.branch_id)
+        if inventory.stock > 0:
             raise ConflictError(
                 "Solo se puede quitar un producto de la sucursal cuando su stock es 0.", code="INVENTORY_HAS_STOCK"
             )
-        super().delete(entity_id)
+        self.delete(inventory_id)
 
     def movements(self, inventory_id: int, page: PageRequest) -> Page[StockMovement]:
         self.get(inventory_id)

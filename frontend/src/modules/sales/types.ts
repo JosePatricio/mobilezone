@@ -21,10 +21,18 @@ export interface SaleCustomer {
   celular: string | null;
 }
 
+export type PaymentMethod = 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  TRANSFERENCIA: 'Transferencia',
+  EFECTIVO: 'Efectivo',
+  TARJETA: 'Tarjeta de crédito',
+};
+
 export interface Sale extends Timestamps {
   id: Id;
   user_id: Id;
-  user: UserRef;
+  user: UserRef & { foto_url: string | null };
   branch_id: Id;
   branch: NamedRef;
   fecha: string;
@@ -32,6 +40,14 @@ export interface Sale extends Timestamps {
   estado: SaleStatus;
   /** true = factura, false = comprobante de venta */
   factura: boolean;
+  /** null only for sales registered before payments were recorded */
+  metodo_pago: PaymentMethod | null;
+  /** credit card surcharge (6 %) */
+  recargo: Money;
+  /** total + recargo */
+  total_pagar: Money;
+  monto_recibido: Money | null;
+  cambio: Money | null;
   cliente_id: Id | null;
   /** null = consumidor final */
   cliente: SaleCustomer | null;
@@ -43,12 +59,18 @@ export interface SaleItemRequest {
   cantidad: number;
 }
 
-export interface CreateSaleRequest {
-  branch_id: Id;
+export interface UpdateSaleRequest {
   items: SaleItemRequest[];
+  metodo_pago: PaymentMethod;
+  /** cash only */
+  monto_recibido: Money | null;
   factura: boolean;
   /** null = consumidor final */
   cliente_id: Id | null;
+}
+
+export interface CreateSaleRequest extends UpdateSaleRequest {
+  branch_id: Id;
 }
 
 export const CONSUMIDOR_FINAL = 'Consumidor final';

@@ -30,12 +30,13 @@ INSERT INTO permissions (codigo, descripcion) VALUES
     ('branches.create', 'Crear sucursales'),
     ('branches.update', 'Editar y activar/desactivar sucursales'),
     ('branches.delete', 'Eliminar sucursales'),
+    ('branches.any', 'Operar en cualquier sucursal: vender y ajustar stock sin estar asignado'),
     ('inventory.view', 'Ver inventario (stock por sucursal)'),
     ('inventory.manage', 'Registrar productos en sucursales y ajustar stock'),
     ('sales.view', 'Ver ventas'),
     ('sales.create', 'Registrar ventas'),
-    ('sales.cancel', 'Anular ventas'),
-    ('sales.any_branch', 'Vender desde cualquier sucursal (sin estar asignado)'),
+    ('sales.update', 'Modificar ventas (devoluciones y cambios de productos)'),
+    ('sales.cancel', 'Eliminar (anular) ventas'),
     ('clients.view', 'Ver clientes'),
     ('clients.create', 'Crear clientes'),
     ('clients.update', 'Editar clientes'),
@@ -73,8 +74,9 @@ SELECT r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.nombre = 'ADMIN'
 -- VENDEDOR
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p ON p.codigo IN (
-    'products.view', 'inventory.view', 'sales.view',
-    'sales.create'
+    'products.view', 'products.create', 'inventory.view',
+    'inventory.manage', 'sales.view', 'sales.create',
+    'sales.update'
 ) WHERE r.nombre = 'VENDEDOR';
 
 -- TECNICO

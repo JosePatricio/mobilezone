@@ -217,3 +217,51 @@ def test_upgrade_003_moves_stock_to_branches(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_004_adds_payments_and_renames_permission(mysql_engine: Engine):
+    """v3 database (0001 + 002 + 003) with a sale → upgrade 004."""
+    from pathlib import Path
+
+    from app.infrastructure.database.sql_scripts import UPGRADE_002, UPGRADE_003, UPGRADE_004
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, initial)
+            run_script(conn, UPGRADE_002)
+            run_script(conn, UPGRADE_003)
+            conn.exec_driver_sql("INSERT INTO permissions (codigo) VALUES ('products.view')")  # 003 added sales.any_branch
+            conn.exec_driver_sql(
+                "INSERT IGNORE INTO role_permissions SELECT r.id, p.id FROM roles r CROSS JOIN permissions p "
+                "WHERE r.nombre IN ('ADMIN', 'VENDEDOR')"
+            )
+            conn.exec_driver_sql(
+                "INSERT INTO users (nombre, apellido, email, password, rol_id) VALUES "
+                "('V','V','v@x.com','h',(SELECT id FROM roles WHERE nombre='VENDEDOR'))"
+            )
+            conn.exec_driver_sql(
+                "INSERT INTO sales (user_id, branch_id, total, estado) VALUES (1, (SELECT id FROM branches), 12.5, 'CONFIRMADA')"
+            )
+
+        with mysql_engine.begin() as conn:
+            run_script(conn, UPGRADE_004)
+
+        with mysql_engine.connect() as conn:
+            q = conn.exec_driver_sql
+            row = q("SELECT metodo_pago, recargo, total_pagar, monto_recibido, cambio FROM sales").one()
+            assert row[0] is None and float(row[1]) == 0 and float(row[2]) == 12.5 and row[3] is None and row[4] is None
+            assert q("SELECT COUNT(*) FROM permissions WHERE codigo = 'sales.any_branch'").scalar() == 0
+            assert q("SELECT COUNT(*) FROM permissions WHERE codigo = 'branches.any'").scalar() == 1
+            vendedor = set(
+                q(
+                    "SELECT p.codigo FROM role_permissions rp JOIN roles r ON r.id = rp.role_id "
+                    "JOIN permissions p ON p.id = rp.permission_id WHERE r.nombre = 'VENDEDOR'"
+                ).scalars()
+            )
+            assert {"inventory.manage", "sales.update"} <= vendedor
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

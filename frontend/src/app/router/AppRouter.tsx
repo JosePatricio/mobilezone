@@ -12,6 +12,7 @@ import { PermissionsPage } from '@/modules/permissions/pages/PermissionsPage';
 import { ProductsPage } from '@/modules/products/pages/ProductsPage';
 import { RolePermissionsPage } from '@/modules/roles/pages/RolePermissionsPage';
 import { RolesPage } from '@/modules/roles/pages/RolesPage';
+import { EditSalePage } from '@/modules/sales/pages/EditSalePage';
 import { NewSalePage } from '@/modules/sales/pages/NewSalePage';
 import { SaleDetailPage } from '@/modules/sales/pages/SaleDetailPage';
 import { SalesPage } from '@/modules/sales/pages/SalesPage';
@@ -54,6 +55,9 @@ export function AppRouter() {
           </Route>
           <Route element={<PermissionRoute permission={P.SALES_VIEW} />}>
             <Route path="sales/:id" element={<SaleDetailPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission={P.SALES_UPDATE} />}>
+            <Route path="sales/:id/edit" element={<EditSalePage />} />
           </Route>
 
           <Route element={<PermissionRoute permission={P.WORK_ORDERS_VIEW} />}>

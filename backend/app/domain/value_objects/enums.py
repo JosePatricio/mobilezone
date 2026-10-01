@@ -30,7 +30,14 @@ class SaleStatus(str, Enum):
 class StockMovementType(str, Enum):
     VENTA = "VENTA"
     ANULACION_VENTA = "ANULACION_VENTA"
+    DEVOLUCION = "DEVOLUCION"  # units returned when a sale is modified
     AJUSTE = "AJUSTE"
+
+
+class PaymentMethod(str, Enum):
+    EFECTIVO = "EFECTIVO"
+    TRANSFERENCIA = "TRANSFERENCIA"
+    TARJETA = "TARJETA"  # credit card: adds a surcharge (CARD_SURCHARGE_RATE)
 
 
 class WorkOrderStatus(IntEnum):

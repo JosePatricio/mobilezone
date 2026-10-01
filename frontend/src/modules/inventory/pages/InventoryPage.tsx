@@ -33,6 +33,7 @@ import type { InventoryItem } from '../types';
 export function InventoryPage() {
   const { user } = useAuth();
   const canManage = usePermission(P.INVENTORY_MANAGE);
+  const anyBranch = usePermission(P.BRANCHES_ANY);
   const [params] = useSearchParams();
   const [search, setSearch] = useState(params.get('search') ?? '');
   const [branchId, setBranchId] = useState(params.get('branch_id') ?? '');
@@ -46,6 +47,8 @@ export function InventoryPage() {
   const [stockOf, setStockOf] = useState<InventoryItem | null>(null);
   const [adding, setAdding] = useState(false);
   const myBranches = new Set((user?.branches ?? []).map((b) => b.id));
+  /** Stock can be changed only in the user's branches (or any, with branches.any). */
+  const canOperate = (branch: number) => canManage && (anyBranch || myBranches.has(branch));
 
   const filters = { page, size: 20, search: debounced, branch_id: branchId, with_stock: onlyWithStock ? true : '' };
   const query = useQuery({
@@ -54,6 +57,7 @@ export function InventoryPage() {
     placeholderData: keepPreviousData,
   });
   const branchOptions = (branches.data ?? []).map((b) => ({ value: b.id, label: b.nombre }));
+  const operableBranchOptions = branchOptions.filter((b) => anyBranch || myBranches.has(Number(b.value)));
 
   const onRemove = async (item: InventoryItem) => {
     const ok = await confirm({
@@ -113,9 +117,9 @@ export function InventoryPage() {
       render: (r) => (
         <div className="row-actions">
           <Button size="sm" variant="ghost" onClick={() => setStockOf(r)}>
-            {canManage ? 'Ajustar stock' : 'Movimientos'}
+            {canOperate(r.branch_id) ? 'Ajustar stock' : 'Movimientos'}
           </Button>
-          {canManage && r.stock === 0 && (
+          {canOperate(r.branch_id) && r.stock === 0 && (
             <Button size="sm" variant="ghost" className="text-danger" onClick={() => onRemove(r)}>
               Quitar
             </Button>
@@ -129,7 +133,10 @@ export function InventoryPage() {
     <>
       <PageHeader
         title="Inventario"
-        actions={canManage && <Button onClick={() => setAdding(true)}>Agregar producto a sucursal</Button>}
+        actions={
+          canManage &&
+          operableBranchOptions.length > 0 && <Button onClick={() => setAdding(true)}>Agregar stock</Button>
+        }
       >
         Stock por sucursal. Busque por SKU o nombre para saber en qué sucursal está disponible un producto.
       </PageHeader>
@@ -169,17 +176,29 @@ export function InventoryPage() {
         emptyMessage={debounced ? `No se encontró "${debounced}" en ninguna sucursal.` : undefined}
       />
 
-      {stockOf && <InventoryStockModal item={stockOf} canAdjust={canManage} onClose={() => setStockOf(null)} />}
+      {stockOf && (
+        <InventoryStockModal item={stockOf} canAdjust={canOperate(stockOf.branch_id)} onClose={() => setStockOf(null)} />
+      )}
       {adding && (
         <AddInventoryModal
-          branchOptions={branchOptions}
-          defaultBranchId={branchId ? Number(branchId) : undefined}
+          branchOptions={operableBranchOptions}
+          defaultBranchId={
+            branchId && operableBranchOptions.some((b) => String(b.value) === branchId)
+              ? Number(branchId)
+              : operableBranchOptions.length === 1
+                ? Number(operableBranchOptions[0].value)
+                : undefined
+          }
           onClose={() => setAdding(false)}
           onSubmit={async (body) => {
-            await inventoryApi.create(body);
+            const { item, created } = await inventoryApi.create(body);
             await queryClient.invalidateQueries({ queryKey: [INVENTORY_KEY] });
             await queryClient.invalidateQueries({ queryKey: [PRODUCTS_KEY] });
-            toast.success('Producto agregado a la sucursal.');
+            toast.success(
+              created
+                ? `Producto agregado a ${item.branch.nombre} con stock ${item.stock}.`
+                : `Se sumaron ${body.stock} unidades. Stock en ${item.branch.nombre}: ${item.stock}.`,
+            );
             setAdding(false);
           }}
         />

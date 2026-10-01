@@ -599,3 +599,39 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .new-customer h3 { font-size: 1rem; margin-bottom: 4px; }
 .branch-checks { border: none; padding: 0; margin: 0 0 12px; }
 .branch-checks-grid { display: flex; flex-wrap: wrap; gap: 0 20px; }
+
+/* ---------------------------------------------------------------- payment / sales v4 */
+.seller-avatar { display: inline-flex; cursor: default; }
+.payment { display: flex; flex-direction: column; gap: 14px; }
+.payment-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--primary-soft);
+}
+.payment-total span { font-weight: 600; }
+.payment-total strong { font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+.payment-detail { margin: -6px 0 0; color: var(--muted); font-size: 0.85rem; }
+.payment-methods { border: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.payment-methods legend { margin-bottom: 6px; }
+.payment-method {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.payment-method.selected { border-color: var(--primary); background: var(--primary-soft); }
+.cash-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; align-items: start; }
+.cash-change { margin: 0; padding: 8px 0; font-size: 1.3rem; font-weight: 700; color: var(--success); }
+.payment-footer {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}

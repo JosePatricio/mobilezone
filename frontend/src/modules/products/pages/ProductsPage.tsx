@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePermission } from '@/modules/auth/components/Can';
-import { CATEGORIES_KEY, categoryApi } from '@/modules/categories/services/categoryApi';
 import {
   Button,
   DataList,
@@ -15,7 +14,7 @@ import {
   useToast,
   type Column,
 } from '@/shared/components';
-import { useCrudList, useCrudMutations, useOptions } from '@/shared/hooks/useCrud';
+import { useCrudList, useCrudMutations } from '@/shared/hooks/useCrud';
 import { useListParams } from '@/shared/hooks/useListParams';
 import { useStatusToggle } from '@/shared/hooks/useStatusToggle';
 import { getErrorMessage } from '@/shared/services/apiError';
@@ -32,13 +31,15 @@ export function ProductsPage() {
   const canUpdate = usePermission(P.PRODUCTS_UPDATE);
   const canDelete = usePermission(P.PRODUCTS_DELETE);
   const canViewInventory = usePermission(P.INVENTORY_VIEW);
-  // The seller (VENDEDOR) has no access to Categorías: the filter is hidden for them.
-  const canViewCategories = usePermission(P.CATEGORIES_VIEW);
   // Acquisition cost is only shown to users who manage products.
   const canSeeCost = canCreate || canUpdate;
   const list = useListParams<{ category_id: string; estado: string }>({ category_id: '', estado: '' });
   const query = useCrudList(PRODUCTS_KEY, productApi, list.params);
-  const categories = useOptions(CATEGORIES_KEY, categoryApi, {}, canViewCategories);
+  const categories = useQuery({
+    queryKey: [PRODUCTS_KEY, 'category-options'],
+    queryFn: productApi.categoryOptions,
+    staleTime: 60_000,
+  });
   const mutations = useCrudMutations(PRODUCTS_KEY, productApi);
   const toggleStatus = useStatusToggle(mutations.setStatus, 'el producto');
   const confirm = useConfirm();
@@ -153,15 +154,13 @@ export function ProductsPage() {
       />
       <div className="toolbar">
         <SearchInput value={list.search} onChange={list.setSearch} placeholder="Buscar por nombre o SKU…" />
-        {canViewCategories && (
-          <Select
-            aria-label="Filtrar por categoría"
-            value={list.filters.category_id}
-            onChange={(e) => list.setFilter('category_id', e.target.value)}
-            options={categoryOptions}
-            placeholder="Todas las categorías"
-          />
-        )}
+        <Select
+          aria-label="Filtrar por categoría"
+          value={list.filters.category_id}
+          onChange={(e) => list.setFilter('category_id', e.target.value)}
+          options={categoryOptions}
+          placeholder="Todas las categorías"
+        />
         <Select
           aria-label="Filtrar por estado"
           value={list.filters.estado}

@@ -12,6 +12,7 @@ SEED_DATA = "03_seed_data.sql"
 DROP_TABLES = "99_drop_tables.sql"
 UPGRADE_002 = "upgrades/002_productos_usuarios_ventas.sql"
 UPGRADE_003 = "upgrades/003_sucursales_inventario.sql"
+UPGRADE_004 = "upgrades/004_pagos_permisos.sql"
 
 
 def read_statements(script: str | Path) -> list[str]:
@@ -41,6 +42,9 @@ def run_script(connection: Connection, script: str | Path) -> None:
         if statement.strip().upper() in ("START TRANSACTION", "COMMIT"):
             continue  # the caller controls the transaction
         # exec_driver_sql: no bind-parameter parsing (bcrypt hashes contain ':' and '$').
+        # "format" drivers (PyMySQL) still interpolate '%', so literal percent signs are escaped.
+        if connection.dialect.paramstyle in ("format", "pyformat"):
+            statement = statement.replace("%", "%%")
         connection.exec_driver_sql(statement)
 
 

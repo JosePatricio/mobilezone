@@ -29,14 +29,15 @@ class Perm:
     BRANCHES_CREATE = "branches.create"
     BRANCHES_UPDATE = "branches.update"
     BRANCHES_DELETE = "branches.delete"
+    BRANCHES_ANY = "branches.any"
 
     INVENTORY_VIEW = "inventory.view"
     INVENTORY_MANAGE = "inventory.manage"
 
     SALES_VIEW = "sales.view"
     SALES_CREATE = "sales.create"
+    SALES_UPDATE = "sales.update"
     SALES_CANCEL = "sales.cancel"
-    SALES_ANY_BRANCH = "sales.any_branch"
 
     CLIENTS_VIEW = "clients.view"
     CLIENTS_CREATE = "clients.create"
@@ -84,12 +85,13 @@ PERMISSION_CATALOG: dict[str, str] = {
     Perm.BRANCHES_CREATE: "Crear sucursales",
     Perm.BRANCHES_UPDATE: "Editar y activar/desactivar sucursales",
     Perm.BRANCHES_DELETE: "Eliminar sucursales",
+    Perm.BRANCHES_ANY: "Operar en cualquier sucursal: vender y ajustar stock sin estar asignado",
     Perm.INVENTORY_VIEW: "Ver inventario (stock por sucursal)",
     Perm.INVENTORY_MANAGE: "Registrar productos en sucursales y ajustar stock",
     Perm.SALES_VIEW: "Ver ventas",
     Perm.SALES_CREATE: "Registrar ventas",
-    Perm.SALES_CANCEL: "Anular ventas",
-    Perm.SALES_ANY_BRANCH: "Vender desde cualquier sucursal (sin estar asignado)",
+    Perm.SALES_UPDATE: "Modificar ventas (devoluciones y cambios de productos)",
+    Perm.SALES_CANCEL: "Eliminar (anular) ventas",
     Perm.CLIENTS_VIEW: "Ver clientes",
     Perm.CLIENTS_CREATE: "Crear clientes",
     Perm.CLIENTS_UPDATE: "Editar clientes",
@@ -118,12 +120,16 @@ ALL_PERMISSIONS: list[str] = list(PERMISSION_CATALOG)
 # Default roles created by the seed script (system roles, see SystemRole).
 DEFAULT_ROLES: dict[str, list[str]] = {
     "ADMIN": ALL_PERMISSIONS,
-    # Seller: Ventas, Productos and Inventario (to find the branch that has a product).
+    # Seller: Ventas (sell and modify sales), Productos (view and add) and Inventario
+    # (find a product in other branches and load stock in their own branches).
     "VENDEDOR": [
         Perm.PRODUCTS_VIEW,
+        Perm.PRODUCTS_CREATE,
         Perm.INVENTORY_VIEW,
+        Perm.INVENTORY_MANAGE,
         Perm.SALES_VIEW,
         Perm.SALES_CREATE,
+        Perm.SALES_UPDATE,
     ],
     "TECNICO": [
         Perm.PRODUCTS_VIEW,

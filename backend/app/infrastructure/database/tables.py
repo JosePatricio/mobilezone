@@ -45,7 +45,7 @@ from app.domain.entities import (
     WorkOrderSparePart,
 )
 from app.domain.entities.base import utcnow
-from app.domain.value_objects.enums import SaleStatus, StockMovementType
+from app.domain.value_objects.enums import PaymentMethod, SaleStatus, StockMovementType
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -216,6 +216,11 @@ sales_table = Table(
     Column("estado", _str_enum(SaleStatus), nullable=False),
     Column("factura", Boolean, nullable=False, default=False, server_default=FALSE),  # 1 factura / 0 comprobante
     Column("cliente_id", ForeignKey("users.id"), index=True),  # NULL = consumidor final
+    Column("metodo_pago", _str_enum(PaymentMethod)),  # NULL only for sales before payments were recorded
+    Column("recargo", MONEY, nullable=False, default=0, server_default=FALSE),  # credit card surcharge
+    Column("total_pagar", MONEY, nullable=False, default=0, server_default=FALSE),  # total + recargo
+    Column("monto_recibido", MONEY),  # cash received
+    Column("cambio", MONEY),  # change given back (cash)
     *_timestamps(),
 )
 

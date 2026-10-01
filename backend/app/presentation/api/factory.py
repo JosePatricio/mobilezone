@@ -11,6 +11,7 @@ from app.infrastructure.config.settings import Settings, get_settings
 from app.infrastructure.database.session import build_engine, build_session_factory
 from app.infrastructure.security.jwt_tokens import JwtTokenService
 from app.infrastructure.security.passwords import BcryptPasswordHasher
+from app.infrastructure.pdf.receipt import ReportLabReceiptRenderer
 from app.infrastructure.storage.local import LocalFileStorage
 from app.presentation.api.routes import auth, catalog, inventory, products, roles, sales, users, work_orders
 from app.presentation.api.schemas.common import configure_media_url
@@ -36,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     media_dir = Path(settings.media_dir)
     media_dir.mkdir(parents=True, exist_ok=True)
     app.state.file_storage = LocalFileStorage(media_dir)
+    app.state.receipt_renderer = ReportLabReceiptRenderer(settings.company_name, settings.timezone)
     configure_media_url(settings.media_url)
 
     app.add_middleware(

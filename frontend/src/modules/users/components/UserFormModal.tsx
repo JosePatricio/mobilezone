@@ -38,7 +38,15 @@ function buildSchema(isEdit: boolean, roles: NamedRef[]) {
     .superRefine((v, ctx) => {
       const pwd = v.password ?? '';
       const isClient = roleName(v.rol_id) === SYSTEM_ROLES.CLIENTE;
-      if (!isEdit && !isClient && !pwd) {
+      const isSeller = roleName(v.rol_id) === SYSTEM_ROLES.VENDEDOR;
+      if (!isEdit && isSeller && !pwd && !v.identificacion) {
+        // A seller without password gets the cédula / RUC as initial password.
+        ctx.addIssue({
+          code: 'custom',
+          path: ['identificacion'],
+          message: 'Ingrese la cédula / RUC: será la contraseña inicial del vendedor',
+        });
+      } else if (!isEdit && !isClient && !isSeller && !pwd) {
         ctx.addIssue({ code: 'custom', path: ['password'], message: 'La contraseña es obligatoria' });
       } else if (pwd && pwd.length < 8) {
         ctx.addIssue({ code: 'custom', path: ['password'], message: 'Mínimo 8 caracteres' });
@@ -178,8 +186,14 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
             label="Contraseña"
             type="password"
             autoComplete="new-password"
-            required={!user}
-            hint={user ? 'Deje vacío para mantener la actual' : 'Mínimo 8 caracteres'}
+            required={!user && roleName !== SYSTEM_ROLES.VENDEDOR}
+            hint={
+              user
+                ? 'Deje vacío para mantener la actual'
+                : roleName === SYSTEM_ROLES.VENDEDOR
+                  ? 'Si la deja vacía, la contraseña será su cédula / RUC'
+                  : 'Mínimo 8 caracteres'
+            }
             error={errors.password?.message}
             {...register('password')}
           />

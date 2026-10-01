@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { FieldValues, Path, Resolver, UseFormSetError } from 'react-hook-form';
-import { getFieldErrors } from '@/shared/services/apiError';
+import { getFieldErrors, toApiError } from '@/shared/services/apiError';
 import { isValidMoney, normalizeMoney } from './money';
 
 /**
@@ -50,6 +50,13 @@ export const zOptionalId = z.preprocess(
 
 /** Copies 422 field errors from the API into react-hook-form. Returns true if any was applied. */
 export function applyServerErrors<T extends FieldValues>(err: unknown, setError: UseFormSetError<T>): boolean {
+  // Business errors (400 / 409) that point to a field, e.g. a repeated cédula / RUC.
+  const apiError = toApiError(err);
+  const field = (apiError.details as { field?: unknown } | undefined)?.field;
+  if (apiError.status !== 422 && typeof field === 'string') {
+    setError(field as Path<T>, { type: 'server', message: apiError.message });
+    return true;
+  }
   const fieldErrors = getFieldErrors(err);
   const entries = Object.entries(fieldErrors);
   entries.forEach(([field, message]) => setError(field as Path<T>, { type: 'server', message }));

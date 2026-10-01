@@ -63,11 +63,15 @@ class TestInventory:
         product = client.get(f"{API}/products/{pantalla.id}", headers=headers).json()
         assert product["stock"] == 10  # total of every branch
 
-    def test_seller_cannot_change_stock(self, client, factory):
-        headers = auth_headers(client, factory.user(SystemRole.VENDEDOR).email)
+    def test_seller_changes_stock_only_in_own_branches(self, client, factory):
+        headers = auth_headers(client, factory.user(SystemRole.VENDEDOR).email)  # Matriz
         inv = factory.inventory(stock=3)
         response = client.patch(f"{API}/inventory/{inv.id}/stock", json={"cantidad": 5}, headers=headers)
+        assert response.status_code == 200 and response.json()["stock"] == 8
+        other = factory.inventory(stock=3, branch=factory.branch("Norte"))
+        response = client.patch(f"{API}/inventory/{other.id}/stock", json={"cantidad": 5}, headers=headers)
         assert response.status_code == 403
+        assert response.json()["error"]["code"] == "BRANCH_NOT_ASSIGNED"
 
     def test_delete_only_without_stock(self, client, admin_headers, factory):
         inv = factory.inventory(stock=2)
@@ -84,7 +88,7 @@ class TestSalesByBranch:
         inv = factory.inventory(stock=5, branch=norte)
         response = client.post(
             f"{API}/sales",
-            json={"branch_id": norte.id, "items": [{"inventory_id": inv.id, "cantidad": 1}]},
+            json={"metodo_pago": "EFECTIVO", "branch_id": norte.id, "items": [{"inventory_id": inv.id, "cantidad": 1}]},
             headers=headers,
         )
         assert response.status_code == 403
@@ -129,7 +133,7 @@ class TestSalesByBranch:
         inv = factory.inventory()
         sale = client.post(
             f"{API}/sales",
-            json={"branch_id": inv.branch_id, "items": [{"inventory_id": inv.id, "cantidad": 1}], "cliente_id": customer.id},
+            json={"metodo_pago": "EFECTIVO", "branch_id": inv.branch_id, "items": [{"inventory_id": inv.id, "cantidad": 1}], "cliente_id": customer.id},
             headers=headers,
         ).json()
         assert sale["cliente"]["identificacion"] == customer.identificacion

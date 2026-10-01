@@ -5,10 +5,20 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response, UploadFile, status
 
 from app.application.dto import ProductData
+from app.application.use_cases.catalog import CategoryUseCases
 from app.application.use_cases.products import ProductUseCases
+from app.domain.value_objects.pagination import MAX_PAGE_SIZE, PageRequest
 from app.domain.entities import User
 from app.domain.value_objects.permissions import Perm
-from app.presentation.api.dependencies import PageDep, StorageDep, UowDep, read_upload, require_permissions
+from app.presentation.api.dependencies import (
+    PageDep,
+    StorageDep,
+    UowDep,
+    read_upload,
+    require_any_permission,
+    require_permissions,
+)
+from app.presentation.api.schemas.catalog import CategorySummary
 from app.presentation.api.schemas.common import PageResponse, StatusUpdateRequest
 from app.presentation.api.schemas.products import (
     ProductRequest,
@@ -19,6 +29,15 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 CanView = Annotated[User, Depends(require_permissions(Perm.PRODUCTS_VIEW))]
 CanUpdate = Annotated[User, Depends(require_permissions(Perm.PRODUCTS_UPDATE))]
+# The image can be uploaded right after creating the product (sellers can create but not edit).
+CanSetImage = Annotated[User, Depends(require_any_permission(Perm.PRODUCTS_UPDATE, Perm.PRODUCTS_CREATE))]
+
+
+@router.get("/category-options", response_model=list[CategorySummary])
+def category_options(uow: UowDep, _: CanView):
+    """Active categories for the product form (does not require access to the Categorías module)."""
+    result = CategoryUseCases(uow).list(PageRequest(1, MAX_PAGE_SIZE), estado=True)
+    return [CategorySummary.model_validate(c) for c in result.items]
 
 
 @router.get("", response_model=PageResponse[ProductResponse])
@@ -57,7 +76,7 @@ def update_product(product_id: int, body: ProductRequest, uow: UowDep, _: CanUpd
 
 
 @router.put("/{product_id}/image", response_model=ProductResponse)
-def upload_product_image(product_id: int, file: UploadFile, uow: UowDep, storage: StorageDep, _: CanUpdate):
+def upload_product_image(product_id: int, file: UploadFile, uow: UowDep, storage: StorageDep, _: CanSetImage):
     """Uploads the product image (JPG, PNG or WEBP, max 2 MB). Without image the client shows a default one."""
     content = read_upload(file)
     return ProductResponse.model_validate(ProductUseCases(uow, storage).set_image(product_id, content))

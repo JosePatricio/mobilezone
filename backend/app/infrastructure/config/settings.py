@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_name: str = "MobileZone API"
+    company_name: str = "MobileZone"  # shown on the PDF receipts
+    timezone: str = "America/Guayaquil"  # used to print dates on receipts
     environment: str = "development"
     debug: bool = False
 

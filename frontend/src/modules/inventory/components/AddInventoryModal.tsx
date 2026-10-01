@@ -13,12 +13,12 @@ interface Props {
   onSubmit: (body: InventoryRequest) => Promise<void>;
 }
 
-/** Registers a product in a branch with its initial stock. */
+/** Adds stock of a product to a branch. If the product is already in the branch the units are summed. */
 export function AddInventoryModal({ branchOptions, defaultBranchId, onClose, onSubmit }: Props) {
   const [search, setSearch] = useState('');
   const [productId, setProductId] = useState('');
   const [branchId, setBranchId] = useState(defaultBranchId ? String(defaultBranchId) : '');
-  const [stock, setStock] = useState('0');
+  const [stock, setStock] = useState('1');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const debounced = useDebounce(search.trim(), 300);
@@ -33,7 +33,7 @@ export function AddInventoryModal({ branchOptions, defaultBranchId, onClose, onS
     const units = Number(stock);
     if (!productId) return setError('Seleccione un producto.');
     if (!branchId) return setError('Seleccione una sucursal.');
-    if (!Number.isInteger(units) || units < 0) return setError('El stock inicial debe ser un entero mayor o igual a 0.');
+    if (!Number.isInteger(units) || units <= 0) return setError('Ingrese una cantidad entera mayor que 0.');
     setSaving(true);
     try {
       await onSubmit({ product_id: Number(productId), branch_id: Number(branchId), stock: units });
@@ -47,7 +47,7 @@ export function AddInventoryModal({ branchOptions, defaultBranchId, onClose, onS
   return (
     <Modal
       open
-      title="Agregar producto a sucursal"
+      title="Agregar stock"
       onClose={onClose}
       dismissible={!saving}
       footer={
@@ -91,11 +91,12 @@ export function AddInventoryModal({ branchOptions, defaultBranchId, onClose, onS
           options={branchOptions}
         />
         <Input
-          label="Stock inicial"
+          label="Cantidad a agregar"
           type="number"
-          min={0}
+          min={1}
           step={1}
           value={stock}
+          hint="Si el producto ya está en la sucursal, se suma a su stock."
           onChange={(e) => setStock(e.target.value)}
         />
       </div>

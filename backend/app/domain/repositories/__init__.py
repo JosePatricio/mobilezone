@@ -46,6 +46,11 @@ class UserRepository(Repository[User]):
     def get_by_identificacion(self, identificacion: str) -> User | None: ...
 
     @abstractmethod
+    def find_same_person(self, identificacion: str) -> list[User]:
+        """Users with the same cédula / RUC, including the cédula ↔ natural-person RUC
+        relation (``1712345675`` and ``1712345675001`` belong to the same person)."""
+
+    @abstractmethod
     def list(
         self,
         page: PageRequest,

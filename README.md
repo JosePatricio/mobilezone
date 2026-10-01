@@ -64,11 +64,11 @@ Estado de servidor con TanStack Query, formularios con react-hook-form + zod.
 | clients | CRUD + status + `PUT/DELETE /{id}/photo` (usuarios con rol `CLIENTE`) |
 | roles / permissions | CRUD roles, `PUT /roles/{id}/permissions`, `POST/DELETE /roles/{id}/permissions/{pid}`, `GET /permissions` |
 | categories, brands, models, spare-parts | `GET`, `GET /{id}`, `POST`, `PUT /{id}`, `PATCH /{id}/status`, `DELETE /{id}` (409 si tiene registros asociados) |
-| products | CRUD (SKU, PVP, costo, por mayor; `stock` = total de todas las sucursales) + `PUT/DELETE /{id}/image` |
+| products | CRUD (SKU, PVP, costo, por mayor; `stock` = total de todas las sucursales) + `PUT/DELETE /{id}/image`, `GET /products/category-options` |
 | branches | CRUD de sucursales (nombre, ubicación, teléfono) + status |
-| inventory | `GET` (filtros `search` SKU/nombre, `branch_id`, `product_id`, `with_stock`, `active`), `GET /{id}`, `POST` (producto + sucursal + stock inicial), `PATCH /{id}/stock`, `GET /{id}/movements`, `DELETE /{id}`, `GET /inventory/branches` |
+| inventory | `GET` (filtros `search` SKU/nombre, `branch_id`, `product_id`, `with_stock`, `active`), `GET /{id}`, `POST` (producto + sucursal + unidades; si ya existe, suma), `PATCH /{id}/stock`, `GET /{id}/movements`, `DELETE /{id}`, `GET /inventory/branches` |
 | locations | `GET /locations/provinces` (provincias del Ecuador con sus ciudades) |
-| sales | `GET`, `GET /{id}`, `POST` (confirmar: `branch_id`, `items[{inventory_id, cantidad}]`, `factura`, `cliente_id`), `POST /{id}/cancel`, `GET /customers/lookup?identificacion=`, `POST /customers` (registrar cliente) |
+| sales | `GET`, `GET /{id}`, `POST` (confirmar: `branch_id`, `items[{inventory_id, cantidad}]`, `metodo_pago`, `monto_recibido`, `factura`, `cliente_id`), `PUT /{id}` (modificar / devoluciones), `POST /{id}/cancel` (eliminar = anular), `GET /{id}/receipt` (PDF), `GET /customers/lookup?identificacion=`, `POST /customers` (registrar cliente) |
 | work-orders | CRUD, `PATCH /{id}/status`, `GET /by-number/{n}`, `GET /statuses`, `POST /calculate-balance`, `POST/DELETE /{id}/spare-parts` |
 
 Listados paginados: `?page=&size=` (máx. 100) → `{items, total, page, size, pages}`. Montos como string decimal (`"10.50"`).
@@ -88,6 +88,11 @@ Todas están centralizadas para cambiarlas fácilmente:
 | Cédula / RUC | Cédula: provincia, 3er dígito y dígito verificador módulo 10. RUC persona natural: cédula válida + establecimiento. RUC sociedades/públicos: estructura (sin exigir el dígito verificador módulo 11, porque el SRI emite RUC válidos que no lo cumplen) | `value_objects/identificacion.py` |
 | Provincia / ciudad | 24 provincias y sus 221 cantones; la ciudad debe pertenecer a la provincia | `value_objects/locations.py` |
 | Ventas | Comprobante o factura; "Consumidor final" por defecto; cliente buscado por cédula/RUC o registrado desde la misma venta (rol CLIENTE, sin contraseña) | `ConfirmSaleUseCase` |
+| Pago | Transferencia, Efectivo (monto recibido opcional, debe cubrir el total; se calcula el cambio) o Tarjeta de crédito (+6 % redondeado a centavos) | `Sale.apply_payment` |
+| Modificar / eliminar venta | Modificar: la lista completa de productos; las unidades devueltas vuelven al inventario (`DEVOLUCION`) y las nuevas se validan contra el stock. Eliminar = anular (la venta queda ANULADA para auditoría y se devuelve el stock) | `UpdateSaleUseCase`, `CancelSaleUseCase` |
+| Comprobante PDF | Generado por el backend (ReportLab); se descarga al confirmar/modificar la venta y desde el detalle. Es un documento interno: no reemplaza la factura electrónica del SRI | `infrastructure/pdf/receipt.py` |
+| Vendedor | Contraseña inicial = cédula/RUC si no se ingresa otra; crea productos, agrega stock (suma) y modifica ventas solo en sus sucursales | `UserUseCases`, `branch_access.py` |
+| Cédula / RUC repetidos | Únicos; además la cédula y el RUC de la misma persona natural (`1712345675` / `1712345675001`) se consideran duplicados | `find_same_person` |
 | Imágenes | JPG/PNG/WEBP ≤ 2 MB validadas por contenido; guardadas en `backend/media` y servidas en `/media` | `infrastructure/storage/local.py` |
 | Estados 0/1/2 de orden | Etiquetas "Recibida / En proceso / Finalizada", expuestas por `GET /work-orders/statuses` | `WORK_ORDER_STATUS_LABELS` |
 | Login de clientes | Los clientes no tienen contraseña y no pueden iniciar sesión | `LoginUseCase` |
@@ -175,13 +180,14 @@ uvicorn main:app --reload --port 8000
 |---|---|
 | `002_productos_usuarios_ventas.sql` | con `tipo_usuario`, `precio` y rol `USUARIO` (versión 1) |
 | `003_sucursales_inventario.sql` | sin sucursales ni inventario (versión 2) |
+| `004_pagos_permisos.sql` | sin método de pago en ventas (versión 3) |
 
 Con Alembic (aplica solo lo que falta):
 
 ```powershell
 cd backend
 .venv\Scripts\activate
-alembic current           # 0002 = falta el 003; sin versión = ejecute primero "alembic stamp 0001" o "0002"
+alembic current           # p. ej. 0003 = falta el 004; sin versión = ejecute primero "alembic stamp <versión>"
 alembic upgrade head
 python -m app.infrastructure.database.seed
 ```
@@ -190,6 +196,9 @@ o importe los scripts desde phpMyAdmin y luego ejecute `alembic stamp head` y el
 - 002: los productos existentes reciben un SKU provisional (`SKU-000001`, …) y precio por mayor = PVP.
 - 003: se crea la sucursal **Matriz** con el stock actual de cada producto; ventas y movimientos existentes quedan en
   Matriz y los vendedores quedan asignados a ella. Edite luego su ubicación y teléfono en **Sucursales**.
+- 004: las ventas existentes quedan sin método de pago ("No registrado") y `total_pagar` = total; el permiso
+  `sales.any_branch` pasa a llamarse `branches.any`; el rol VENDEDOR recibe `products.create`, `inventory.manage` y
+  `sales.update`.
 
 ### 3. Frontend (terminal 2)
 

@@ -27,7 +27,15 @@ class TestUsersAndRoles:
     def test_vendedor_only_has_sales_and_products(self, client, factory):
         seller = factory.user(SystemRole.VENDEDOR)
         body = client.post(f"{API}/auth/login", json={"email": seller.email, "password": PASSWORD}).json()
-        assert sorted(body["permissions"]) == ["inventory.view", "products.view", "sales.create", "sales.view"]
+        assert sorted(body["permissions"]) == [
+            "inventory.manage",
+            "inventory.view",
+            "products.create",
+            "products.view",
+            "sales.create",
+            "sales.update",
+            "sales.view",
+        ]
         assert [b["nombre"] for b in body["user"]["branches"]] == ["Matriz"]
         assert body["user"]["role"]["nombre"] == "VENDEDOR"
         headers = {"Authorization": f"Bearer {body['access_token']}"}
@@ -80,18 +88,23 @@ class TestUsersAndRoles:
         assert dup.status_code == 409
         assert dup.json()["error"]["code"] == "IDENTIFICATION_ALREADY_EXISTS"
 
-    def test_password_required_except_for_clients(self, client, admin_headers, uow, factory):
-        base = {"nombre": "A", "apellido": "B", "identificacion": "0102030400"}
-        seller = client.post(
+    def test_password_required_except_for_clients_and_sellers(self, client, admin_headers, uow, factory):
+        tech = client.post(
             f"{API}/users",
-            json={**base, "email": "s@example.com", "rol_id": _role_id(uow, "VENDEDOR"), "branch_ids": [1]},
+            json={"nombre": "T", "apellido": "T", "email": "t@example.com", "rol_id": _role_id(uow, "TECNICO")},
             headers=admin_headers,
         )
-        assert seller.status_code == 400
-        assert seller.json()["error"]["code"] == "PASSWORD_REQUIRED"
+        assert tech.status_code == 400
+        assert tech.json()["error"]["code"] == "PASSWORD_REQUIRED"
         customer = client.post(
             f"{API}/users",
-            json={**base, "email": "c@example.com", "rol_id": _role_id(uow, "CLIENTE")},
+            json={
+                "nombre": "A",
+                "apellido": "B",
+                "identificacion": "0102030400",
+                "email": "c@example.com",
+                "rol_id": _role_id(uow, "CLIENTE"),
+            },
             headers=admin_headers,
         )
         assert customer.status_code == 201
@@ -201,7 +214,7 @@ class TestProductsV2:
         inv = factory.inventory(precio="20.00")
         sale = client.post(
             f"{API}/sales",
-            json={"branch_id": inv.branch_id, "items": [{"inventory_id": inv.id, "cantidad": 2}]},
+            json={"metodo_pago": "EFECTIVO", "branch_id": inv.branch_id, "items": [{"inventory_id": inv.id, "cantidad": 2}]},
             headers=admin_headers,
         ).json()
         assert sale["total"] == "40.00"
@@ -237,14 +250,14 @@ class TestSalesV2:
 
         invoice = client.post(
             f"{API}/sales",
-            json={"branch_id": inv.branch_id, "items": items, "factura": True, "cliente_id": customer.id},
+            json={"metodo_pago": "EFECTIVO", "branch_id": inv.branch_id, "items": items, "factura": True, "cliente_id": customer.id},
             headers=headers,
         ).json()
         assert invoice["factura"] is True
         assert invoice["cliente"]["identificacion"] == customer.identificacion
 
         receipt = client.post(
-            f"{API}/sales", json={"branch_id": inv.branch_id, "items": items}, headers=headers
+            f"{API}/sales", json={"metodo_pago": "EFECTIVO", "branch_id": inv.branch_id, "items": items}, headers=headers
         ).json()
         assert receipt["factura"] is False
         assert receipt["cliente"] is None  # consumidor final
@@ -255,7 +268,7 @@ class TestSalesV2:
         inv = factory.inventory()
         response = client.post(
             f"{API}/sales",
-            json={"branch_id": inv.branch_id, "items": [{"inventory_id": inv.id, "cantidad": 1}], "cliente_id": seller.id},
+            json={"metodo_pago": "EFECTIVO", "branch_id": inv.branch_id, "items": [{"inventory_id": inv.id, "cantidad": 1}], "cliente_id": seller.id},
             headers=headers,
         )
         assert response.status_code == 400

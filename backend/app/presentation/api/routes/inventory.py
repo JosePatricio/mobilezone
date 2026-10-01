@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
+from fastapi.responses import JSONResponse
 
 from app.application.dto import BranchData, InventoryData, StockAdjustmentData
 from app.application.use_cases.inventory import BranchUseCases, InventoryUseCases
@@ -104,10 +105,18 @@ def get_inventory(item_id: int, uow: UowDep, _: P_INVENTORY_VIEW):
     return InventoryResponse.model_validate(InventoryUseCases(uow).get(item_id))
 
 
-@inventory.post("", response_model=InventoryResponse, status_code=status.HTTP_201_CREATED)
+@inventory.post(
+    "",
+    response_model=InventoryResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={200: {"model": InventoryResponse, "description": "Ya existía: se sumó el stock"}},
+)
 def create_inventory(body: InventoryRequest, uow: UowDep, actor: P_INVENTORY_MANAGE):
-    """Registers a product in a branch with its initial stock."""
-    return InventoryResponse.model_validate(InventoryUseCases(uow).create(InventoryData(**body.model_dump()), actor))
+    """Registers a product in a branch with its stock (201). If the product is already in
+    the branch, the units are added to the existing stock (200)."""
+    item, created = InventoryUseCases(uow).create(InventoryData(**body.model_dump()), actor)
+    payload = InventoryResponse.model_validate(item).model_dump(mode="json")
+    return JSONResponse(payload, status_code=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 
 @inventory.patch("/{item_id}/stock", response_model=InventoryResponse)
@@ -123,9 +132,9 @@ def list_inventory_movements(item_id: int, uow: UowDep, page: PageDep, _: P_INVE
 
 
 @inventory.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_inventory(item_id: int, uow: UowDep, _: P_INVENTORY_MANAGE) -> Response:
+def delete_inventory(item_id: int, uow: UowDep, actor: P_INVENTORY_MANAGE) -> Response:
     """Removes a product from a branch (only with stock 0 and without history)."""
-    InventoryUseCases(uow).delete(item_id)
+    InventoryUseCases(uow).remove(item_id, actor)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

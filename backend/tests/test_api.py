@@ -153,8 +153,13 @@ class TestProducts:
         )
         assert inv.status_code == 201, inv.text
         inv_id = inv.json()["id"]
-        dup = client.post(f"{API}/inventory", json={"product_id": pid, "branch_id": branch_id}, headers=admin_headers)
-        assert dup.json()["error"]["code"] == "INVENTORY_ALREADY_EXISTS"
+        # The product is already in the branch: "Agregar" adds the units to its stock.
+        again = client.post(
+            f"{API}/inventory", json={"product_id": pid, "branch_id": branch_id, "stock": 1}, headers=admin_headers
+        )
+        assert again.status_code == 200
+        assert again.json()["id"] == inv_id and again.json()["stock"] == 5
+        client.patch(f"{API}/inventory/{inv_id}/stock", json={"cantidad": -1}, headers=admin_headers)
 
         adjusted = client.patch(
             f"{API}/inventory/{inv_id}/stock", json={"cantidad": -5, "motivo": "rotura"}, headers=admin_headers
@@ -167,7 +172,7 @@ class TestProducts:
         assert client.get(f"{API}/products/{pid}", headers=admin_headers).json()["stock"] == 10
 
         movements = client.get(f"{API}/inventory/{inv_id}/movements", headers=admin_headers).json()
-        assert movements["total"] == 2  # initial stock + adjustment
+        assert movements["total"] == 4  # initial stock + entry + 2 adjustments
 
     def test_negative_price_rejected(self, client, admin_headers, factory):
         category = factory.category()
@@ -208,6 +213,7 @@ class TestSales:
             f"{API}/sales",
             json={
                 "branch_id": branch_id,
+                "metodo_pago": "EFECTIVO",
                 "items": [{"inventory_id": a.id, "cantidad": 2}, {"inventory_id": b.id, "cantidad": 1}],
             },
             headers=headers,
@@ -223,7 +229,7 @@ class TestSales:
 
         response = client.post(
             f"{API}/sales",
-            json={"branch_id": branch_id, "items": [{"inventory_id": b.id, "cantidad": 1}]},
+            json={"metodo_pago": "EFECTIVO", "branch_id": branch_id, "items": [{"inventory_id": b.id, "cantidad": 1}]},
             headers=headers,
         )
         assert response.status_code == 409
@@ -235,7 +241,7 @@ class TestSales:
         inv = factory.inventory(stock=2)
         sale = client.post(
             f"{API}/sales",
-            json={"branch_id": inv.branch_id, "items": [{"inventory_id": inv.id, "cantidad": 2}]},
+            json={"metodo_pago": "EFECTIVO", "branch_id": inv.branch_id, "items": [{"inventory_id": inv.id, "cantidad": 2}]},
             headers=headers,
         ).json()
         assert client.post(f"{API}/sales/{sale['id']}/cancel", headers=headers).status_code == 403
@@ -244,7 +250,7 @@ class TestSales:
         assert client.get(f"{API}/inventory/{inv.id}", headers=admin_headers).json()["stock"] == 2
 
     def test_empty_sale_rejected(self, client, admin_headers):
-        response = client.post(f"{API}/sales", json={"branch_id": 1, "items": []}, headers=admin_headers)
+        response = client.post(f"{API}/sales", json={"metodo_pago": "EFECTIVO", "branch_id": 1, "items": []}, headers=admin_headers)
         assert response.status_code == 422
 
 

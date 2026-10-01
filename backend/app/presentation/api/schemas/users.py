@@ -32,13 +32,6 @@ class RoleSummary(Schema):
     nombre: str
 
 
-class UserSummary(Schema):
-    id: int
-    nombre: str
-    apellido: str
-    email: str
-
-
 class _WithPhoto(Schema):
     foto: str | None = Field(default=None, exclude=True)
 
@@ -46,6 +39,13 @@ class _WithPhoto(Schema):
     @property
     def foto_url(self) -> str | None:
         return media_url(self.foto)
+
+
+class UserSummary(_WithPhoto):
+    id: int
+    nombre: str
+    apellido: str
+    email: str
 
 
 class UserResponse(_WithPhoto):

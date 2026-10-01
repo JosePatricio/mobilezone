@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
+from app.domain.value_objects.enums import PaymentMethod
+
 
 @dataclass(frozen=True)
 class CatalogData:
@@ -74,8 +76,21 @@ class SaleItemData:
 class ConfirmSaleData:
     branch_id: int
     items: list[SaleItemData]
+    metodo_pago: PaymentMethod = PaymentMethod.EFECTIVO
+    monto_recibido: Decimal | None = None  # cash only: amount received from the customer
     factura: bool = False  # True = factura, False = comprobante de venta
     cliente_id: int | None = None  # None = consumidor final
+
+
+@dataclass(frozen=True)
+class UpdateSaleData:
+    """Modifies a confirmed sale (returns / changes). ``items`` is the complete new list of lines."""
+
+    items: list[SaleItemData]
+    metodo_pago: PaymentMethod = PaymentMethod.EFECTIVO
+    monto_recibido: Decimal | None = None
+    factura: bool = False
+    cliente_id: int | None = None
 
 
 @dataclass(frozen=True)

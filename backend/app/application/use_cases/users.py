@@ -31,12 +31,21 @@ class _UserValidation(CrudUseCases[User]):
     def _ensure_unique(self, email: str, identificacion: str | None, current_id: int | None = None) -> None:
         existing = self.uow.users.get_by_email(email.strip().lower())
         if existing is not None and existing.id != current_id:
-            raise ConflictError("Ya existe un usuario con ese email.", code="EMAIL_ALREADY_EXISTS")
+            raise ConflictError(
+                "Ya existe un usuario con ese email.", code="EMAIL_ALREADY_EXISTS", details={"field": "email"}
+            )
         if identificacion:
-            existing = self.uow.users.get_by_identificacion(identificacion)
-            if existing is not None and existing.id != current_id:
+            for existing in self.uow.users.find_same_person(identificacion):
+                if existing.id == current_id:
+                    continue
+                same = existing.identificacion == identificacion
                 raise ConflictError(
-                    "Ya existe un usuario con esa cédula / RUC.", code="IDENTIFICATION_ALREADY_EXISTS"
+                    "Ya existe un usuario con esa cédula / RUC."
+                    if same
+                    else f"La cédula / RUC corresponde a la misma persona que {existing.nombre_completo} "
+                    f"({existing.identificacion}).",
+                    code="IDENTIFICATION_ALREADY_EXISTS",
+                    details={"field": "identificacion"},
                 )
 
     def _role_by_name(self, name: SystemRole) -> Role:
@@ -111,11 +120,25 @@ class UserUseCases(_UserValidation):
             user.set_branches(self._resolve_branches(role, data.branch_ids))
             # Clients never log in (no password); every other role needs one.
             if role.nombre != SystemRole.CLIENTE.value:
-                if not data.password:
-                    raise ValidationError("La contraseña es obligatoria.", code="PASSWORD_REQUIRED")
-                user.password = self.hasher.hash(_validate_password(data.password))
+                password = data.password or self._default_password(role, user)
+                user.password = self.hasher.hash(_validate_password(password))
             self.uow.users.add(user)
         return user
+
+    @staticmethod
+    def _default_password(role: Role, user: User) -> str:
+        """Sellers without an explicit password get their cédula / RUC as initial password."""
+        if role.nombre == SystemRole.VENDEDOR.value:
+            if not user.identificacion:
+                raise ValidationError(
+                    "Ingrese la cédula / RUC del vendedor: será su contraseña inicial.",
+                    code="IDENTIFICATION_REQUIRED",
+                    details={"field": "identificacion"},
+                )
+            return user.identificacion
+        raise ValidationError(
+            "La contraseña es obligatoria.", code="PASSWORD_REQUIRED", details={"field": "password"}
+        )
 
     def update(self, user_id: int, data: UserData, actor: User) -> User:
         with self.uow.transaction():
@@ -135,8 +158,8 @@ class UserUseCases(_UserValidation):
                 user.password = None
             elif data.password:
                 user.password = self.hasher.hash(_validate_password(data.password))
-            elif not user.password:
-                raise ValidationError("La contraseña es obligatoria para este rol.", code="PASSWORD_REQUIRED")
+            elif not user.password:  # e.g. a client promoted to seller
+                user.password = self.hasher.hash(_validate_password(self._default_password(role, user)))
         return user
 
     def set_user_status(self, user_id: int, estado: bool, actor: User) -> User:
