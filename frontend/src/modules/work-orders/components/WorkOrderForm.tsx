@@ -22,6 +22,9 @@ import { photoChanges, PhotoSlots, type PhotoChanges } from './PhotoSlots';
 
 export const MAX_WARRANTY_DAYS = 3650;
 
+/** Location preselected when registering a new client from a work order. */
+const DEFAULT_CUSTOMER_LOCATION = { provincia: 'Pichincha', ciudad: 'Quito' };
+
 export const workOrderSchema = z
   .object({
     cliente: z.object({
@@ -446,6 +449,8 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           <NewCustomerForm
             identificacion={registering}
             create={workOrderApi.createCustomer}
+            showRole={false}
+            defaultLocation={DEFAULT_CUSTOMER_LOCATION}
             onCancel={() => setRegistering(null)}
             onCreated={(client) => {
               setRegistering(null);

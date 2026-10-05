@@ -48,7 +48,7 @@ const publicOrder: PublicWorkOrder = {
 };
 
 const createdCustomers: Record<string, unknown>[] = [];
-vi.mock('@/shared/components/LocationFields', () => ({ LocationFields: () => null }));
+vi.mock('@/shared/components/LocationFields', () => ({ LocationFields: () => null, useProvinces: () => ({ isSuccess: true }) }));
 vi.mock('../services/workOrderApi', () => ({
   WORK_ORDERS_KEY: 'work-orders',
   workOrderApi: {
@@ -114,11 +114,19 @@ describe('WorkOrderForm', () => {
     // Not registered: the same registration form as in sales opens in a modal.
     const modal = await screen.findByRole('dialog', { name: 'Nuevo cliente' });
     expect(within(modal).getByLabelText(/Cédula o RUC/)).toHaveValue('0102030400');
+    // The role is always CLIENTE, so the work order form does not show it.
+    expect(within(modal).queryByText('Rol')).not.toBeInTheDocument();
     await userEvent.type(within(modal).getByLabelText(/^Nombre/), 'Ana');
     await userEvent.type(within(modal).getByLabelText(/^Apellido/), 'Mora');
     await userEvent.click(within(modal).getByRole('button', { name: 'Registrar cliente' }));
     await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(createdCustomers[0]).toMatchObject({ identificacion: '0102030400', nombre: 'Ana', apellido: 'Mora' });
+    expect(createdCustomers[0]).toMatchObject({
+      identificacion: '0102030400',
+      nombre: 'Ana',
+      apellido: 'Mora',
+      provincia: 'Pichincha',
+      ciudad: 'Quito',
+    });
     expect(screen.getByLabelText(/Nombres/)).toHaveValue('Ana');
 
     await userEvent.click(screen.getByRole('radio', { name: 'Negro' }));

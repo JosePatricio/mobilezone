@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import type { z } from 'zod';
 import { clientSchema } from '@/modules/clients/components/ClientFormModal';
 import type { Client, ClientRequest } from '@/modules/clients/types';
-import { Button, Input, LocationFields } from '@/shared/components';
+import { Button, Input, LocationFields, useProvinces } from '@/shared/components';
 import { getErrorMessage } from '@/shared/services/apiError';
 import { type FormShape, zodForm, applyServerErrors } from '@/shared/utils/validation';
 import { saleApi } from '../services/saleApi';
@@ -17,13 +17,24 @@ interface Props {
   onCancel: () => void;
   /** Endpoint that registers the client (sales by default; work orders use their own). */
   create?: (body: ClientRequest) => Promise<Client>;
+  /** Show the role as text. Work orders hide it; the role is CLIENTE either way. */
+  showRole?: boolean;
+  /** Province and city preselected in the location fields. */
+  defaultLocation?: { provincia: string; ciudad: string };
 }
 
 /**
  * Quick registration of a client from the sales or work order screen. Same fields as a user; the role
- * is always CLIENTE (shown as text) and clients have no password. Available to sellers.
+ * is always CLIENTE (shown as text unless hidden) and clients have no password. Available to sellers.
  */
-export function NewCustomerForm({ identificacion, onCreated, onCancel, create = saleApi.createCustomer }: Props) {
+export function NewCustomerForm({
+  identificacion,
+  onCreated,
+  onCancel,
+  create = saleApi.createCustomer,
+  showRole = true,
+  defaultLocation,
+}: Props) {
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -40,12 +51,22 @@ export function NewCustomerForm({ identificacion, onCreated, onCancel, create = 
       identificacion,
       email: '',
       celular: '',
-      provincia: '',
-      ciudad: '',
+      provincia: defaultLocation?.provincia ?? '',
+      ciudad: defaultLocation?.ciudad ?? '',
       estado: true,
     },
   });
   const provincia = useWatch({ control, name: 'provincia' }) as string;
+  const provincesLoaded = useProvinces().isSuccess;
+  const defaultProvincia = defaultLocation?.provincia;
+  const defaultCiudad = defaultLocation?.ciudad;
+
+  // A select only displays its value once the option exists, so re-apply the default after the catalog loads.
+  useEffect(() => {
+    if (!provincesLoaded || !defaultProvincia) return;
+    setValue('provincia', defaultProvincia);
+    setValue('ciudad', defaultCiudad ?? '');
+  }, [provincesLoaded, defaultProvincia, defaultCiudad, setValue]);
 
   const submit = handleSubmit(async (values) => {
     setServerError(null);
@@ -84,10 +105,12 @@ export function NewCustomerForm({ identificacion, onCreated, onCancel, create = 
       />
       <Input label="Email" type="email" hint="Opcional" error={errors.email?.message} {...register('email')} />
       <Input label="Celular" type="tel" inputMode="tel" error={errors.celular?.message} {...register('celular')} />
-      <div className="field">
-        <span className="field-label">Rol</span>
-        <p className="readonly-value">CLIENTE</p>
-      </div>
+      {showRole && (
+        <div className="field">
+          <span className="field-label">Rol</span>
+          <p className="readonly-value">CLIENTE</p>
+        </div>
+      )}
       <LocationFields register={register} setValue={setValue} errors={errors} provincia={provincia} />
       <div className="full form-actions">
         <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>

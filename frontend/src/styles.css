@@ -700,28 +700,33 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .color-swatch-text { width: auto; border-radius: 16px; padding: 0 12px; background: var(--surface-alt); font-size: 12px; }
 .link-button { background: none; border: 0; padding: 0; color: var(--primary); cursor: pointer; font: inherit; text-decoration: underline; }
 
-/* Printable work order: hidden on screen, the only content printed */
+/* Printable work order: 80 mm thermal receipt (72 mm printable), hidden on screen, the only content printed */
 .print-sheet { display: none; }
 @media print {
-  @page { size: A4; margin: 14mm; }
-  body { background: #fff; }
+  /* No page size: the 80 mm roll is continuous, so the printer driver sets it. The sheet sets its own margins. */
+  @page { margin: 0; }
+  html, body { background: #fff; margin: 0; padding: 0; min-width: 0; }
   body > :not(.print-sheet) { display: none !important; }
-  .print-sheet { display: block; color: #000; font-size: 12px; }
-  .print-sheet h1 { margin: 0; font-size: 22px; }
-  .print-sheet h2 { font-size: 13px; margin: 14px 0 6px; border-bottom: 1px solid #999; padding-bottom: 2px; text-transform: uppercase; }
-  .print-sheet dl { display: grid; grid-template-columns: 130px 1fr; gap: 3px 8px; margin: 0; }
-  .print-sheet dt { color: #444; }
-  .print-sheet dd { margin: 0; }
-  .print-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 8px; }
-  .print-header p { margin: 2px 0 0; }
-  .print-number { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-  .print-number strong { font-size: 18px; }
-  .print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
-  .print-qr { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; margin-top: 14px; }
-  .print-qr img { width: 130px; height: 130px; }
-  .print-url { word-break: break-all; font-size: 9px; }
-  .print-signatures { display: flex; justify-content: space-between; margin-top: 60px; gap: 40px; }
-  .print-signatures span { flex: 1; border-top: 1px solid #000; padding-top: 4px; text-align: center; }
+  /* Monospace at 10.5px ≈ 43 characters per 72 mm line */
+  .print-sheet {
+    display: block; box-sizing: border-box; width: 72mm; margin: 0 auto; padding: 2mm 0 6mm;
+    color: #000; font: 10.5px/1.3 'Courier New', Consolas, monospace;
+  }
+  .print-sheet h1 { margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase; }
+  .print-sheet h2 { font-size: 10.5px; font-weight: 700; margin: 6px 0 2px; padding-top: 4px; border-top: 1px dashed #000; text-transform: uppercase; }
+  .print-sheet p { margin: 0; }
+  .print-sheet hr { border: 0; border-top: 1px dashed #000; margin: 4px 0; }
+  .print-sheet header { padding-bottom: 4px; margin-bottom: 4px; border-bottom: 1px dashed #000; }
+  .receipt-center { text-align: center; }
+  .receipt-strong { font-weight: 700; font-size: 12px; }
+  .receipt-row { display: flex; justify-content: space-between; gap: 6px; break-inside: avoid; }
+  .receipt-row > span:first-child { flex-shrink: 0; }
+  .receipt-row > span:last-child { text-align: right; overflow-wrap: anywhere; }
+  .print-qr { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 8px; padding-top: 6px; border-top: 1px dashed #000; }
+  .print-qr img { width: 36mm; height: 36mm; }
+  .print-url { word-break: break-all; font-size: 8.5px; }
+  .print-signatures { display: flex; flex-direction: column; gap: 30px; margin-top: 30px; }
+  .print-signatures span { border-top: 1px solid #000; padding-top: 2px; text-align: center; }
 }
 
 /* Work orders v8: status selector and history */
