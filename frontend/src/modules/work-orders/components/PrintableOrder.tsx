@@ -5,6 +5,7 @@ import { formatDate, formatDateTime, formatOrderNumber, formatWarrantyDays, full
 import { formatMoney } from '@/shared/utils/money';
 import type { WorkOrder } from '../types';
 import { useOrderQr } from './OrderQr';
+import { formatPattern, parsePattern, PatternLock } from './PatternLock';
 
 const LOCK_LABELS = { NINGUNO: 'Sin bloqueo', PATRON: 'Patrón registrado', PIN: 'PIN registrado' } as const;
 
@@ -20,7 +21,7 @@ function Row({ label, children, strong }: { label: string; children: ReactNode; 
 
 /**
  * Printable receipt of the order for an 80 mm thermal printer (hidden on screen, the only thing
- * printed by window.print). The unlock pattern / PIN is not printed: the receipt is handed to the client.
+ * printed by window.print). The unlock pattern is printed so the technician can unlock the device; the PIN is not.
  */
 export function PrintableOrder({ order }: { order: WorkOrder }) {
   const { url, image } = useOrderQr(order.codigo_publico);
@@ -55,6 +56,12 @@ export function PrintableOrder({ order }: { order: WorkOrder }) {
         {order.tipo_display ? ` (${order.tipo_display})` : ''}
       </Row>
       <Row label="Desbloqueo">{LOCK_LABELS[order.bloqueo_tipo]}</Row>
+      {order.bloqueo_tipo === 'PATRON' && order.bloqueo_valor && (
+        <div className="receipt-center receipt-pattern">
+          <PatternLock value={order.bloqueo_valor} readOnly />
+          <small>Patrón: {formatPattern(parsePattern(order.bloqueo_valor))}</small>
+        </div>
+      )}
 
       <h2>Observaciones</h2>
       <p className="pre-line">{order.observacion ?? '—'}</p>
