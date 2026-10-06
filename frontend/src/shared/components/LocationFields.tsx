@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import type { FieldErrors, UseFormRegister, UseFormSetValue } from 'react-hook-form';
 import { http } from '@/shared/services/httpClient';
 import { Select } from './Select';
@@ -26,11 +27,23 @@ interface Props {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   errors: FieldErrors<any>;
   provincia: string | null | undefined;
+  /** Current city: re-applied once the options load, so a preselected value is shown. */
+  ciudad?: string | null;
 }
 
 /** Provincia select + Ciudad select filtered by the selected province (e.g. Pichincha → Quito). */
-export function LocationFields({ register, setValue, errors, provincia }: Props) {
+export function LocationFields({ register, setValue, errors, provincia, ciudad }: Props) {
   const provinces = useProvinces();
+  const loaded = Boolean(provinces.data);
+
+  // A <select> cannot show a value before its <option> exists: re-apply the values once loaded.
+  useEffect(() => {
+    if (!loaded) return;
+    if (provincia) setValue('provincia', provincia);
+    if (ciudad) setValue('ciudad', ciudad);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
+
   const cities = provinces.data?.find((p) => p.nombre === provincia)?.ciudades ?? [];
   const message = (field: string) => errors[field]?.message as string | undefined;
 

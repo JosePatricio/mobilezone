@@ -9,14 +9,21 @@ from app.domain.exceptions import AuthenticationError
 
 
 class JwtTokenService(TokenService):
-    def __init__(self, secret_key: str, algorithm: str = "HS256", expire_minutes: int = 60) -> None:
+    def __init__(
+        self,
+        secret_key: str,
+        algorithm: str = "HS256",
+        expire_minutes: int = 60,
+        remember_expire_minutes: int = 30 * 24 * 60,
+    ) -> None:
         self.secret_key = secret_key
         self.algorithm = algorithm
         self.expire_minutes = expire_minutes
+        self.remember_expire_minutes = remember_expire_minutes
 
-    def create_access_token(self, user_id: int) -> AccessToken:
+    def create_access_token(self, user_id: int, remember: bool = False) -> AccessToken:
         now = datetime.now(timezone.utc)
-        expires_at = now + timedelta(minutes=self.expire_minutes)
+        expires_at = now + timedelta(minutes=self.remember_expire_minutes if remember else self.expire_minutes)
         payload = {"sub": str(user_id), "iat": now, "exp": expires_at, "type": "access"}
         return AccessToken(token=jwt.encode(payload, self.secret_key, algorithm=self.algorithm), expires_at=expires_at)
 

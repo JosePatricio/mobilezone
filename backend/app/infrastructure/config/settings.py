@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     jwt_secret_key: str = Field(default="change-me-in-production-please-use-a-long-random-value", min_length=32)
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
+    # "Mantener la sesión iniciada" on the login screen: longer session, shared by every tab.
+    remember_token_expire_days: int = 30
 
     bcrypt_rounds: int = 12
 

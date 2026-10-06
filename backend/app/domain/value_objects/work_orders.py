@@ -15,6 +15,7 @@ class EntryReason(str, Enum):
     """Motivo de ingreso del equipo."""
 
     CAMBIO_DISPLAY = "CAMBIO_DISPLAY"
+    PANTALLA = "PANTALLA"
     PIN_CARGA = "PIN_CARGA"
     BATERIA = "BATERIA"
     TAPA = "TAPA"
@@ -31,6 +32,7 @@ class EntryReason(str, Enum):
 
 ENTRY_REASON_LABELS: dict[EntryReason, str] = {
     EntryReason.CAMBIO_DISPLAY: "Cambio de display",
+    EntryReason.PANTALLA: "Pantalla",
     EntryReason.PIN_CARGA: "PIN de carga",
     EntryReason.BATERIA: "Batería",
     EntryReason.TAPA: "Tapa",

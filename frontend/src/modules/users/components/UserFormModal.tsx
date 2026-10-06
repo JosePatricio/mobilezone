@@ -19,6 +19,10 @@ import { zCelular, zOptionalIdentificacion } from '@/shared/utils/identification
 import { type FormShape, zodForm, applyServerErrors, zOptionalText, zRequiredId, zText } from '@/shared/utils/validation';
 import { SYSTEM_ROLES, type User, type UserRequest } from '../types';
 
+/** Location preselected for new users. */
+export const DEFAULT_PROVINCIA = 'Pichincha';
+export const DEFAULT_CIUDAD = 'Quito';
+
 function buildSchema(isEdit: boolean, roles: NamedRef[]) {
   const roleName = (id: number) => roles.find((r) => r.id === id)?.nombre;
   return z
@@ -94,8 +98,8 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
       email: user?.email ?? '',
       identificacion: user?.identificacion ?? '',
       celular: user?.celular ?? '',
-      provincia: user?.provincia ?? '',
-      ciudad: user?.ciudad ?? '',
+      provincia: user ? (user.provincia ?? '') : DEFAULT_PROVINCIA,
+      ciudad: user ? (user.ciudad ?? '') : DEFAULT_CIUDAD,
       direccion: user?.direccion ?? '',
       rol_id: user?.rol_id ?? clientRoleId ?? '',
       password: '',
@@ -109,7 +113,10 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
     if (!user && clientRoleId && !getValues('rol_id')) setValue('rol_id', clientRoleId);
   }, [user, clientRoleId, getValues, setValue]);
 
-  const [rolId, provincia, branchIds] = useWatch({ control, name: ['rol_id', 'provincia', 'branch_ids'] });
+  const [rolId, provincia, ciudad, branchIds] = useWatch({
+    control,
+    name: ['rol_id', 'provincia', 'ciudad', 'branch_ids'],
+  });
   const roleName = roleOptions.find((r) => r.id === Number(rolId))?.nombre;
   const isClient = roleName === SYSTEM_ROLES.CLIENTE;
   const selectedBranches = new Set<number>((branchIds as number[] | undefined) ?? []);
@@ -180,7 +187,13 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
           error={errors.rol_id?.message}
           {...register('rol_id')}
         />
-        <LocationFields register={register} setValue={setValue} errors={errors} provincia={provincia as string} />
+        <LocationFields
+          register={register}
+          setValue={setValue}
+          errors={errors}
+          provincia={provincia as string}
+          ciudad={ciudad as string}
+        />
         <Input
           label="Dirección"
           className="full"

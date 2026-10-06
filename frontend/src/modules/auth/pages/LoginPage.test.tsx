@@ -22,7 +22,17 @@ describe('LoginPage', () => {
     await userEvent.type(screen.getByLabelText('Contraseña'), 'wrong');
     await userEvent.click(screen.getByRole('button', { name: 'Ingresar' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Credenciales inválidas.');
-    expect(login).toHaveBeenCalledWith({ email: 'ana@example.com', password: 'wrong' });
+    expect(login).toHaveBeenCalledWith({ email: 'ana@example.com', password: 'wrong', remember: false });
+  });
+
+  it('can keep the session', async () => {
+    const login = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<LoginPage />, { auth: fakeAuth({ status: 'anonymous', user: null, login }) });
+    await userEvent.type(screen.getByLabelText('Email'), 'ana@example.com');
+    await userEvent.type(screen.getByLabelText('Contraseña'), 'Secret1234');
+    await userEvent.click(screen.getByLabelText('Mantener la sesión iniciada'));
+    await userEvent.click(screen.getByRole('button', { name: 'Ingresar' }));
+    expect(login).toHaveBeenCalledWith({ email: 'ana@example.com', password: 'Secret1234', remember: true });
   });
 
   it('informs when the session expired', () => {

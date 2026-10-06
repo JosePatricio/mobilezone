@@ -68,14 +68,12 @@ vi.mock('../services/workOrderApi', () => ({
         : Promise.reject(new ApiError(404, 'WORK_ORDER_NOT_FOUND', 'No encontrada')),
   },
 }));
-vi.mock('@/modules/brands/services/brandApi', () => ({
-  BRANDS_KEY: 'brands',
-  brandApi: { list: () => Promise.resolve({ items: [{ id: 1, nombre: 'Samsung' }], total: 1, page: 1, size: 100, pages: 1 }) },
+const devices = vi.hoisted(() => ({
+  brands: vi.fn(() => Promise.resolve({ items: [{ id: 1, nombre: 'Samsung' }], total: 1, page: 1, size: 100, pages: 1 })),
+  models: vi.fn(() => Promise.resolve({ items: [{ id: 2, nombre: 'A10' }], total: 1, page: 1, size: 100, pages: 1 })),
 }));
-vi.mock('@/modules/models/services/modelApi', () => ({
-  MODELS_KEY: 'models',
-  modelApi: { list: () => Promise.resolve({ items: [{ id: 2, nombre: 'A10' }], total: 1, page: 1, size: 100, pages: 1 }) },
-}));
+vi.mock('@/modules/brands/services/brandApi', () => ({ BRANDS_KEY: 'brands', brandApi: { list: devices.brands } }));
+vi.mock('@/modules/models/services/modelApi', () => ({ MODELS_KEY: 'models', modelApi: { list: devices.models } }));
 vi.mock('@/modules/users/services/userApi', () => ({ userApi: { technicians: () => Promise.resolve([]) } }));
 
 function renderForm(onSubmit = vi.fn<(body: WorkOrderRequest, photos: PhotoChanges) => Promise<void>>()) {
@@ -98,6 +96,20 @@ describe('WorkOrderForm', () => {
     expect(screen.getByText('Ana Pérez (usted)')).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Fecha\s*\*?$/)).not.toBeInTheDocument();
     expect(screen.getByLabelText('Fecha de entrega')).toHaveAttribute('type', 'datetime-local');
+  });
+
+  it('queries brands and models again every time a selector is opened', async () => {
+    renderForm();
+    const marca = screen.getByLabelText(/^Marca/);
+    await screen.findByRole('option', { name: 'Samsung' });
+    await userEvent.selectOptions(marca, '1');
+    await screen.findByRole('option', { name: 'A10' });
+    const brandCalls = devices.brands.mock.calls.length;
+    const modelCalls = devices.models.mock.calls.length;
+
+    fireEvent.mouseDown(screen.getByLabelText(/^Modelo\s*\*?$/));
+    await vi.waitFor(() => expect(devices.brands.mock.calls.length).toBe(brandCalls + 1));
+    expect(devices.models.mock.calls.length).toBe(modelCalls + 1);
   });
 
   it('chooses the color from the palette', async () => {

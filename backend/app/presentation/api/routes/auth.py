@@ -30,7 +30,7 @@ def _token_response(result) -> TokenResponse:
 
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, uow: UowDep, hasher: HasherDep, tokens: TokensDep) -> TokenResponse:
-    return _token_response(LoginUseCase(uow, hasher, tokens).execute(body.email, body.password))
+    return _token_response(LoginUseCase(uow, hasher, tokens).execute(body.email, body.password, body.remember))
 
 
 @router.post("/token", include_in_schema=False)

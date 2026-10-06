@@ -22,7 +22,8 @@ class AccessToken:
 
 class TokenService(ABC):
     @abstractmethod
-    def create_access_token(self, user_id: int) -> AccessToken: ...
+    def create_access_token(self, user_id: int, remember: bool = False) -> AccessToken:
+        """``remember`` ("Mantener la sesión iniciada") issues a longer-lived token."""
 
     @abstractmethod
     def decode_user_id(self, token: str) -> int:

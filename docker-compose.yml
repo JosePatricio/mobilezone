@@ -32,6 +32,7 @@ services:
       DATABASE_URL: mysql+pymysql://${DB_USER:-mobilezone}:${DB_PASSWORD}@db:3306/${DB_NAME:-mobilezone}?charset=utf8mb4
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in .env}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      REMEMBER_TOKEN_EXPIRE_DAYS: ${REMEMBER_TOKEN_EXPIRE_DAYS:-30}
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost"]}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}

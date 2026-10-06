@@ -4,7 +4,8 @@ import { authApi } from '@/modules/auth/services/authApi';
 import type { LoginRequest } from '@/modules/auth/types';
 import type { User } from '@/modules/users/types';
 import { onUnauthorized } from '@/shared/services/httpClient';
-import { tokenStorage } from '@/shared/services/tokenStorage';
+import { sessionSync } from '@/shared/services/sessionSync';
+import { tokenStorage, type StoredSession } from '@/shared/services/tokenStorage';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
 export type LogoutReason = 'manual' | 'expired';
@@ -24,14 +25,17 @@ export const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<AuthStatus>(() => (tokenStorage.get() ? 'loading' : 'anonymous'));
+  // Without a stored session, a new tab first asks the open tabs for theirs (sessionSync).
+  const [status, setStatus] = useState<AuthStatus>(() =>
+    tokenStorage.get() || sessionSync.available ? 'loading' : 'anonymous',
+  );
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<Set<string>>(new Set());
   const [logoutReason, setLogoutReason] = useState<LogoutReason | null>(null);
   const expiryTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  const logout = useCallback(
-    (reason: LogoutReason = 'manual') => {
+  const endSession = useCallback(
+    (reason: LogoutReason) => {
       clearTimeout(expiryTimer.current);
       tokenStorage.clear();
       queryClient.clear();
@@ -41,6 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus('anonymous');
     },
     [queryClient],
+  );
+
+  const logout = useCallback(
+    (reason: LogoutReason = 'manual') => {
+      // Logging out closes the session in every open tab.
+      if (reason === 'manual') sessionSync.publishLogout();
+      endSession(reason);
+    },
+    [endSession],
   );
 
   const scheduleExpiry = useCallback(
@@ -53,25 +66,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [logout],
   );
 
-  // Restore session on load.
+  // Restore the session on load: the stored one, or the one of another open tab.
   useEffect(() => {
-    const session = tokenStorage.get();
-    if (!session) return;
     let cancelled = false;
-    authApi
-      .me()
-      .then((me) => {
-        if (cancelled) return;
-        setUser(me.user);
-        setPermissions(new Set(me.permissions));
-        setStatus('authenticated');
-        scheduleExpiry(session.expiresAt);
-      })
-      .catch(() => !cancelled && logout('expired'));
+    const restore = (session: StoredSession) => {
+      setStatus('loading');
+      authApi
+        .me()
+        .then((me) => {
+          if (cancelled) return;
+          setUser(me.user);
+          setPermissions(new Set(me.permissions));
+          setLogoutReason(null);
+          setStatus('authenticated');
+          scheduleExpiry(session.expiresAt);
+        })
+        .catch(() => !cancelled && endSession('expired'));
+    };
+    const adopt = (session: StoredSession) => {
+      if (cancelled || tokenStorage.get()) return; // this tab already has a session
+      tokenStorage.set(session);
+      restore(session);
+    };
+
+    const stored = tokenStorage.get();
+    if (stored) restore(stored);
+    else if (sessionSync.available) {
+      void sessionSync.request().then((session) => {
+        if (session) adopt(session);
+        else if (!cancelled && !tokenStorage.get()) setStatus('anonymous');
+      });
+    }
+    const unsubscribe = sessionSync.subscribe({ onSession: adopt, onLogout: () => endSession('manual') });
     return () => {
       cancelled = true;
+      unsubscribe();
     };
-  }, [logout, scheduleExpiry]);
+  }, [endSession, scheduleExpiry]);
 
   // Any 401 from the API (expired/invalid token) closes the session.
   useEffect(() => onUnauthorized(() => logout('expired')), [logout]);
@@ -81,7 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (credentials: LoginRequest) => {
       const result = await authApi.login(credentials);
-      tokenStorage.set({ token: result.access_token, expiresAt: result.expires_at });
+      const session = { token: result.access_token, expiresAt: result.expires_at };
+      tokenStorage.set(session, Boolean(credentials.remember));
+      sessionSync.publishSession(session); // other open tabs on the login screen enter too
       setUser(result.user);
       setPermissions(new Set(result.permissions));
       setLogoutReason(null);

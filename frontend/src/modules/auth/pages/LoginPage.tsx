@@ -4,12 +4,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/app/store/AuthProvider';
-import { Button, Input } from '@/shared/components';
+import { Button, Checkbox, Input } from '@/shared/components';
 import { getErrorMessage } from '@/shared/services/apiError';
 
 const schema = z.object({
   email: z.string().trim().min(1, 'Ingrese su email').email('Email inválido'),
   password: z.string().min(1, 'Ingrese su contraseña'),
+  remember: z.boolean(),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -21,7 +22,7 @@ export function LoginPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { email: '', password: '' } });
+  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { email: '', password: '', remember: false } });
 
   if (status === 'authenticated') {
     const from = (location.state as { from?: string } | null)?.from ?? '/';
@@ -74,6 +75,7 @@ export function LoginPage() {
           error={errors.password?.message}
           {...register('password')}
         />
+        <Checkbox label="Mantener la sesión iniciada" {...register('remember')} />
         <Button type="submit" loading={isSubmitting} className="btn-block">
           Ingresar
         </Button>

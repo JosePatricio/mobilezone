@@ -93,6 +93,8 @@ DB_PASSWORD=<second openssl rand -hex 16>
 
 JWT_SECRET_KEY=<openssl rand -base64 48 output>
 ACCESS_TOKEN_EXPIRE_MINUTES=60
+# "Mantener la sesión iniciada" (login checkbox)
+REMEMBER_TOKEN_EXPIRE_DAYS=30
 BCRYPT_ROUNDS=12
 
 CORS_ORIGINS=["http://<server-ip>:8082"]

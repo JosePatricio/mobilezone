@@ -50,3 +50,21 @@ def test_new_password_rules(client, factory):
 def test_change_password_requires_login(client):
     response = client.post(URL, json={"current_password": PASSWORD, "new_password": "NuevaClave99"})
     assert response.status_code == 401
+
+
+def _expires_in_hours(response) -> float:
+    from datetime import datetime, timezone
+
+    expires_at = datetime.fromisoformat(response.json()["expires_at"].replace("Z", "+00:00"))
+    return (expires_at - datetime.now(timezone.utc)).total_seconds() / 3600
+
+
+def test_keep_session_issues_a_longer_token(client, factory, settings):
+    seller = factory.user(SystemRole.VENDEDOR)
+    normal = client.post(f"{API}/auth/login", json={"email": seller.email, "password": PASSWORD})
+    kept = client.post(f"{API}/auth/login", json={"email": seller.email, "password": PASSWORD, "remember": True})
+    assert normal.status_code == 200 and kept.status_code == 200
+    assert _expires_in_hours(normal) <= settings.access_token_expire_minutes / 60
+    assert _expires_in_hours(kept) > 24 * (settings.remember_token_expire_days - 1)
+    me = client.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {kept.json()['access_token']}"})
+    assert me.status_code == 200

@@ -17,7 +17,7 @@ class LoginUseCase(UseCase):
         self.hasher = hasher
         self.tokens = tokens
 
-    def execute(self, email: str, password: str) -> LoginResult:
+    def execute(self, email: str, password: str, remember: bool = False) -> LoginResult:
         user = self.uow.users.get_by_email(email.strip().lower())
         # Clients without password cannot log in (pending definition, spec §25.7).
         if user is None or not user.password:
@@ -26,7 +26,7 @@ class LoginUseCase(UseCase):
             raise AuthenticationError(INVALID_CREDENTIALS, code="INVALID_CREDENTIALS")
         if not user.estado:
             raise AuthenticationError("El usuario se encuentra inactivo.", code="USER_INACTIVE")
-        token = self.tokens.create_access_token(user.id)  # type: ignore[arg-type]
+        token = self.tokens.create_access_token(user.id, remember)  # type: ignore[arg-type]
         return LoginResult(
             access_token=token.token,
             expires_at=token.expires_at,

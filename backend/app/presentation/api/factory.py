@@ -33,7 +33,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.session_factory = build_session_factory(engine)
     app.state.password_hasher = BcryptPasswordHasher(settings.bcrypt_rounds)
     app.state.token_service = JwtTokenService(
-        settings.jwt_secret_key, settings.jwt_algorithm, settings.access_token_expire_minutes
+        settings.jwt_secret_key,
+        settings.jwt_algorithm,
+        settings.access_token_expire_minutes,
+        remember_expire_minutes=settings.remember_token_expire_days * 24 * 60,
     )
     media_dir = Path(settings.media_dir)
     media_dir.mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Controller, useForm, useWatch, type FieldValues, type Path, type UseFormSetError } from 'react-hook-form';
 import { z } from 'zod';
 import { useAuth } from '@/app/store/AuthProvider';
@@ -144,6 +144,19 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
   const brands = useOptions(BRANDS_KEY, brandApi);
   const models = useOptions(MODELS_KEY, modelApi, { brand_id: Number(marcaId) }, Boolean(marcaId));
 
+  // Brands and models can be added from another tab: query both every time a selector is opened
+  // (and when returning to this tab). An in-flight query is reused instead of starting another one.
+  const { refetch: refetchBrands } = brands;
+  const { refetch: refetchModels } = models;
+  const refreshDevices = useCallback(() => {
+    void refetchBrands({ cancelRefetch: false });
+    if (marcaId) void refetchModels({ cancelRefetch: false });
+  }, [refetchBrands, refetchModels, marcaId]);
+  useEffect(() => {
+    window.addEventListener('focus', refreshDevices);
+    return () => window.removeEventListener('focus', refreshDevices);
+  }, [refreshDevices]);
+
   // Reset the model when the brand changes (models are filtered by brand).
   const previousBrand = useRef(marcaId);
   useEffect(() => {
@@ -285,10 +298,21 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
 
       <Card title="Datos del celular">
         <div className="form-grid">
-          <Select label="Marca" required options={brandOptions} placeholder="Seleccione…" error={errors.marca_id?.message} {...register('marca_id')} />
+          <Select
+            label="Marca"
+            required
+            options={brandOptions}
+            placeholder="Seleccione…"
+            error={errors.marca_id?.message}
+            onMouseDown={refreshDevices}
+            onFocus={refreshDevices}
+            {...register('marca_id')}
+          />
           <Select
             label="Modelo"
             required
+            onMouseDown={refreshDevices}
+            onFocus={refreshDevices}
             options={modelOptions}
             placeholder={marcaId ? 'Seleccione…' : 'Seleccione primero una marca'}
             disabled={!marcaId}
