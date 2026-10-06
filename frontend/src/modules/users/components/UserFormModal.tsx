@@ -30,6 +30,7 @@ function buildSchema(isEdit: boolean, roles: NamedRef[]) {
       celular: zCelular,
       provincia: zOptionalText(100),
       ciudad: zOptionalText(100),
+      direccion: zOptionalText(255),
       rol_id: zRequiredId('Seleccione un rol'),
       password: z.string().max(128).optional(),
       branch_ids: z.array(z.number()),
@@ -95,6 +96,7 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
       celular: user?.celular ?? '',
       provincia: user?.provincia ?? '',
       ciudad: user?.ciudad ?? '',
+      direccion: user?.direccion ?? '',
       rol_id: user?.rol_id ?? clientRoleId ?? '',
       password: '',
       branch_ids: user?.branches.map((b) => b.id) ?? [],
@@ -179,6 +181,13 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
           {...register('rol_id')}
         />
         <LocationFields register={register} setValue={setValue} errors={errors} provincia={provincia as string} />
+        <Input
+          label="Dirección"
+          className="full"
+          hint="Se muestra en los repuestos que publica el afiliado"
+          error={errors.direccion?.message}
+          {...register('direccion')}
+        />
         {isClient ? (
           <p className="field-hint">Los clientes no inician sesión: no necesitan contraseña.</p>
         ) : (

@@ -70,6 +70,8 @@ Estado de servidor con TanStack Query, formularios con react-hook-form + zod.
 | locations | `GET /locations/provinces` (provincias del Ecuador con sus ciudades) |
 | sales | `GET`, `GET /{id}`, `POST` (confirmar: `branch_id`, `items[{inventory_id, cantidad}]`, `metodo_pago`, `monto_recibido`, `factura`, `cliente_id`), `PUT /{id}` (modificar / devoluciones), `POST /{id}/cancel` (eliminar = anular), `GET /{id}/receipt` (PDF), `GET /customers/lookup?identificacion=`, `POST /customers` (registrar cliente) |
 | work-orders | CRUD, `PATCH /{id}/status`, `GET /by-number/{n}`, `GET /statuses`, `POST /calculate-balance`, `POST/DELETE /{id}/spare-parts` |
+| affiliate-parts | Repuestos de afiliados (rol TECNICO, permiso `affiliate_parts.manage`): `GET` (los propios; todos con `affiliate_parts.any`, filtros `tipo`, `condicion`, `estado`, `garantia`, `search`, `user_id`), `GET /{id}`, `POST`, `PUT /{id}`, `PATCH /{id}/status` (DISPONIBLE / VENDIDO), `DELETE /{id}`, `GET /visits` |
+| public/affiliate-parts | Catálogo público sin login (página `/repuestos`): `GET` (repuestos de todos los afiliados activos, con su dirección `users.direccion`), `GET /catalogs`, `POST /visits` (contador de visitas) |
 
 Listados paginados: `?page=&size=` (máx. 100) → `{items, total, page, size, pages}`. Montos como string decimal (`"10.50"`).
 

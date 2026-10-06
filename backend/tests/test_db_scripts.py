@@ -434,3 +434,47 @@ def test_upgrade_008_status_history_and_order_sales(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_009_affiliate_parts_address_and_permissions(mysql_engine: Engine):
+    """v8 database (0001 + 002..008) with a configured TECNICO role -> upgrade 009."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (
+        initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004,
+        sql.UPGRADE_005, sql.UPGRADE_006, sql.UPGRADE_007, sql.UPGRADE_008,
+    )
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+            q = conn.exec_driver_sql
+            q("INSERT IGNORE INTO roles (nombre) VALUES ('ADMIN'), ('TECNICO')")
+            q("INSERT IGNORE INTO permissions (codigo) VALUES ('work_orders.view')")
+            q(
+                "INSERT IGNORE INTO role_permissions (role_id, permission_id) "
+                "SELECT r.id, p.id FROM roles r CROSS JOIN permissions p"
+            )
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_009)
+        with mysql_engine.connect() as conn:
+            q = conn.exec_driver_sql
+            assert "direccion" in set(q("SHOW COLUMNS FROM users").scalars())
+            assert {"affiliate_parts", "page_visits"} <= set(q("SHOW TABLES").scalars())
+            granted = q(
+                "SELECT r.nombre, p.codigo FROM role_permissions rp JOIN roles r ON r.id = rp.role_id "
+                "JOIN permissions p ON p.id = rp.permission_id WHERE p.codigo LIKE 'affiliate%%'"
+            ).all()
+            assert sorted(map(tuple, granted)) == [
+                ("ADMIN", "affiliate_parts.any"),
+                ("ADMIN", "affiliate_parts.manage"),
+                ("TECNICO", "affiliate_parts.manage"),
+            ]
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

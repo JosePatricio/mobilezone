@@ -57,7 +57,9 @@ INSERT INTO permissions (codigo, descripcion) VALUES
     ('spare_parts.create', 'Crear repuestos'),
     ('spare_parts.update', 'Editar y activar/desactivar repuestos'),
     ('spare_parts.delete', 'Eliminar repuestos'),
-    ('settings.reset_data', 'Configuración: vaciar todos los datos del negocio')
+    ('settings.reset_data', 'Configuración: vaciar todos los datos del negocio'),
+    ('affiliate_parts.manage', 'Repuestos de afiliados: publicar y administrar sus propios repuestos'),
+    ('affiliate_parts.any', 'Repuestos de afiliados: administrar los repuestos de todos los afiliados')
 ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion);
 
 -- System roles (the role defines the kind of user) ---------------------------
@@ -89,7 +91,7 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.codigo IN (
     'products.view', 'clients.view', 'clients.create',
     'brands.view', 'models.view', 'work_orders.view',
     'work_orders.create', 'work_orders.update', 'work_orders.spare_parts.add',
-    'work_orders.spare_parts.remove', 'spare_parts.view'
+    'work_orders.spare_parts.remove', 'spare_parts.view', 'affiliate_parts.manage'
 ) WHERE r.nombre = 'TECNICO';
 
 -- CLIENTE: no permissions (clients do not log in)

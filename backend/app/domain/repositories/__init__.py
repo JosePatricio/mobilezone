@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Generic, Iterator, TypeVar
 
 from app.domain.entities import (
+    AffiliatePart,
     Branch,
     Brand,
     Category,
@@ -22,6 +23,7 @@ from app.domain.entities import (
     User,
     WorkOrder,
 )
+from app.domain.value_objects.affiliate_parts import AffiliatePartStatus, AffiliatePartType, PartCondition
 from app.domain.value_objects.enums import SaleStatus
 from app.domain.value_objects.pagination import Page, PageRequest
 
@@ -215,6 +217,33 @@ class WorkOrderRepository(Repository[WorkOrder]):
     ) -> Page[WorkOrder]: ...
 
 
+class AffiliatePartRepository(Repository[AffiliatePart]):
+    @abstractmethod
+    def list(
+        self,
+        page: PageRequest,
+        *,
+        user_id: int | None = None,
+        tipo: AffiliatePartType | None = None,
+        condicion: PartCondition | None = None,
+        estado: AffiliatePartStatus | None = None,
+        garantia: bool | None = None,
+        search: str | None = None,
+        active_affiliates: bool = False,
+    ) -> Page[AffiliatePart]:
+        """``search`` matches the description or the affiliate name / city; ``active_affiliates``
+        leaves out the parts of deactivated users (public catalog)."""
+
+
+class PageVisitRepository(ABC):
+    @abstractmethod
+    def increment(self, pagina: str) -> int:
+        """Adds one visit to the page and returns the new total."""
+
+    @abstractmethod
+    def count(self, pagina: str) -> int: ...
+
+
 class DataResetRepository(ABC):
     @abstractmethod
     def delete_business_data(self, client_role: str) -> tuple[dict[str, int], list[str]]:
@@ -244,6 +273,8 @@ class UnitOfWork(ABC):
     models: DeviceModelRepository
     spare_parts: SparePartRepository
     work_orders: WorkOrderRepository
+    affiliate_parts: AffiliatePartRepository
+    page_visits: PageVisitRepository
     data_reset: DataResetRepository
 
     @abstractmethod

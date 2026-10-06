@@ -31,6 +31,7 @@ from sqlalchemy.dialects.mysql import DATETIME
 from sqlalchemy.orm import column_property, registry, relationship
 
 from app.domain.entities import (
+    AffiliatePart,
     Branch,
     Brand,
     Category,
@@ -50,6 +51,7 @@ from app.domain.entities import (
     WorkOrderStatusChange,
 )
 from app.domain.entities.base import utcnow
+from app.domain.value_objects.affiliate_parts import AffiliatePartStatus, AffiliatePartType, PartCondition
 from app.domain.value_objects.enums import PaymentMethod, SaleStatus, StockMovementType
 from app.domain.value_objects.work_orders import DisplayType, EntryReason, LockType
 
@@ -151,6 +153,7 @@ users_table = Table(
     Column("celular", String(20)),
     Column("provincia", String(100)),
     Column("ciudad", String(100)),  # canton of the province (see value_objects/locations.py)
+    Column("direccion", String(255)),  # address (shown in the affiliate spare parts)
     Column("foto", String(255)),  # relative path in the media storage
     Column("rol_id", ForeignKey("roles.id"), nullable=False, index=True),  # the role defines the user kind
     Column("estado", Boolean, nullable=False, default=True, server_default=TRUE),
@@ -363,6 +366,37 @@ work_order_spare_parts_table = Table(
     CheckConstraint("cantidad > 0", name="cantidad_positive"),
 )
 
+affiliate_parts_table = Table(
+    "affiliate_parts",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", ForeignKey("users.id"), nullable=False, index=True),  # affiliate who published it
+    Column("tipo", _str_enum(AffiliatePartType), nullable=False, index=True),
+    Column("condicion", _str_enum(PartCondition), nullable=False),  # nuevo / usado
+    Column("garantia", Boolean, nullable=False, default=False, server_default=FALSE),
+    Column("estado", _str_enum(AffiliatePartStatus), nullable=False, index=True),  # disponible / vendido
+    Column("descripcion", Text),
+    Column("precio", MONEY),
+    *_timestamps(),
+    CheckConstraint("precio IS NULL OR precio >= 0", name="precio_non_negative"),
+)
+
+# Visit counters of public pages (e.g. the affiliate spare parts catalog).
+page_visits_table = Table(
+    "page_visits",
+    metadata,
+    Column("pagina", String(50), primary_key=True),
+    Column("visitas", Integer, nullable=False, default=0, server_default=FALSE),
+    Column(
+        "updated_at",
+        TIMESTAMP,
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+        server_default=text("CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)"),
+    ),
+)
+
 Index("ix_users_nombre_apellido", users_table.c.nombre, users_table.c.apellido)
 
 # InnoDB (transactions, FKs, row locks for SELECT ... FOR UPDATE) and full Unicode.
@@ -461,6 +495,9 @@ def start_mappers() -> None:
         WorkOrderStatusChange,
         work_order_status_changes_table,
         properties={"user": relationship(User, lazy="joined")},
+    )
+    mapper_registry.map_imperatively(
+        AffiliatePart, affiliate_parts_table, properties={"user": relationship(User, lazy="joined")}
     )
     wo = work_orders_table.c
     mapper_registry.map_imperatively(

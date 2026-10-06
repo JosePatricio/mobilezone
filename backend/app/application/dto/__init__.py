@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 
+from app.domain.value_objects.affiliate_parts import AffiliatePartStatus, AffiliatePartType, PartCondition
 from app.domain.value_objects.enums import PaymentMethod
 
 
@@ -103,6 +104,26 @@ class SparePartData:
 
 
 @dataclass(frozen=True)
+class AffiliatePartData:
+    tipo: AffiliatePartType
+    condicion: PartCondition = PartCondition.NUEVO
+    garantia: bool = False
+    estado: AffiliatePartStatus = AffiliatePartStatus.DISPONIBLE
+    descripcion: str | None = None
+    precio: Decimal | None = None
+
+
+@dataclass(frozen=True)
+class AffiliatePartFilters:
+    tipo: AffiliatePartType | None = None
+    condicion: PartCondition | None = None
+    estado: AffiliatePartStatus | None = None
+    garantia: bool | None = None
+    search: str | None = None
+    user_id: int | None = None  # affiliate (only with affiliate_parts.any)
+
+
+@dataclass(frozen=True)
 class UserData:
     """Create / update data. The role defines the kind of user (no separate user type)."""
 
@@ -115,6 +136,7 @@ class UserData:
     celular: str | None = None
     provincia: str | None = None
     ciudad: str | None = None
+    direccion: str | None = None
     estado: bool = True
     branch_ids: list[int] | None = None  # sucursales (required for VENDEDOR)
 

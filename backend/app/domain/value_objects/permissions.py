@@ -66,6 +66,9 @@ class Perm:
 
     SETTINGS_RESET_DATA = "settings.reset_data"
 
+    AFFILIATE_PARTS_MANAGE = "affiliate_parts.manage"
+    AFFILIATE_PARTS_ANY = "affiliate_parts.any"
+
 
 PERMISSION_CATALOG: dict[str, str] = {
     Perm.USERS_VIEW: "Ver usuarios",
@@ -114,6 +117,8 @@ PERMISSION_CATALOG: dict[str, str] = {
     Perm.SPARE_PARTS_UPDATE: "Editar y activar/desactivar repuestos",
     Perm.SPARE_PARTS_DELETE: "Eliminar repuestos",
     Perm.SETTINGS_RESET_DATA: "Configuración: vaciar todos los datos del negocio",
+    Perm.AFFILIATE_PARTS_MANAGE: "Repuestos de afiliados: publicar y administrar sus propios repuestos",
+    Perm.AFFILIATE_PARTS_ANY: "Repuestos de afiliados: administrar los repuestos de todos los afiliados",
 }
 
 ALL_PERMISSIONS: list[str] = list(PERMISSION_CATALOG)
@@ -158,6 +163,8 @@ DEFAULT_ROLES: dict[str, list[str]] = {
         Perm.WORK_ORDERS_SPARE_PARTS_ADD,
         Perm.WORK_ORDERS_SPARE_PARTS_REMOVE,
         Perm.SPARE_PARTS_VIEW,
+        # Affiliate: publishes their own spare parts in the public catalog.
+        Perm.AFFILIATE_PARTS_MANAGE,
     ],
     # Clients do not log in and have no permissions.
     "CLIENTE": [],

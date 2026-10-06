@@ -93,6 +93,7 @@ class UserUseCases(_UserValidation):
             celular=data.celular,
             provincia=data.provincia,
             ciudad=data.ciudad,
+            direccion=data.direccion,
             estado=data.estado,
         )
 
@@ -160,7 +161,10 @@ class UserUseCases(_UserValidation):
                 raise ValidationError("No puede desactivar su propio usuario.", code="CANNOT_DEACTIVATE_SELF")
             if user.id == actor.id and data.rol_id != user.rol_id:
                 raise ValidationError("No puede cambiar su propio rol.", code="CANNOT_CHANGE_OWN_ROLE")
-            attrs = ("nombre", "apellido", "email", "identificacion", "celular", "provincia", "ciudad", "estado", "rol_id")
+            attrs = (
+                "nombre", "apellido", "email", "identificacion", "celular",
+                "provincia", "ciudad", "direccion", "estado", "rol_id",
+            )
             for attr in attrs:
                 setattr(user, attr, getattr(changes, attr))
             user.set_branches(self._resolve_branches(role, data.branch_ids))

@@ -80,6 +80,7 @@ class User(Activatable):
     celular: str | None = None
     provincia: str | None = None
     ciudad: str | None = None
+    direccion: str | None = None  # address shown in the affiliate spare parts
     foto: str | None = None
     estado: bool = True
     branches: list[Branch] = field(default_factory=list)  # sucursales assigned (sellers)
@@ -98,6 +99,8 @@ class User(Activatable):
         self.identificacion = normalize_identificacion(self.identificacion)
         self.celular = normalize_celular(self.celular)
         self.provincia, self.ciudad = validate_location(self.provincia, self.ciudad)
+        direccion = optional_text(self.direccion)
+        self.direccion = require_text(direccion, "direccion", 255) if direccion else None
 
     @property
     def nombre_completo(self) -> str:

@@ -19,6 +19,7 @@ OptionalEmail = Annotated[
 Celular = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=20)]
 Provincia = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=100)]
 Ciudad = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=100)]
+Direccion = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=255)]
 
 
 class BranchRef(Schema):
@@ -63,6 +64,7 @@ class UserResponse(_WithPhoto):
     celular: str | None
     provincia: str | None
     ciudad: str | None
+    direccion: str | None
     rol_id: int
     role: RoleSummary
     branches: list[BranchRef] = Field(description="Sucursales asignadas")
@@ -99,6 +101,7 @@ class UserRequest(RequestSchema):
     celular: Celular = None
     provincia: Provincia = None
     ciudad: Ciudad = None
+    direccion: Direccion = Field(default=None, description="Dirección (se muestra en los repuestos de afiliados)")
     estado: bool = True
     branch_ids: list[int] = Field(default_factory=list, description="Sucursales (obligatorio para VENDEDOR)")
 

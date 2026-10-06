@@ -16,6 +16,7 @@ export const testUser: User = {
   celular: '0991234567',
   provincia: 'Pichincha',
   ciudad: 'Quito',
+  direccion: null,
   foto_url: null,
   rol_id: 1,
   role: { id: 1, nombre: 'VENDEDOR' },

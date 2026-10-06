@@ -306,3 +306,4 @@ Do **not** run `docker compose down -v`. It deletes the database volume and all 
 cd /opt/mobilezone
 git pull
 docker compose up -d --build
+

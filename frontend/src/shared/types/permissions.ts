@@ -49,6 +49,8 @@ export const PERMISSIONS = {
   SPARE_PARTS_UPDATE: 'spare_parts.update',
   SPARE_PARTS_DELETE: 'spare_parts.delete',
   SETTINGS_RESET_DATA: 'settings.reset_data',
+  AFFILIATE_PARTS_MANAGE: 'affiliate_parts.manage',
+  AFFILIATE_PARTS_ANY: 'affiliate_parts.any',
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

@@ -6,12 +6,14 @@ from sqlalchemy.orm import Session
 from app.domain.exceptions import ConflictError
 from app.domain.repositories import UnitOfWork
 from app.infrastructure.repositories.sqlalchemy import (
+    SqlAlchemyAffiliatePartRepository,
     SqlAlchemyBranchRepository,
     SqlAlchemyBrandRepository,
     SqlAlchemyCategoryRepository,
     SqlAlchemyDataResetRepository,
     SqlAlchemyDeviceModelRepository,
     SqlAlchemyInventoryRepository,
+    SqlAlchemyPageVisitRepository,
     SqlAlchemyPermissionRepository,
     SqlAlchemyProductRepository,
     SqlAlchemyRoleRepository,
@@ -41,6 +43,8 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.models = SqlAlchemyDeviceModelRepository(session)
         self.spare_parts = SqlAlchemySparePartRepository(session)
         self.work_orders = SqlAlchemyWorkOrderRepository(session)
+        self.affiliate_parts = SqlAlchemyAffiliatePartRepository(session)
+        self.page_visits = SqlAlchemyPageVisitRepository(session)
         self.data_reset = SqlAlchemyDataResetRepository(session)
 
     def _translate(self, exc: IntegrityError) -> ConflictError:

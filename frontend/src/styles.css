@@ -689,6 +689,15 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .public-page { min-height: 100vh; background: var(--bg); display: flex; justify-content: center; padding: 24px 16px; }
 .public-card { width: 100%; max-width: 480px; }
 .public-card .app-brand { margin-bottom: 16px; color: var(--text); }
+
+/* Public catalog of the affiliate spare parts */
+.public-catalog { width: 100%; max-width: 1100px; }
+.public-catalog .app-brand { margin-bottom: 16px; color: var(--text); }
+.part-grid { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.part-card { margin: 0; }
+.part-card-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.part-card-header h2 { margin: 0; font-size: 1.1rem; }
+.public-visits { text-align: center; }
 .d-block { display: block; }
 
 /* Work orders v6 */

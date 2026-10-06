@@ -6,10 +6,12 @@ from decimal import Decimal
 from typing import Generic, TypeVar
 
 from sqlalchemy import Select, and_, delete, func, or_, select, text
+from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import Session
 
 from app.domain import repositories as ports
 from app.domain.entities import (
+    AffiliatePart,
     Branch,
     Brand,
     Category,
@@ -27,11 +29,13 @@ from app.domain.entities import (
 from app.domain.value_objects.enums import SaleStatus
 from app.domain.value_objects.pagination import Page, PageRequest
 from app.infrastructure.database.tables import (
+    affiliate_parts_table,
     branches_table,
     brands_table,
     categories_table,
     inventory_table,
     models_table,
+    page_visits_table,
     permissions_table,
     products_table,
     roles_table,
@@ -418,6 +422,63 @@ class SqlAlchemyWorkOrderRepository(SqlAlchemyRepository[WorkOrder], ports.WorkO
         if fecha_hasta is not None:
             stmt = stmt.where(c.fecha <= fecha_hasta)
         return self._paginate(stmt.order_by(c.num_orden.desc()), page)
+
+
+class SqlAlchemyAffiliatePartRepository(SqlAlchemyRepository[AffiliatePart], ports.AffiliatePartRepository):
+    entity = AffiliatePart
+
+    def list(
+        self,
+        page,
+        *,
+        user_id=None,
+        tipo=None,
+        condicion=None,
+        estado=None,
+        garantia=None,
+        search=None,
+        active_affiliates=False,
+    ):
+        c = affiliate_parts_table.c
+        u = users_table.alias("affiliate")
+        stmt = select(AffiliatePart).join(u, u.c.id == c.user_id)
+        if user_id is not None:
+            stmt = stmt.where(c.user_id == user_id)
+        if tipo is not None:
+            stmt = stmt.where(c.tipo == tipo)
+        if condicion is not None:
+            stmt = stmt.where(c.condicion == condicion)
+        if estado is not None:
+            stmt = stmt.where(c.estado == estado)
+        if garantia is not None:
+            stmt = stmt.where(c.garantia == garantia)
+        if search:
+            pattern = _like(search)
+            stmt = stmt.where(
+                or_(
+                    func.lower(func.coalesce(c.descripcion, "")).like(pattern, escape="\\"),
+                    func.lower(u.c.nombre + " " + u.c.apellido).like(pattern, escape="\\"),
+                    func.lower(func.coalesce(u.c.ciudad, "")).like(pattern, escape="\\"),
+                )
+            )
+        if active_affiliates:
+            stmt = stmt.where(u.c.estado.is_(True))
+        return self._paginate(stmt.order_by(c.created_at.desc(), c.id.desc()), page)
+
+
+class SqlAlchemyPageVisitRepository(ports.PageVisitRepository):
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def increment(self, pagina: str) -> int:
+        # Atomic upsert: concurrent visits never lose a count.
+        stmt = mysql_insert(page_visits_table).values(pagina=pagina, visitas=1)
+        self.session.execute(stmt.on_duplicate_key_update(visitas=page_visits_table.c.visitas + 1))
+        return self.count(pagina)
+
+    def count(self, pagina: str) -> int:
+        c = page_visits_table.c
+        return int(self.session.scalar(select(c.visitas).where(c.pagina == pagina)) or 0)
 
 
 class SqlAlchemyDataResetRepository(ports.DataResetRepository):

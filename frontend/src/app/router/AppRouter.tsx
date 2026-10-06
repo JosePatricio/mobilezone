@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { MainLayout } from '@/layouts/MainLayout';
+import { AffiliatePartsPage, PUBLIC_CATALOG_PATH } from '@/modules/affiliate-parts/pages/AffiliatePartsPage';
+import { PublicAffiliatePartsPage } from '@/modules/affiliate-parts/pages/PublicAffiliatePartsPage';
 import { LoginPage } from '@/modules/auth/pages/LoginPage';
 import { BranchesPage } from '@/modules/branches/pages/BranchesPage';
 import { BrandsPage } from '@/modules/brands/pages/BrandsPage';
@@ -33,6 +35,8 @@ export function AppRouter() {
       <Route path="/login" element={<LoginPage />} />
       {/* Public status page of a work order (QR); no session needed. */}
       <Route path="/orden/:codigo" element={<PublicWorkOrderPage />} />
+      {/* Public catalog of the affiliate spare parts; no session needed. */}
+      <Route path={PUBLIC_CATALOG_PATH} element={<PublicAffiliatePartsPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
@@ -77,6 +81,9 @@ export function AppRouter() {
 
           <Route element={<PermissionRoute permission={P.SPARE_PARTS_VIEW} />}>
             <Route path="spare-parts" element={<SparePartsPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission={P.AFFILIATE_PARTS_MANAGE} />}>
+            <Route path="affiliate-parts" element={<AffiliatePartsPage />} />
           </Route>
           <Route element={<PermissionRoute permission={P.CLIENTS_VIEW} />}>
             <Route path="clients" element={<ClientsPage />} />

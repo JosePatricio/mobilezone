@@ -34,6 +34,10 @@ export const NAVIGATION: NavGroup[] = [
     ],
   },
   {
+    label: 'Afiliados',
+    items: [{ to: '/affiliate-parts', label: 'Repuestos afiliados', permissions: [P.AFFILIATE_PARTS_MANAGE] }],
+  },
+  {
     label: 'Configuración',
     items: [
       { to: '/branches', label: 'Sucursales', permissions: [P.BRANCHES_VIEW] },

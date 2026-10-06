@@ -18,6 +18,8 @@ export interface User extends Timestamps {
   celular: string | null;
   provincia: string | null;
   ciudad: string | null;
+  /** Address (shown in the affiliate spare parts). */
+  direccion: string | null;
   /** null = show the default avatar */
   foto_url: string | null;
   rol_id: Id;
@@ -37,6 +39,7 @@ export interface UserRequest {
   celular: string | null;
   provincia: string | null;
   ciudad: string | null;
+  direccion: string | null;
   estado: boolean;
   /** Required for the VENDEDOR role */
   branch_ids: Id[];

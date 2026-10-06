@@ -1,3 +1,4 @@
+from app.domain.entities.affiliate_part import AffiliatePart
 from app.domain.entities.branch import Branch
 from app.domain.entities.catalog import Brand, Category, DeviceModel
 from app.domain.entities.inventory import Inventory
@@ -14,6 +15,7 @@ from app.domain.entities.work_order import (
 )
 
 __all__ = [
+    "AffiliatePart",
     "Branch",
     "Brand",
     "Category",
