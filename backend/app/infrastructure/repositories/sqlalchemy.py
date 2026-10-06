@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Generic, TypeVar
 
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import Select, and_, delete, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.domain import repositories as ports
@@ -35,10 +35,14 @@ from app.infrastructure.database.tables import (
     permissions_table,
     products_table,
     roles_table,
+    sale_details_table,
     sales_table,
     spare_parts_table,
     stock_movements_table,
     users_table,
+    work_order_photos_table,
+    work_order_spare_parts_table,
+    work_order_status_changes_table,
     work_orders_table,
 )
 
@@ -414,3 +418,72 @@ class SqlAlchemyWorkOrderRepository(SqlAlchemyRepository[WorkOrder], ports.WorkO
         if fecha_hasta is not None:
             stmt = stmt.where(c.fecha <= fecha_hasta)
         return self._paginate(stmt.order_by(c.num_orden.desc()), page)
+
+
+class SqlAlchemyDataResetRepository(ports.DataResetRepository):
+    """Bulk delete of the business data, children before parents (no ON DELETE CASCADE needed)."""
+
+    # Tables whose numbering restarts from 1 (order and sale numbers come from their ids).
+    RENUMBERED = (
+        work_order_spare_parts_table,
+        work_order_photos_table,
+        work_order_status_changes_table,
+        sale_details_table,
+        sales_table,
+        work_orders_table,
+        stock_movements_table,
+        inventory_table,
+        products_table,
+        categories_table,
+        spare_parts_table,
+        models_table,
+        brands_table,
+    )
+
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def delete_business_data(self, client_role: str) -> tuple[dict[str, int], list[str]]:
+        client_ids = (
+            select(users_table.c.id)
+            .join(roles_table, roles_table.c.id == users_table.c.rol_id)
+            .where(roles_table.c.nombre == client_role)
+        )
+        files = [
+            *self.session.scalars(select(work_order_photos_table.c.ruta)),
+            *self.session.scalars(select(products_table.c.imagen).where(products_table.c.imagen.is_not(None))),
+            *self.session.scalars(
+                select(users_table.c.foto).where(users_table.c.foto.is_not(None), users_table.c.id.in_(client_ids))
+            ),
+        ]
+        # MySQL cannot delete from a table selected in its own subquery: resolve the ids first.
+        client_id_list = list(self.session.scalars(client_ids))
+
+        def remove(table, *where) -> int:
+            return self.session.execute(delete(table).where(*where)).rowcount
+
+        counts = {
+            "ordenes_repuestos": remove(work_order_spare_parts_table),
+            "ordenes_fotos": remove(work_order_photos_table),
+            "ordenes_historial": remove(work_order_status_changes_table),
+            "ventas_detalles": remove(sale_details_table),
+            "ventas": remove(sales_table),
+            "ordenes": remove(work_orders_table),
+            "movimientos_stock": remove(stock_movements_table),
+            "inventario": remove(inventory_table),
+            "productos": remove(products_table),
+            "categorias": remove(categories_table),
+            "repuestos": remove(spare_parts_table),
+            "modelos": remove(models_table),
+            "marcas": remove(brands_table),
+            "clientes": remove(users_table, users_table.c.id.in_(client_id_list)) if client_id_list else 0,
+        }
+        return counts, files
+
+    def restart_numbering(self) -> None:
+        if self.session.get_bind().dialect.name != "mysql":
+            return
+        for table in self.RENUMBERED:
+            # ALTER TABLE commits implicitly: only called once the data is deleted and committed.
+            self.session.execute(text(f"ALTER TABLE `{table.name}` AUTO_INCREMENT = 1"))
+        self.session.commit()

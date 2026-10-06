@@ -42,6 +42,7 @@ export const NAVIGATION: NavGroup[] = [
       { to: '/users', label: 'Usuarios', permissions: [P.USERS_VIEW] },
       { to: '/roles', label: 'Roles', permissions: [P.ROLES_VIEW] },
       { to: '/permissions', label: 'Permisos', permissions: [P.PERMISSIONS_VIEW] },
+      { to: '/settings', label: 'Configuración', permissions: [P.SETTINGS_RESET_DATA] },
     ],
   },
 ];

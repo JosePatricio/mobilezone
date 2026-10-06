@@ -14,6 +14,7 @@ from app.infrastructure.security.passwords import BcryptPasswordHasher
 from app.infrastructure.pdf.receipt import ReportLabReceiptRenderer
 from app.infrastructure.storage.local import LocalFileStorage
 from app.presentation.api.routes import auth, catalog, inventory, products, roles, sales, users, work_orders
+from app.presentation.api.routes import settings as settings_routes
 from app.presentation.api.schemas.common import configure_media_url
 from app.presentation.middleware.errors import register_error_handlers
 
@@ -67,6 +68,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         work_orders.router,
         work_orders.public_router,
         catalog.spare_parts,
+        settings_routes.router,
     ):
         api.include_router(router)
     app.include_router(api)

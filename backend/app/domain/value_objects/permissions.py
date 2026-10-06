@@ -64,6 +64,8 @@ class Perm:
     SPARE_PARTS_UPDATE = "spare_parts.update"
     SPARE_PARTS_DELETE = "spare_parts.delete"
 
+    SETTINGS_RESET_DATA = "settings.reset_data"
+
 
 PERMISSION_CATALOG: dict[str, str] = {
     Perm.USERS_VIEW: "Ver usuarios",
@@ -111,6 +113,7 @@ PERMISSION_CATALOG: dict[str, str] = {
     Perm.SPARE_PARTS_CREATE: "Crear repuestos",
     Perm.SPARE_PARTS_UPDATE: "Editar y activar/desactivar repuestos",
     Perm.SPARE_PARTS_DELETE: "Eliminar repuestos",
+    Perm.SETTINGS_RESET_DATA: "Configuración: vaciar todos los datos del negocio",
 }
 
 ALL_PERMISSIONS: list[str] = list(PERMISSION_CATALOG)

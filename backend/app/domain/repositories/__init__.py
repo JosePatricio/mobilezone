@@ -215,6 +215,19 @@ class WorkOrderRepository(Repository[WorkOrder]):
     ) -> Page[WorkOrder]: ...
 
 
+class DataResetRepository(ABC):
+    @abstractmethod
+    def delete_business_data(self, client_role: str) -> tuple[dict[str, int], list[str]]:
+        """Deletes the business data (orders, sales, inventory, catalogs and clients).
+
+        Returns the rows deleted per module and the stored files they referenced.
+        """
+
+    @abstractmethod
+    def restart_numbering(self) -> None:
+        """Order numbers, sale numbers, etc. start again from 1 (run after the commit)."""
+
+
 class UnitOfWork(ABC):
     """Transaction boundary shared by all repositories of one operation."""
 
@@ -231,6 +244,7 @@ class UnitOfWork(ABC):
     models: DeviceModelRepository
     spare_parts: SparePartRepository
     work_orders: WorkOrderRepository
+    data_reset: DataResetRepository
 
     @abstractmethod
     def flush(self) -> None: ...

@@ -17,6 +17,7 @@ import { NewSalePage } from '@/modules/sales/pages/NewSalePage';
 import { SaleDetailPage } from '@/modules/sales/pages/SaleDetailPage';
 import { SalesPage } from '@/modules/sales/pages/SalesPage';
 import { SparePartsPage } from '@/modules/spare-parts/pages/SparePartsPage';
+import { SettingsPage } from '@/modules/settings/pages/SettingsPage';
 import { UsersPage } from '@/modules/users/pages/UsersPage';
 import { WorkOrderDetailPage } from '@/modules/work-orders/pages/WorkOrderDetailPage';
 import { WorkOrderFormPage } from '@/modules/work-orders/pages/WorkOrderFormPage';
@@ -95,6 +96,9 @@ export function AppRouter() {
           </Route>
           <Route element={<PermissionRoute permission={P.PERMISSIONS_VIEW} />}>
             <Route path="permissions" element={<PermissionsPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission={P.SETTINGS_RESET_DATA} />}>
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
 
           <Route path="*" element={<EmptyState title="Página no encontrada" />} />

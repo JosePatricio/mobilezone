@@ -9,6 +9,7 @@ from app.infrastructure.repositories.sqlalchemy import (
     SqlAlchemyBranchRepository,
     SqlAlchemyBrandRepository,
     SqlAlchemyCategoryRepository,
+    SqlAlchemyDataResetRepository,
     SqlAlchemyDeviceModelRepository,
     SqlAlchemyInventoryRepository,
     SqlAlchemyPermissionRepository,
@@ -40,6 +41,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.models = SqlAlchemyDeviceModelRepository(session)
         self.spare_parts = SqlAlchemySparePartRepository(session)
         self.work_orders = SqlAlchemyWorkOrderRepository(session)
+        self.data_reset = SqlAlchemyDataResetRepository(session)
 
     def _translate(self, exc: IntegrityError) -> ConflictError:
         return ConflictError(

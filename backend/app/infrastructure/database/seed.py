@@ -17,6 +17,17 @@ from app.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
 
 DEFAULT_BRANCH = "Matriz"
 
+# Additional administrators always present. Only the bcrypt hash is kept in the code; the user
+# is created once (a later password change is never overwritten).
+DEFAULT_ADMINS: list[dict[str, str]] = [
+    {
+        "nombre": "Jose David",
+        "apellido": "Administrador",
+        "email": "josedavidip89@gmail.com",
+        "password_hash": "$2b$12$btCMZmr6ZjbsS7tLmhTdAuQD.69Qe.Nrh1RCGlip41CDQ2IXkehf.",
+    },
+]
+
 
 def seed(session: Session, settings: Settings, hasher: PasswordHasher) -> None:
     uow = SqlAlchemyUnitOfWork(session)
@@ -49,8 +60,8 @@ def seed(session: Session, settings: Settings, hasher: PasswordHasher) -> None:
         if uow.branches.list(PageRequest(1, 1)).total == 0:
             uow.branches.add(Branch(nombre=DEFAULT_BRANCH, ubicacion="Por definir"))
 
+        admin_role = uow.roles.get_by_nombre("ADMIN")
         if uow.users.get_by_email(settings.admin_email) is None:
-            admin_role = uow.roles.get_by_nombre("ADMIN")
             uow.users.add(
                 User(
                     nombre=settings.admin_nombre,
@@ -60,6 +71,17 @@ def seed(session: Session, settings: Settings, hasher: PasswordHasher) -> None:
                     rol_id=admin_role.id if admin_role else None,
                 )
             )
+        for admin in DEFAULT_ADMINS:
+            if uow.users.get_by_email(admin["email"]) is None:
+                uow.users.add(
+                    User(
+                        nombre=admin["nombre"],
+                        apellido=admin["apellido"],
+                        email=admin["email"],
+                        password=admin["password_hash"],
+                        rol_id=admin_role.id if admin_role else None,
+                    )
+                )
 
 
 def main() -> None:

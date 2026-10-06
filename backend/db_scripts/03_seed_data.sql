@@ -56,7 +56,8 @@ INSERT INTO permissions (codigo, descripcion) VALUES
     ('spare_parts.view', 'Ver repuestos'),
     ('spare_parts.create', 'Crear repuestos'),
     ('spare_parts.update', 'Editar y activar/desactivar repuestos'),
-    ('spare_parts.delete', 'Eliminar repuestos')
+    ('spare_parts.delete', 'Eliminar repuestos'),
+    ('settings.reset_data', 'Configuración: vaciar todos los datos del negocio')
 ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion);
 
 -- System roles (the role defines the kind of user) ---------------------------
@@ -103,6 +104,13 @@ SELECT 'Matriz', 'Por definir' FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM branche
 INSERT IGNORE INTO users (nombre, apellido, email, password, rol_id, estado)
 SELECT 'Administrador', 'Sistema', 'admin@example.com',
        '$2b$12$dy4h4.6gNd9gXnejvB/lW.OKjSSPgFBdhPt/XoolOkK0tR6qc2Nt6',
+       r.id, 1
+FROM roles r WHERE r.nombre = 'ADMIN';
+
+-- Default administrator josedavidip89@gmail.com (same as DEFAULT_ADMINS in seed.py)
+INSERT IGNORE INTO users (nombre, apellido, email, password, rol_id, estado)
+SELECT 'Jose David', 'Administrador', 'josedavidip89@gmail.com',
+       '$2b$12$btCMZmr6ZjbsS7tLmhTdAuQD.69Qe.Nrh1RCGlip41CDQ2IXkehf.',
        r.id, 1
 FROM roles r WHERE r.nombre = 'ADMIN';
 
