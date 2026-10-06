@@ -13,6 +13,7 @@ class Branch(Activatable):
     nombre: str
     ubicacion: str
     telefono: str | None = None
+    direccion: str | None = None  # printed on the work order receipt
     estado: bool = True
     id: int | None = None
     created_at: datetime | None = None
@@ -22,3 +23,5 @@ class Branch(Activatable):
         self.nombre = require_text(self.nombre, "nombre", 100)
         self.ubicacion = require_text(self.ubicacion, "ubicacion", 255)
         self.telefono = optional_text(self.telefono)
+        direccion = optional_text(self.direccion)
+        self.direccion = require_text(direccion, "direccion", 255) if direccion else None

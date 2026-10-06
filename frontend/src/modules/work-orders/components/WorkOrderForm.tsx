@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Controller, useForm, useWatch, type FieldValues, type Path, type UseFormSetError } from 'react-hook-form';
+import { useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 import { useAuth } from '@/app/store/AuthProvider';
 import { BRANDS_KEY, brandApi } from '@/modules/brands/services/brandApi';
@@ -12,9 +13,9 @@ import { getErrorMessage, toApiError } from '@/shared/services/apiError';
 import { fromDateTimeLocal, fullName, toDateTimeLocal } from '@/shared/utils/format';
 import { cleanIdentificacion, isValidIdentificacion, zCelular, zIdentificacion } from '@/shared/utils/identification';
 import { calculateBalance, formatMoney, isValidMoney, toCents } from '@/shared/utils/money';
-import { type FormShape, zodForm, applyServerErrors, zMoney, zOptionalEmail, zOptionalText, zRequiredId, zText } from '@/shared/utils/validation';
+import { type FormShape, zodForm, applyServerErrors, zMoney, zOptionalEmail, zOptionalId, zOptionalText, zRequiredId, zText } from '@/shared/utils/validation';
 import { useWorkOrderCatalogs } from '../hooks/useWorkOrderCatalogs';
-import { workOrderApi } from '../services/workOrderApi';
+import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
 import { DISPLAY_CHANGE, type LockType, type WorkOrder, type WorkOrderRequest } from '../types';
 import { ColorPalette } from './ColorPalette';
 import { MIN_PATTERN_DOTS, parsePattern, PatternLock } from './PatternLock';
@@ -56,6 +57,7 @@ export const workOrderSchema = z
     presupuesto: zMoney,
     anticipo: zMoney,
     fecha_entrega: z.string().optional(),
+    branch_id: zOptionalId,
   })
   .superRefine((v, ctx) => {
     if (toCents(v.anticipo) > toCents(v.presupuesto)) {
@@ -134,10 +136,23 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
       presupuesto: order?.presupuesto ?? '0.00',
       anticipo: order?.anticipo ?? '0.00',
       fecha_entrega: toDateTimeLocal(order?.fecha_entrega),
+      branch_id: order ? (order.branch_id ?? '') : (user?.branches[0]?.id ?? ''),
     },
   });
 
   const marcaId = useWatch({ control, name: 'marca_id' });
+
+  // Sucursal (local): its address and phone are printed on the order.
+  const branches = useQuery({ queryKey: [WORK_ORDERS_KEY, 'branches'], queryFn: workOrderApi.branches, staleTime: 60_000 });
+  const branchesLoaded = Boolean(branches.data);
+  useEffect(() => {
+    // A <select> shows its value only once the option exists: re-apply it (or take the first branch).
+    if (!branchesLoaded) return;
+    const current = getValues('branch_id');
+    const first = branches.data?.[0]?.id;
+    setValue('branch_id', current || (order ? '' : (first ?? '')));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchesLoaded]);
   const motivo = useWatch({ control, name: 'motivo_ingreso' });
   const bloqueo = useWatch({ control, name: 'bloqueo_tipo' }) as LockType;
   const [presupuesto, anticipo] = useWatch({ control, name: ['presupuesto', 'anticipo'] });
@@ -241,6 +256,11 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
 
   const safeMoney = (v: unknown) => (typeof v === 'string' && isValidMoney(v) ? v : '0');
   const saldo = calculateBalance(safeMoney(presupuesto), safeMoney(anticipo));
+  const branchOptions = withCurrent(
+    (branches.data ?? []).map((b) => ({ value: b.id, label: b.nombre })),
+    order?.branch_id ?? undefined,
+    order?.branch?.nombre,
+  );
   const technician = order ? (order.tecnico ? fullName(order.tecnico) : 'Sin asignar') : `${fullName(user)} (usted)`;
 
   return (
@@ -431,6 +451,14 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           <div className="full">
             <PhotoSlots value={photos} onChange={setPhotos} />
           </div>
+          <Select
+            label="Sucursal"
+            options={branchOptions}
+            placeholder="Seleccione…"
+            hint="Su dirección y teléfono se imprimen en la orden"
+            error={errors.branch_id?.message}
+            {...register('branch_id')}
+          />
           <div className="field">
             <span className="field-label">Vendedor</span>
             <p className="readonly-value">{technician}</p>

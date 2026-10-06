@@ -55,6 +55,7 @@ class BranchData:
     nombre: str
     ubicacion: str
     telefono: str | None = None
+    direccion: str | None = None
     estado: bool = True
 
 
@@ -189,6 +190,7 @@ class WorkOrderData:
     color: str | None = None
     modelo_tecnico: str | None = None  # technical model code of the phone, e.g. SM-A105M
     fecha_entrega: datetime | None = None  # timezone-aware
+    branch_id: int | None = None  # sucursal (local); None = the user's branch
 
 
 @dataclass(frozen=True)

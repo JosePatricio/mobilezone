@@ -7,6 +7,7 @@ import type {
   FinalizeWorkOrderRequest,
   PublicWorkOrder,
   WorkOrder,
+  WorkOrderBranch,
   WorkOrderCatalogs,
   WorkOrderClient,
   WorkOrderListItem,
@@ -36,6 +37,8 @@ export const workOrderApi = {
     http.post<WorkOrder>(`${BASE}/${id}/finalize`, body).then((r) => r.data),
   statuses: () => http.get<WorkOrderStatusOption[]>(`${BASE}/statuses`).then((r) => r.data),
   catalogs: () => http.get<WorkOrderCatalogs>(`${BASE}/catalogs`).then((r) => r.data),
+  /** Active branches (locales) for the order form. */
+  branches: () => http.get<WorkOrderBranch[]>(`${BASE}/branches`).then((r) => r.data),
   /** Client by cédula / RUC (404 = new client). */
   lookupCustomer: (identificacion: string) =>
     http.get<WorkOrderClient>(`${BASE}/customers/lookup`, { params: { identificacion } }).then((r) => r.data),

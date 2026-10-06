@@ -16,14 +16,14 @@ from app.application.dto import (
 from app.application.services.files import FileStorage, validate_image
 from app.application.use_cases.base import UseCase
 from app.application.use_cases.branch_access import ensure_branch_access
-from app.domain.entities import Sale, User, WorkOrder, WorkOrderPhoto, WorkOrderSparePart, calculate_balance
+from app.domain.entities import Branch, Sale, User, WorkOrder, WorkOrderPhoto, WorkOrderSparePart, calculate_balance
 from app.domain.exceptions import ConflictError, NotFoundError, ValidationError
 from app.domain.repositories import UnitOfWork
 from app.domain.value_objects.enums import SystemRole, WorkOrderStatus
 from app.domain.entities.base import optional_text
 from app.domain.entities.user import normalize_celular
 from app.domain.value_objects.identificacion import normalize_identificacion
-from app.domain.value_objects.pagination import Page, PageRequest
+from app.domain.value_objects.pagination import MAX_PAGE_SIZE, Page, PageRequest
 from app.domain.value_objects.work_orders import validate_warranty_days
 
 
@@ -108,6 +108,28 @@ class _WorkOrderValidation(UseCase):
         order.fecha_entrega = data.fecha_entrega
         order.modelo_tecnico = optional_text(data.modelo_tecnico)
 
+    def _resolve_branch(self, branch_id: int | None, actor: User) -> Branch:
+        """Sucursal (local) of the order; its address and phone are printed on the receipt.
+
+        Without a choice: the first active branch assigned to the user, else the first active branch.
+        """
+        if branch_id is not None:
+            branch = self.uow.branches.get(branch_id)
+            if branch is None or not branch.estado:
+                raise ValidationError(
+                    "La sucursal seleccionada no existe o está inactiva.",
+                    code="INVALID_BRANCH",
+                    details={"field": "branch_id"},
+                )
+            return branch
+        assigned = sorted((b for b in actor.branches if b.estado), key=lambda b: b.nombre)
+        if assigned:
+            return assigned[0]
+        active = self.uow.branches.list(PageRequest(1, MAX_PAGE_SIZE), estado=True).items
+        if not active:
+            raise ValidationError("Registre una sucursal activa.", code="BRANCH_REQUIRED", details={"field": "branch_id"})
+        return min(active, key=lambda b: b.id or 0)
+
     def _validate_device(self, marca_id: int, modelo_id: int) -> None:
         brand = self.uow.brands.get(marca_id)
         if brand is None:
@@ -130,10 +152,12 @@ class CreateWorkOrderUseCase(_WorkOrderValidation):
         with self.uow.transaction():
             client = self._resolve_client(data.cliente)
             self._validate_device(data.marca_id, data.modelo_id)
+            branch = self._resolve_branch(data.branch_id, actor)
             order = WorkOrder(
                 user_id=actor.id,  # type: ignore[arg-type]  # user who generates the order
                 cliente_id=client.id,  # type: ignore[arg-type]
                 tecnico_id=actor.id,  # the logged user is the technician
+                branch_id=branch.id,
                 marca_id=data.marca_id,
                 modelo_id=data.modelo_id,
                 motivo_ingreso=data.motivo_ingreso,  # type: ignore[arg-type]
@@ -160,6 +184,8 @@ class UpdateWorkOrderUseCase(_WorkOrderValidation):
             self._validate_device(data.marca_id, data.modelo_id)
             order.cliente_id = client.id  # type: ignore[assignment]
             order.marca_id, order.modelo_id = data.marca_id, data.modelo_id
+            if data.branch_id is not None or order.branch_id is None:
+                order.branch_id = self._resolve_branch(data.branch_id, actor).id
             normalized = WorkOrder(
                 user_id=order.user_id,
                 cliente_id=order.cliente_id,

@@ -123,6 +123,8 @@ export function WorkOrderDetailPage() {
             </dd>
             <dt>Garantía</dt>
             <dd>{formatWarrantyDays(order.garantia_dias)}</dd>
+            <dt>Sucursal</dt>
+            <dd>{order.branch?.nombre ?? '—'}</dd>
             <dt>Desbloqueo</dt>
             <dd>
               {order.bloqueo_tipo === 'PATRON' ? (

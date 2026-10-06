@@ -17,6 +17,7 @@ constraints), InnoDB and `utf8mb4`. The scripts avoid MySQL-only syntax so they 
 | `upgrades/007_modelo_tecnico.sql` | Upgrades a version 6 database: technical model of the phone in work orders (run once) |
 | `upgrades/008_estados_venta_orden.sql` | Upgrades a version 7 database: work order status history, sale of a finalized order (`sales.work_order_id`) (run once) |
 | `upgrades/009_repuestos_afiliados.sql` | Upgrades a version 8 database: `users.direccion`, affiliate spare parts (`affiliate_parts`), public page visit counter (`page_visits`), permissions `affiliate_parts.*` (run once) |
+| `upgrades/010_sucursal_orden.sql` | Upgrades a version 9 database: `branches.direccion`, branch of each work order (`work_orders.branch_id`) (run once) |
 
 ## Option A — Alembic + Python seed (recommended)
 
@@ -42,7 +43,7 @@ The SQL seed creates `admin@example.com` / `Admin12345`: change that password af
 `02_create_tables.sql` always holds the **current** full schema (new installations). Databases created with an older
 version are upgraded with the scripts in `upgrades/`, in order (Alembic runs them too: revision 0002 executes
 `upgrades/002_productos_usuarios_ventas.sql`, revision 0003 `upgrades/003_sucursales_inventario.sql`, revision 0004
-`upgrades/004_pagos_permisos.sql`, revision 0005 `upgrades/005_ordenes_trabajo.sql`, revision 0006 `upgrades/006_ordenes_vendedor.sql`, revision 0007 `upgrades/007_modelo_tecnico.sql`, revision 0008 `upgrades/008_estados_venta_orden.sql`, revision 0009 `upgrades/009_repuestos_afiliados.sql`; revision 0001
+`upgrades/004_pagos_permisos.sql`, revision 0005 `upgrades/005_ordenes_trabajo.sql`, revision 0006 `upgrades/006_ordenes_vendedor.sql`, revision 0007 `upgrades/007_modelo_tecnico.sql`, revision 0008 `upgrades/008_estados_venta_orden.sql`, revision 0009 `upgrades/009_repuestos_afiliados.sql`, revision 0010 `upgrades/010_sucursal_orden.sql`; revision 0001
 runs the frozen copy in `migrations/sql/`).
 
 Upgrade 002: role replaces `users.tipo_usuario` (USUARIO → VENDEDOR, new CLIENTE role), new user fields

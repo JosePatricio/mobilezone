@@ -9,16 +9,17 @@ export interface SelectOption {
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
+  hint?: string;
   options: SelectOption[];
   placeholder?: string;
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { label, error, options, placeholder, required, className, ...rest },
+  { label, error, hint, options, placeholder, required, className, ...rest },
   ref,
 ) {
   return (
-    <FormField label={label} error={error} required={required} className={className}>
+    <FormField label={label} error={error} hint={hint} required={required} className={className}>
       {(id, describedBy) => (
         <select
           id={id}

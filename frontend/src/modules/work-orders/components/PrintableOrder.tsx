@@ -33,6 +33,13 @@ export function PrintableOrder({ order }: { order: WorkOrder }) {
     <section className="print-sheet" aria-hidden="true">
       <header className="receipt-center">
         <h1>MobileZone</h1>
+        {order.branch && (
+          <div className="receipt-contact">
+            <p>{order.branch.nombre}</p>
+            <p>{order.branch.direccion ?? order.branch.ubicacion}</p>
+            {order.branch.telefono && <p>Tel.: {order.branch.telefono}</p>}
+          </div>
+        )}
         <p>Orden de trabajo</p>
         <p className="receipt-strong">N.º {formatOrderNumber(order.num_orden)}</p>
       </header>

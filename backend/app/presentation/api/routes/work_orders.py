@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Request, Response, UploadFile, status
 
 from app.application.dto import ClientData, FinalizeWorkOrderData, WorkOrderClientData, WorkOrderStatusData, WorkOrderData, WorkOrderFilters, WorkOrderSparePartData
+from app.application.use_cases.inventory import BranchUseCases
 from app.application.use_cases.users import ClientUseCases
 from app.application.use_cases.work_orders import (
     AddSparePartToWorkOrderUseCase,
@@ -24,6 +25,7 @@ from app.application.use_cases.work_orders import (
 )
 from app.domain.entities import User
 from app.domain.value_objects.enums import WORK_ORDER_STATUS_LABELS
+from app.domain.value_objects.pagination import MAX_PAGE_SIZE, PageRequest
 from app.domain.value_objects.permissions import Perm
 from app.presentation.api.dependencies import (
     CurrentUser,
@@ -37,6 +39,7 @@ from app.presentation.api.dependencies import (
 from app.presentation.api.schemas.common import PageResponse
 from app.presentation.api.schemas.users import ClientRequest, ClientResponse, ClientSummary
 from app.presentation.api.schemas.work_orders import (
+    BranchContact,
     AddWorkOrderSparePartRequest,
     BalanceRequest,
     BalanceResponse,
@@ -80,6 +83,13 @@ def _data(body: WorkOrderRequest, tz: ZoneInfo) -> WorkOrderData:
 def list_catalogs(_: CurrentUser):
     """Options of the order form: entry reasons, display types, warranty, lock types and statuses."""
     return WorkOrderCatalogsResponse.build()
+
+
+@router.get("/branches", response_model=list[BranchContact])
+def list_order_branches(uow: UowDep, _: CanEdit):
+    """Active branches (locales) for the order form (does not require ``inventory.view``)."""
+    result = BranchUseCases(uow).list(PageRequest(1, MAX_PAGE_SIZE), estado=True)
+    return [BranchContact.model_validate(b) for b in result.items]
 
 
 @router.get("/customers/lookup", response_model=ClientSummary)

@@ -65,11 +65,11 @@ Estado de servidor con TanStack Query, formularios con react-hook-form + zod.
 | roles / permissions | CRUD roles, `PUT /roles/{id}/permissions`, `POST/DELETE /roles/{id}/permissions/{pid}`, `GET /permissions` |
 | categories, brands, models, spare-parts | `GET`, `GET /{id}`, `POST`, `PUT /{id}`, `PATCH /{id}/status`, `DELETE /{id}` (409 si tiene registros asociados) |
 | products | CRUD (SKU, PVP, costo, por mayor; `stock` = total de todas las sucursales) + `PUT/DELETE /{id}/image`, `GET /products/category-options` |
-| branches | CRUD de sucursales (nombre, ubicación, teléfono) + status |
+| branches | CRUD de sucursales (nombre, ubicación, dirección, teléfono) + status |
 | inventory | `GET` (filtros `search` SKU/nombre, `branch_id`, `product_id`, `with_stock`, `active`), `GET /{id}`, `POST` (producto + sucursal + unidades; si ya existe, suma), `PATCH /{id}/stock`, `GET /{id}/movements`, `DELETE /{id}`, `GET /inventory/branches` |
 | locations | `GET /locations/provinces` (provincias del Ecuador con sus ciudades) |
 | sales | `GET`, `GET /{id}`, `POST` (confirmar: `branch_id`, `items[{inventory_id, cantidad}]`, `metodo_pago`, `monto_recibido`, `factura`, `cliente_id`), `PUT /{id}` (modificar / devoluciones), `POST /{id}/cancel` (eliminar = anular), `GET /{id}/receipt` (PDF), `GET /customers/lookup?identificacion=`, `POST /customers` (registrar cliente) |
-| work-orders | CRUD, `PATCH /{id}/status`, `GET /by-number/{n}`, `GET /statuses`, `POST /calculate-balance`, `POST/DELETE /{id}/spare-parts` |
+| work-orders | CRUD, `PATCH /{id}/status`, `GET /by-number/{n}`, `GET /statuses`, `GET /branches` (sucursal de la orden: su dirección y teléfono se imprimen), `POST /calculate-balance`, `POST/DELETE /{id}/spare-parts` |
 | affiliate-parts | Repuestos de afiliados (rol TECNICO, permiso `affiliate_parts.manage`): `GET` (los propios; todos con `affiliate_parts.any`, filtros `tipo`, `condicion`, `estado`, `garantia`, `search`, `user_id`), `GET /{id}`, `POST`, `PUT /{id}`, `PATCH /{id}/status` (DISPONIBLE / VENDIDO), `DELETE /{id}`, `GET /visits` |
 | public/affiliate-parts | Catálogo público sin login (página `/repuestos`): `GET` (repuestos de todos los afiliados activos, con su dirección `users.direccion`), `GET /catalogs`, `POST /visits` (contador de visitas) |
 

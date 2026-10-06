@@ -734,6 +734,7 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
   .print-sheet hr { border: 0; border-top: 1px dashed #000; margin: 4px 0; }
   .print-sheet header { padding-bottom: 4px; margin-bottom: 4px; border-bottom: 1px dashed #000; }
   .receipt-center { text-align: center; }
+  .receipt-contact { margin: 2px 0 4px; font-size: 10px; overflow-wrap: anywhere; }
   .receipt-strong { font-weight: 700; font-size: 12px; }
   .receipt-row { display: flex; justify-content: space-between; gap: 6px; break-inside: avoid; }
   .receipt-row > span:first-child { flex-shrink: 0; }

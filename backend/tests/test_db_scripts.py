@@ -478,3 +478,48 @@ def test_upgrade_009_affiliate_parts_address_and_permissions(mysql_engine: Engin
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_010_branch_address_and_order_branch(mysql_engine: Engine):
+    """v9 database (0001 + 002..009) with an order of a seller of the second branch -> upgrade 010."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (
+        initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005,
+        sql.UPGRADE_006, sql.UPGRADE_007, sql.UPGRADE_008, sql.UPGRADE_009,
+    )
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+            q = conn.exec_driver_sql
+            q("INSERT IGNORE INTO roles (nombre) VALUES ('ADMIN')")
+            q("INSERT INTO branches (nombre, ubicacion) VALUES ('Norte', 'x')")
+            norte = q("SELECT id FROM branches WHERE nombre = 'Norte'").scalar()
+            q(
+                "INSERT INTO users (nombre, apellido, email, password, rol_id) VALUES "
+                "('A','A','a@x.com','h',(SELECT id FROM roles WHERE nombre='ADMIN'))"
+            )
+            user = q("SELECT id FROM users WHERE email = 'a@x.com'").scalar()
+            q(f"INSERT INTO user_branches (user_id, branch_id) VALUES ({user}, {norte})")
+            q("INSERT INTO brands (nombre) VALUES ('Samsung')")
+            q("INSERT INTO models (brand_id, nombre) VALUES ((SELECT id FROM brands), 'A10')")
+            q(
+                "INSERT INTO work_orders (user_id, cliente_id, marca_id, modelo_id, estado, motivo_ingreso, "
+                f"codigo_publico, presupuesto, anticipo, saldo, fecha) VALUES ({user}, {user}, (SELECT id FROM brands), "
+                "(SELECT id FROM models), 0, 'OTROS', 'c1', 10, 0, 10, '2026-09-01')"
+            )
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_010)
+        with mysql_engine.connect() as conn:
+            q = conn.exec_driver_sql
+            assert "direccion" in set(q("SHOW COLUMNS FROM branches").scalars())
+            assert q("SELECT branch_id FROM work_orders").scalar() == norte
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

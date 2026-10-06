@@ -54,6 +54,11 @@ vi.mock('../services/workOrderApi', () => ({
   workOrderApi: {
     catalogs: () => Promise.resolve(catalogs),
     statuses: () => Promise.resolve(catalogs.estados),
+    branches: () =>
+      Promise.resolve([
+        { id: 1, nombre: 'Matriz', ubicacion: 'Centro', direccion: 'Av. Amazonas N24-12', telefono: '022345678' },
+        { id: 3, nombre: 'Norte', ubicacion: 'CC El Bosque', direccion: null, telefono: null },
+      ]),
     createCustomer: (body: Record<string, unknown>) => {
       createdCustomers.push(body);
       return Promise.resolve({ id: 9, email: null, foto_url: null, estado: true, ...body });
@@ -169,9 +174,14 @@ describe('WorkOrderForm', () => {
     await userEvent.type(advance, '20');
     expect(screen.getByTestId('form-saldo')).toHaveTextContent('60,00');
 
+    // The branch of the user is preselected; another one can be chosen.
+    await vi.waitFor(() => expect(screen.getByLabelText(/^Sucursal/)).toHaveValue('1'));
+    await userEvent.selectOptions(screen.getByLabelText(/^Sucursal/), 'Norte');
+
     await userEvent.click(screen.getByRole('button', { name: 'Crear orden' }));
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      branch_id: 3,
       cliente: { identificacion: '0102030400', nombre: 'Ana', apellido: 'Mora', celular: null, email: 'ana@example.com' },
       modelo_tecnico: 'SM-A105M',
       marca_id: 1,

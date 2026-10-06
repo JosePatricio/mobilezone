@@ -29,6 +29,7 @@ import type { Branch, BranchRequest } from '../types';
 const schema = z.object({
   nombre: zText(100),
   ubicacion: zText(255, 'Ingrese la ubicación'),
+  direccion: zOptionalText(255),
   telefono: zOptionalText(20).refine((v) => v === null || /^[\d\s()+-]{7,20}$/.test(v), 'Teléfono inválido'),
   estado: z.boolean(),
 });
@@ -66,6 +67,7 @@ export function BranchesPage() {
   const columns: Column<Branch>[] = [
     { key: 'nombre', header: 'Sucursal', render: (r) => <strong>{r.nombre}</strong>, sortValue: (r) => r.nombre },
     { key: 'ubicacion', header: 'Ubicación', render: (r) => r.ubicacion },
+    { key: 'direccion', header: 'Dirección', render: (r) => r.direccion ?? '—' },
     { key: 'telefono', header: 'Teléfono', render: (r) => r.telefono ?? '—' },
     { key: 'estado', header: 'Estado', render: (r) => <StatusBadge active={r.estado} /> },
     {
@@ -149,6 +151,7 @@ function BranchFormModal({
       nombre: branch?.nombre ?? '',
       ubicacion: branch?.ubicacion ?? '',
       telefono: branch?.telefono ?? '',
+      direccion: branch?.direccion ?? '',
       estado: branch?.estado ?? true,
     },
   });
@@ -188,6 +191,13 @@ function BranchFormModal({
         <Input label="Nombre" required error={errors.nombre?.message} {...register('nombre')} />
         <Input label="Teléfono" type="tel" inputMode="tel" error={errors.telefono?.message} {...register('telefono')} />
         <Input label="Ubicación" required className="full" error={errors.ubicacion?.message} {...register('ubicacion')} />
+        <Input
+          label="Dirección"
+          className="full"
+          hint="Se imprime en la orden de trabajo junto al teléfono"
+          error={errors.direccion?.message}
+          {...register('direccion')}
+        />
         <Checkbox label="Activa" toggle {...register('estado')} />
       </form>
     </Modal>

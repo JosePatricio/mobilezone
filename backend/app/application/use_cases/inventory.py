@@ -28,7 +28,13 @@ class BranchUseCases(CrudUseCases[Branch]):
 
     def create(self, data: BranchData) -> Branch:
         with self.uow.transaction():
-            branch = Branch(nombre=data.nombre, ubicacion=data.ubicacion, telefono=data.telefono, estado=data.estado)
+            branch = Branch(
+                nombre=data.nombre,
+                ubicacion=data.ubicacion,
+                telefono=data.telefono,
+                direccion=data.direccion,
+                estado=data.estado,
+            )
             self._ensure_unique(branch.nombre)
             self.uow.branches.add(branch)
         return branch
@@ -36,9 +42,12 @@ class BranchUseCases(CrudUseCases[Branch]):
     def update(self, branch_id: int, data: BranchData) -> Branch:
         with self.uow.transaction():
             branch = self.get(branch_id)
-            changes = Branch(nombre=data.nombre, ubicacion=data.ubicacion, telefono=data.telefono)
+            changes = Branch(
+                nombre=data.nombre, ubicacion=data.ubicacion, telefono=data.telefono, direccion=data.direccion
+            )
             self._ensure_unique(changes.nombre, current_id=branch.id)
             branch.nombre, branch.ubicacion, branch.telefono = changes.nombre, changes.ubicacion, changes.telefono
+            branch.direccion = changes.direccion
             branch.estado = data.estado
         return branch
 

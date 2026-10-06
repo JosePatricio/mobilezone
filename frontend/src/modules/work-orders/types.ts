@@ -101,9 +101,20 @@ export interface WorkOrderSale {
   metodo_pago: string | null;
 }
 
+/** Shop (sucursal) of the order: its contact data is printed on the receipt. */
+export interface WorkOrderBranch {
+  id: Id;
+  nombre: string;
+  ubicacion: string;
+  direccion: string | null;
+  telefono: string | null;
+}
+
 export interface WorkOrder extends WorkOrderListItem, Timestamps {
   /** User who registered the order. */
   user: UserRef;
+  branch_id: Id | null;
+  branch: WorkOrderBranch | null;
   observacion: string | null;
   /** Technical model code of the phone, e.g. SM-A105M. */
   modelo_tecnico: string | null;
@@ -143,6 +154,8 @@ export interface WorkOrderRequest {
   anticipo: Money;
   /** ISO 8601 */
   fecha_entrega: string | null;
+  /** Sucursal (local) that receives the device; null = the user's branch. */
+  branch_id: Id | null;
 }
 
 /** Public status page (QR): no client data and no unlock code. */

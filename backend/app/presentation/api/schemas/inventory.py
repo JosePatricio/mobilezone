@@ -17,6 +17,9 @@ class BranchRequest(RequestSchema):
     nombre: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
     ubicacion: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
     telefono: Telefono = None
+    direccion: Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=255)] = Field(
+        default=None, description="Dirección del local (se imprime en la orden de trabajo)"
+    )
     estado: bool = True
 
 
@@ -30,6 +33,7 @@ class BranchResponse(Schema):
     nombre: str
     ubicacion: str
     telefono: str | None
+    direccion: str | None
     estado: bool
     created_at: datetime
     updated_at: datetime

@@ -21,6 +21,7 @@ from app.domain.value_objects.work_orders import (
 MAX_WORK_ORDER_PHOTOS = 3
 
 if TYPE_CHECKING:
+    from app.domain.entities.branch import Branch
     from app.domain.entities.catalog import Brand, DeviceModel
     from app.domain.entities.spare_part import SparePart
     from app.domain.entities.user import User
@@ -124,6 +125,7 @@ class WorkOrder:
     fecha: date | None = None  # reception date (local day of the shop)
     fecha_entrega: datetime | None = None  # promised delivery date and time
     tecnico_id: int | None = None  # technician: the user who registered the order
+    branch_id: int | None = None  # sucursal (local) that receives the device
     observacion: str | None = None
     estado: int = WorkOrderStatus.RECIBIDO
     color: str | None = None
@@ -144,6 +146,7 @@ class WorkOrder:
         user: User
         cliente: User
         tecnico: User | None
+        branch: Branch | None
         marca: Brand
         modelo: DeviceModel
 

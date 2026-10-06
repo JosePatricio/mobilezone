@@ -194,6 +194,7 @@ branches_table = Table(
     Column("nombre", String(100), nullable=False, unique=True),
     Column("ubicacion", String(255), nullable=False),
     Column("telefono", String(20)),
+    Column("direccion", String(255)),  # printed on the work order receipt
     Column("estado", Boolean, nullable=False, default=True, server_default=TRUE),
     *_timestamps(),
 )
@@ -309,6 +310,7 @@ work_orders_table = Table(
     Column("user_id", ForeignKey("users.id"), nullable=False, index=True),
     Column("cliente_id", ForeignKey("users.id"), nullable=False, index=True),
     Column("tecnico_id", ForeignKey("users.id"), index=True),
+    Column("branch_id", ForeignKey("branches.id"), index=True),  # sucursal (local) that receives the device
     Column("marca_id", ForeignKey("brands.id"), nullable=False),
     Column("modelo_id", ForeignKey("models.id"), nullable=False),
     Column("observacion", Text),
@@ -507,6 +509,7 @@ def start_mappers() -> None:
             "user": relationship(User, foreign_keys=[wo.user_id], lazy="joined"),
             "cliente": relationship(User, foreign_keys=[wo.cliente_id], lazy="joined"),
             "tecnico": relationship(User, foreign_keys=[wo.tecnico_id], lazy="joined"),
+            "branch": relationship(Branch, lazy="joined"),
             "marca": relationship(Brand, lazy="joined"),
             "modelo": relationship(DeviceModel, lazy="joined"),
             "spare_parts": relationship(

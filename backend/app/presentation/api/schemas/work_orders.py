@@ -55,6 +55,9 @@ class WorkOrderRequest(RequestSchema):
     fecha_entrega: datetime | None = Field(
         default=None, description="Fecha y hora de entrega (ISO 8601; sin zona = hora local del local)"
     )
+    branch_id: int | None = Field(
+        default=None, description="Sucursal (local) que recibe el equipo; vacío = sucursal del usuario"
+    )
 
 
 class WorkOrderStatusOption(Schema):
@@ -173,6 +176,16 @@ class WorkOrderSparePartResponse(Schema):
     fecha: datetime
 
 
+class BranchContact(Schema):
+    """Contact data of the shop printed on the receipt."""
+
+    id: int
+    nombre: str
+    ubicacion: str
+    direccion: str | None
+    telefono: str | None
+
+
 class WorkOrderListItem(Schema):
     id: int
     num_orden: int
@@ -209,6 +222,8 @@ class WorkOrderListItem(Schema):
 
 class WorkOrderResponse(WorkOrderListItem):
     user: UserSummary = Field(description="Usuario que registró la orden")
+    branch_id: int | None
+    branch: BranchContact | None = Field(description="Sucursal (local): dirección y teléfono para la orden impresa")
     observacion: str | None
     modelo_tecnico: str | None
     bloqueo_tipo: LockType
