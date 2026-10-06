@@ -16,7 +16,12 @@ export interface NavGroup {
 export const NAVIGATION: NavGroup[] = [
   // Ventas is the first menu entry.
   { items: [{ to: '/sales', label: 'Ventas', permissions: [P.SALES_VIEW, P.SALES_CREATE] }] },
-  { items: [{ to: '/', label: 'Dashboard', permissions: [] }] },
+  {
+    items: [
+      { to: '/', label: 'Dashboard', permissions: [] },
+      { to: '/profile', label: 'Mi perfil', permissions: [] },
+    ],
+  },
   {
     label: 'Comercial',
     items: [

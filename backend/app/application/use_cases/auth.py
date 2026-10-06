@@ -3,8 +3,9 @@ from __future__ import annotations
 from app.application.dto import LoginResult
 from app.application.services.security import PasswordHasher, TokenService
 from app.application.use_cases.base import UseCase
+from app.application.use_cases.users import validate_password
 from app.domain.entities import User
-from app.domain.exceptions import AuthenticationError
+from app.domain.exceptions import AuthenticationError, ValidationError
 from app.domain.repositories import UnitOfWork
 
 INVALID_CREDENTIALS = "Credenciales inválidas."
@@ -45,3 +46,33 @@ class GetAuthenticatedUserUseCase(UseCase):
         if user is None or not user.estado:
             raise AuthenticationError("Sesión inválida o usuario inactivo.", code="INVALID_TOKEN")
         return user
+
+
+class ChangePasswordUseCase(UseCase):
+    """The logged user changes their own password (Mi perfil). The current password is required."""
+
+    def __init__(self, uow: UnitOfWork, hasher: PasswordHasher) -> None:
+        super().__init__(uow)
+        self.hasher = hasher
+
+    def execute(self, actor: User, current_password: str, new_password: str) -> None:
+        with self.uow.transaction():
+            user = self.uow.users.get(actor.id)  # type: ignore[arg-type]
+            if user is None or not user.password or not self.hasher.verify(current_password, user.password):
+                # 400, not 401: a wrong current password must not end the session.
+                raise ValidationError(
+                    "La contraseña actual es incorrecta.",
+                    code="INVALID_CURRENT_PASSWORD",
+                    details={"field": "current_password"},
+                )
+            if new_password == current_password:
+                raise ValidationError(
+                    "La nueva contraseña debe ser distinta de la actual.",
+                    code="SAME_PASSWORD",
+                    details={"field": "new_password"},
+                )
+            try:
+                validate_password(new_password)
+            except ValidationError as exc:
+                raise ValidationError(exc.message, code=exc.code, details={"field": "new_password"}) from exc
+            user.password = self.hasher.hash(new_password)

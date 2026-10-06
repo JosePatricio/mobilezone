@@ -12,6 +12,7 @@ import { InventoryPage } from '@/modules/inventory/pages/InventoryPage';
 import { ModelsPage } from '@/modules/models/pages/ModelsPage';
 import { PermissionsPage } from '@/modules/permissions/pages/PermissionsPage';
 import { ProductsPage } from '@/modules/products/pages/ProductsPage';
+import { ProfilePage } from '@/modules/profile/pages/ProfilePage';
 import { RolePermissionsPage } from '@/modules/roles/pages/RolePermissionsPage';
 import { RolesPage } from '@/modules/roles/pages/RolesPage';
 import { EditSalePage } from '@/modules/sales/pages/EditSalePage';
@@ -41,6 +42,8 @@ export function AppRouter() {
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
           <Route index element={<DashboardPage />} />
+          {/* Every logged user: their data and password change. */}
+          <Route path="profile" element={<ProfilePage />} />
 
           <Route element={<PermissionRoute permission={P.PRODUCTS_VIEW} />}>
             <Route path="products" element={<ProductsPage />} />

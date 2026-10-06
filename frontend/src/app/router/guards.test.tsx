@@ -58,12 +58,12 @@ describe('navigation', () => {
   it('adapts the menu to the user permissions', () => {
     const auth = fakeAuth({ permissionCodes: ['work_orders.view'] });
     const labels = visibleNavigation(auth.hasAnyPermission).flatMap((g) => g.items.map((i) => i.label));
-    expect(labels).toEqual(['Dashboard', 'Órdenes']);
+    expect(labels).toEqual(['Dashboard', 'Mi perfil', 'Órdenes']);
   });
 
   it('shows Ventas first; a seller sees Ventas, Productos and Inventario', () => {
     const seller = fakeAuth({ permissionCodes: ['products.view', 'inventory.view', 'sales.view', 'sales.create'] });
     const labels = visibleNavigation(seller.hasAnyPermission).flatMap((g) => g.items.map((i) => i.label));
-    expect(labels).toEqual(['Ventas', 'Dashboard', 'Productos', 'Inventario']);
+    expect(labels).toEqual(['Ventas', 'Dashboard', 'Mi perfil', 'Productos', 'Inventario']);
   });
 });

@@ -2,12 +2,18 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.application.use_cases.auth import LoginUseCase
+from app.application.use_cases.auth import ChangePasswordUseCase, LoginUseCase
 from app.presentation.api.dependencies import CurrentUser, HasherDep, TokensDep, UowDep
-from app.presentation.api.schemas.users import CurrentUserResponse, LoginRequest, TokenResponse, UserResponse
+from app.presentation.api.schemas.users import (
+    ChangePasswordRequest,
+    CurrentUserResponse,
+    LoginRequest,
+    TokenResponse,
+    UserResponse,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -39,3 +45,10 @@ def token(
 @router.get("/me", response_model=CurrentUserResponse)
 def me(user: CurrentUser) -> CurrentUserResponse:
     return CurrentUserResponse(user=UserResponse.model_validate(user), permissions=sorted(user.permissions))
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(body: ChangePasswordRequest, user: CurrentUser, uow: UowDep, hasher: HasherDep) -> Response:
+    """Mi perfil: the logged user changes their own password (the current one is required)."""
+    ChangePasswordUseCase(uow, hasher).execute(user, body.current_password, body.new_password)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

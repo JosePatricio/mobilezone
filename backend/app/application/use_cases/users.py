@@ -16,7 +16,7 @@ MIN_PASSWORD_LENGTH = 8
 USER_PHOTOS_FOLDER = "users"
 
 
-def _validate_password(password: str) -> str:
+def validate_password(password: str) -> str:
     if len(password) < MIN_PASSWORD_LENGTH:
         raise ValidationError(
             f"La contraseña debe tener al menos {MIN_PASSWORD_LENGTH} caracteres.", code="WEAK_PASSWORD"
@@ -123,7 +123,7 @@ class UserUseCases(_UserValidation):
             if role.nombre != SystemRole.CLIENTE.value:
                 self._require_email(user)
                 password = data.password or self._default_password(role, user)
-                user.password = self.hasher.hash(_validate_password(password))
+                user.password = self.hasher.hash(validate_password(password))
             self.uow.users.add(user)
         return user
 
@@ -173,9 +173,9 @@ class UserUseCases(_UserValidation):
                 return user
             self._require_email(user)
             if data.password:
-                user.password = self.hasher.hash(_validate_password(data.password))
+                user.password = self.hasher.hash(validate_password(data.password))
             elif not user.password:  # e.g. a client promoted to seller
-                user.password = self.hasher.hash(_validate_password(self._default_password(role, user)))
+                user.password = self.hasher.hash(validate_password(self._default_password(role, user)))
         return user
 
     def set_user_status(self, user_id: int, estado: bool, actor: User) -> User:

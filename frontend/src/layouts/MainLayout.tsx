@@ -42,11 +42,13 @@ export function MainLayout() {
         </Link>
         <div className="app-user">
           {hasAnyPermission([P.SALES_CREATE, P.SALES_VIEW]) && <TodaySales />}
-          <Avatar src={user?.foto_url} alt={fullName(user)} size="sm" />
-          <div className="app-user-info">
-            <strong>{fullName(user)}</strong>
-            <small className="muted">{user?.role?.nombre ?? ''}</small>
-          </div>
+          <Link to="/profile" className="app-user-link" title="Mi perfil">
+            <Avatar src={user?.foto_url} alt={fullName(user)} size="sm" />
+            <div className="app-user-info">
+              <strong>{fullName(user)}</strong>
+              <small className="muted">{user?.role?.nombre ?? ''}</small>
+            </div>
+          </Link>
           <button type="button" className="btn btn-ghost btn-sm" onClick={onLogout}>
             Salir
           </button>

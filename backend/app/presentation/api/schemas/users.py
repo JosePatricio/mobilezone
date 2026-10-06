@@ -32,6 +32,11 @@ class LoginRequest(RequestSchema):
     password: str = Field(min_length=1, max_length=128)
 
 
+class ChangePasswordRequest(RequestSchema):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=1, max_length=128, description="Mínimo 8 caracteres")
+
+
 class RoleSummary(Schema):
     id: int
     nombre: str
