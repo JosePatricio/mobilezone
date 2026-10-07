@@ -1,7 +1,3 @@
-Modulo sucursal
+Modulo ordenes
+En la factura, en el campo Desbloqueo, debe aparecer tambien si selecciona PIN, al momento solo aparece cuando selecciona Patron
 
-Agregar campo direccion
-
-En modulo ordenes
-Necesitamos en la factura los datos de contacto del local
-Telefono y direccion (mismo campo direccion de sucursal)

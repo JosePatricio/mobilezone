@@ -46,4 +46,14 @@ describe('PrintableOrder', () => {
     expect(screen.getByText('Centro')).toBeInTheDocument();
     expect(screen.queryByText(/Tel\.:/)).not.toBeInTheDocument();
   });
+
+  it('prints the PIN in Desbloqueo', () => {
+    renderWithProviders(<PrintableOrder order={{ ...order, bloqueo_tipo: 'PIN', bloqueo_valor: '4821' }} />);
+    expect(screen.getByText('PIN: 4821')).toBeInTheDocument();
+  });
+
+  it('shows "Sin bloqueo" without a lock', () => {
+    renderWithProviders(<PrintableOrder order={order} />);
+    expect(screen.getByText('Sin bloqueo')).toBeInTheDocument();
+  });
 });

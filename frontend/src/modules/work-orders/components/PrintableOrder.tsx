@@ -21,7 +21,7 @@ function Row({ label, children, strong }: { label: string; children: ReactNode; 
 
 /**
  * Printable receipt of the order for an 80 mm thermal printer (hidden on screen, the only thing
- * printed by window.print). The unlock pattern is printed so the technician can unlock the device; the PIN is not.
+ * printed by window.print). The unlock pattern and the PIN are printed so the technician can unlock the device.
  */
 export function PrintableOrder({ order }: { order: WorkOrder }) {
   const { url, image } = useOrderQr(order.codigo_publico);
@@ -62,7 +62,9 @@ export function PrintableOrder({ order }: { order: WorkOrder }) {
         {order.motivo_ingreso_label}
         {order.tipo_display ? ` (${order.tipo_display})` : ''}
       </Row>
-      <Row label="Desbloqueo">{LOCK_LABELS[order.bloqueo_tipo]}</Row>
+      <Row label="Desbloqueo">
+        {order.bloqueo_tipo === 'PIN' && order.bloqueo_valor ? `PIN: ${order.bloqueo_valor}` : LOCK_LABELS[order.bloqueo_tipo]}
+      </Row>
       {order.bloqueo_tipo === 'PATRON' && order.bloqueo_valor && (
         <div className="receipt-center receipt-pattern">
           <PatternLock value={order.bloqueo_valor} readOnly />
