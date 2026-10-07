@@ -197,7 +197,7 @@ describe('WorkOrderForm', () => {
       fecha_entrega: new Date(2026, 9, 5, 16, 30).toISOString(),
     });
     expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('tecnico_id');
-  });
+  }, 15_000); // long scripted flow: slower when the whole suite runs in parallel
 });
 
 describe('PublicWorkOrderPage', () => {

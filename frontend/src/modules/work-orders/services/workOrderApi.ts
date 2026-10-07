@@ -29,6 +29,8 @@ export const workOrderApi = {
   getByNumber: (num: number) => http.get<WorkOrder>(`${BASE}/by-number/${num}`).then((r) => r.data),
   create: (body: WorkOrderRequest) => http.post<WorkOrder>(BASE, body).then((r) => r.data),
   update: (id: Id, body: WorkOrderRequest) => http.put<WorkOrder>(`${BASE}/${id}`, body).then((r) => r.data),
+  /** Deletes the order completely (photos, spare parts, history and the sale of a finalized order). */
+  remove: (id: Id) => http.delete(`${BASE}/${id}`).then(() => undefined),
   /** Recibido / En proceso (recorded in the history). */
   setStatus: (id: Id, body: WorkOrderStatusRequest) =>
     http.patch<WorkOrder>(`${BASE}/${id}/status`, body).then((r) => r.data),

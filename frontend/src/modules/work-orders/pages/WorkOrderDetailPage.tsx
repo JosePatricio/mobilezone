@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Can, usePermission } from '@/modules/auth/components/Can';
+import { SALES_KEY } from '@/modules/sales/services/saleApi';
 import { Button, Card, ErrorState, Loading, PageHeader, useConfirm, useToast } from '@/shared/components';
 import { getErrorMessage } from '@/shared/services/apiError';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
@@ -21,6 +22,8 @@ export function WorkOrderDetailPage() {
   const id = Number(useParams().id);
   const canUpdate = usePermission(P.WORK_ORDERS_UPDATE);
   const canRemovePartPermission = usePermission(P.WORK_ORDERS_SPARE_PARTS_REMOVE);
+  const canDelete = usePermission(P.WORK_ORDERS_DELETE);
+  const navigate = useNavigate();
   const { catalogs, labelOf } = useWorkOrderCatalogs();
   const confirm = useConfirm();
   const toast = useToast();
@@ -31,6 +34,7 @@ export function WorkOrderDetailPage() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: [WORK_ORDERS_KEY] });
   const addPart = useMutation({ mutationFn: (body: AddSparePartRequest) => workOrderApi.addSparePart(id, body), onSuccess: invalidate });
   const removePart = useMutation({ mutationFn: (itemId: number) => workOrderApi.removeSparePart(id, itemId), onSuccess: invalidate });
+  const removeOrder = useMutation({ mutationFn: () => workOrderApi.remove(id) });
 
   if (query.isLoading) return <Loading />;
   if (query.isError || !query.data) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
@@ -55,6 +59,28 @@ export function WorkOrderDetailPage() {
     }
   };
 
+  const onDelete = async () => {
+    const ok = await confirm({
+      title: 'Eliminar orden',
+      message: order.sale
+        ? `¿Eliminar por completo la orden #${formatOrderNumber(order.num_orden)}? También se eliminará su venta #${order.sale.id} (${formatMoney(order.sale.total_pagar)}). Esta acción no se puede deshacer.`
+        : `¿Eliminar por completo la orden #${formatOrderNumber(order.num_orden)}? Se borran sus fotos, repuestos e historial. Esta acción no se puede deshacer.`,
+      confirmLabel: 'Eliminar',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await removeOrder.mutateAsync();
+      queryClient.removeQueries({ queryKey: [WORK_ORDERS_KEY, 'detail', id] });
+      await queryClient.invalidateQueries({ queryKey: [WORK_ORDERS_KEY] });
+      if (order.sale) await queryClient.invalidateQueries({ queryKey: [SALES_KEY] });
+      toast.success('Orden eliminada.');
+      navigate('/work-orders', { replace: true });
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -71,6 +97,11 @@ export function WorkOrderDetailPage() {
               <Link to={`/work-orders/${order.id}/edit`} className="btn btn-primary btn-md">
                 Editar
               </Link>
+            )}
+            {canDelete && (
+              <Button variant="danger" onClick={() => void onDelete()} loading={removeOrder.isPending}>
+                Eliminar
+              </Button>
             )}
           </>
         }

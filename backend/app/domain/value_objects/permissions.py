@@ -58,6 +58,7 @@ class Perm:
     WORK_ORDERS_UPDATE = "work_orders.update"
     WORK_ORDERS_SPARE_PARTS_ADD = "work_orders.spare_parts.add"
     WORK_ORDERS_SPARE_PARTS_REMOVE = "work_orders.spare_parts.remove"
+    WORK_ORDERS_DELETE = "work_orders.delete"
 
     SPARE_PARTS_VIEW = "spare_parts.view"
     SPARE_PARTS_CREATE = "spare_parts.create"
@@ -112,6 +113,7 @@ PERMISSION_CATALOG: dict[str, str] = {
     Perm.WORK_ORDERS_UPDATE: "Editar órdenes de trabajo y cambiar su estado",
     Perm.WORK_ORDERS_SPARE_PARTS_ADD: "Registrar repuestos en órdenes",
     Perm.WORK_ORDERS_SPARE_PARTS_REMOVE: "Quitar repuestos de órdenes",
+    Perm.WORK_ORDERS_DELETE: "Eliminar órdenes de trabajo por completo (incluida la venta de una orden finalizada)",
     Perm.SPARE_PARTS_VIEW: "Ver repuestos",
     Perm.SPARE_PARTS_CREATE: "Crear repuestos",
     Perm.SPARE_PARTS_UPDATE: "Editar y activar/desactivar repuestos",

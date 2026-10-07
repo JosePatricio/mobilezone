@@ -326,6 +326,26 @@ class RemoveWorkOrderPhotoUseCase(UseCase):
         self.storage.delete(photo.ruta)
 
 
+class DeleteWorkOrderUseCase(UseCase):
+    """Deletes the order completely: spare parts, photos (and their files), status history and,
+    if it was finalized, the sale of the repair (it has no product lines, so no stock changes)."""
+
+    def __init__(self, uow: UnitOfWork, storage: FileStorage) -> None:
+        super().__init__(uow)
+        self.storage = storage
+
+    def execute(self, work_order_id: int) -> None:
+        with self.uow.transaction():
+            order = _get_order(self.uow, work_order_id)
+            files = [photo.ruta for photo in order.photos]
+            if order.sale is not None:
+                self.uow.sales.delete(order.sale)
+                self.uow.flush()  # the sale references the order
+            self.uow.work_orders.delete(order)
+        for path in files:
+            self.storage.delete(path)
+
+
 class PublicWorkOrderStatusUseCase(UseCase):
     """Status of an order for the public page opened from the QR (no authentication)."""
 

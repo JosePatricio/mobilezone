@@ -18,6 +18,7 @@ from app.application.use_cases.work_orders import (
     CalculateWorkOrderBalanceUseCase,
     ChangeWorkOrderStatusUseCase,
     CreateWorkOrderUseCase,
+    DeleteWorkOrderUseCase,
     FinalizeWorkOrderUseCase,
     RemoveSparePartFromWorkOrderUseCase,
     UpdateWorkOrderUseCase,
@@ -160,6 +161,19 @@ def create_work_order(
 def update_work_order(request: Request, work_order_id: int, body: WorkOrderRequest, uow: UowDep, actor: CanUpdate):
     order = UpdateWorkOrderUseCase(uow).execute(work_order_id, _data(body, _tz(request)), actor)
     return WorkOrderResponse.model_validate(order)
+
+
+
+@router.delete("/{work_order_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_work_order(
+    work_order_id: int,
+    uow: UowDep,
+    storage: StorageDep,
+    _: Annotated[User, Depends(require_permissions(Perm.WORK_ORDERS_DELETE))],
+) -> Response:
+    """Deletes the order completely (photos, spare parts, history and the sale of a finalized order)."""
+    DeleteWorkOrderUseCase(uow, storage).execute(work_order_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _local(value, tz: ZoneInfo):

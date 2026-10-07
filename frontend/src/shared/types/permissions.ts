@@ -44,6 +44,7 @@ export const PERMISSIONS = {
   WORK_ORDERS_UPDATE: 'work_orders.update',
   WORK_ORDERS_SPARE_PARTS_ADD: 'work_orders.spare_parts.add',
   WORK_ORDERS_SPARE_PARTS_REMOVE: 'work_orders.spare_parts.remove',
+  WORK_ORDERS_DELETE: 'work_orders.delete',
   SPARE_PARTS_VIEW: 'spare_parts.view',
   SPARE_PARTS_CREATE: 'spare_parts.create',
   SPARE_PARTS_UPDATE: 'spare_parts.update',

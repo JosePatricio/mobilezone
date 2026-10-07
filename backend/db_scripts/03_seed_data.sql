@@ -53,6 +53,7 @@ INSERT INTO permissions (codigo, descripcion) VALUES
     ('work_orders.update', 'Editar órdenes de trabajo y cambiar su estado'),
     ('work_orders.spare_parts.add', 'Registrar repuestos en órdenes'),
     ('work_orders.spare_parts.remove', 'Quitar repuestos de órdenes'),
+    ('work_orders.delete', 'Eliminar órdenes de trabajo por completo (incluida la venta de una orden finalizada)'),
     ('spare_parts.view', 'Ver repuestos'),
     ('spare_parts.create', 'Crear repuestos'),
     ('spare_parts.update', 'Editar y activar/desactivar repuestos'),

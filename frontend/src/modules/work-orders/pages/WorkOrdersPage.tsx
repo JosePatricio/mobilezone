@@ -5,7 +5,7 @@ import { userApi } from '@/modules/users/services/userApi';
 import { Button, DataList, DatePicker, Input, PageHeader, SearchInput, Select, type Column } from '@/shared/components';
 import { useListParams } from '@/shared/hooks/useListParams';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
-import { formatDate, formatDateTime, formatOrderNumber, formatWarrantyDays, fullName } from '@/shared/utils/format';
+import { formatDate, formatDateTime, formatOrderNumber, fullName } from '@/shared/utils/format';
 import { formatMoney, toCents } from '@/shared/utils/money';
 import { useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
 import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
@@ -27,8 +27,19 @@ export function WorkOrdersPage() {
     placeholderData: keepPreviousData,
   });
 
+  // Only the key data; the rest (vendedor, garantía, costo, anticipo, ...) is in the order detail.
   const columns: Column<WorkOrderListItem>[] = [
-    { key: 'num', header: 'N.º Orden', render: (r) => formatOrderNumber(r.num_orden), sortValue: (r) => r.num_orden },
+    {
+      key: 'num',
+      header: 'N.º Orden',
+      render: (r) => (
+        <>
+          <strong>{formatOrderNumber(r.num_orden)}</strong>
+          <small className="muted d-block">{formatDate(r.fecha)}</small>
+        </>
+      ),
+      sortValue: (r) => r.num_orden,
+    },
     {
       key: 'cliente',
       header: 'Cliente',
@@ -40,15 +51,18 @@ export function WorkOrdersPage() {
       ),
       sortValue: (r) => fullName(r.cliente),
     },
-    { key: 'marca', header: 'Marca', render: (r) => r.marca.nombre },
-    { key: 'modelo', header: 'Modelo', render: (r) => r.modelo.nombre },
-    { key: 'motivo', header: 'Motivo', render: (r) => r.motivo_ingreso_label, sortValue: (r) => r.motivo_ingreso_label },
-    { key: 'tecnico', header: 'Vendedor', render: (r) => (r.tecnico ? fullName(r.tecnico) : 'Sin asignar') },
-    { key: 'garantia', header: 'Garantía', render: (r) => formatWarrantyDays(r.garantia_dias), sortValue: (r) => r.garantia_dias },
-    { key: 'presupuesto', header: 'Costo', align: 'right', render: (r) => formatMoney(r.presupuesto) },
-    { key: 'anticipo', header: 'Anticipo', align: 'right', render: (r) => formatMoney(r.anticipo) },
+    {
+      key: 'equipo',
+      header: 'Equipo',
+      render: (r) => (
+        <>
+          {r.marca.nombre} {r.modelo.nombre}
+          <small className="muted d-block">{r.motivo_ingreso_label}</small>
+        </>
+      ),
+      sortValue: (r) => `${r.marca.nombre} ${r.modelo.nombre}`.toLowerCase(),
+    },
     { key: 'saldo', header: 'Saldo', align: 'right', render: (r) => formatMoney(r.saldo), sortValue: (r) => toCents(r.saldo) },
-    { key: 'fecha', header: 'Ingreso', render: (r) => formatDate(r.fecha), sortValue: (r) => r.fecha },
     {
       key: 'entrega',
       header: 'Entrega',

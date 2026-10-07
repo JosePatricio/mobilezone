@@ -1,3 +1,3 @@
 Modulo ordenes
-En la factura, en el campo Desbloqueo, debe aparecer tambien si selecciona PIN, al momento solo aparece cuando selecciona Patron
-
+En el detalle de orden Agregar un boton Eliminar , que borre por completo esa orden.
+En la lista de ordenes, disminuye los campos solo pon campos que consideres importantes
