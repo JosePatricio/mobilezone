@@ -37,6 +37,8 @@ export interface AffiliatePart extends Timestamps {
   estado_label: string;
   descripcion: string | null;
   precio: Money | null;
+  /** null = show the default image */
+  imagen_url: string | null;
   afiliado: Affiliate;
 }
 

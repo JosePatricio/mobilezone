@@ -12,13 +12,16 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+/** The dashboard summarizes orders, sales and products: without them there is nothing to show. */
+export const DASHBOARD_PERMISSIONS: string[] = [P.WORK_ORDERS_VIEW, P.SALES_VIEW, P.PRODUCTS_VIEW];
+
 /** Sidebar menu. Items are filtered by the permissions of the current user. */
 export const NAVIGATION: NavGroup[] = [
   // Ventas is the first menu entry.
   { items: [{ to: '/sales', label: 'Ventas', permissions: [P.SALES_VIEW, P.SALES_CREATE] }] },
   {
     items: [
-      { to: '/', label: 'Dashboard', permissions: [] },
+      { to: '/', label: 'Dashboard', permissions: DASHBOARD_PERMISSIONS },
       { to: '/profile', label: 'Mi perfil', permissions: [] },
     ],
   },
@@ -61,4 +64,13 @@ export function visibleNavigation(hasAny: (codes: string[]) => boolean): NavGrou
     ...group,
     items: group.items.filter((item) => item.permissions.length === 0 || hasAny(item.permissions)),
   })).filter((group) => group.items.length > 0);
+}
+
+/**
+ * Start page of users without a dashboard (e.g. TECNICO → Repuestos afiliados):
+ * their first module of the menu, else Mi perfil.
+ */
+export function homePath(hasAny: (codes: string[]) => boolean): string {
+  const items = visibleNavigation(hasAny).flatMap((group) => group.items);
+  return items.find((item) => item.to !== '/' && item.to !== '/profile')?.to ?? '/profile';
 }

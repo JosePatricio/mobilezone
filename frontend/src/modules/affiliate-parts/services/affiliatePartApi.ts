@@ -1,4 +1,5 @@
 import { http } from '@/shared/services/httpClient';
+import { deleteImage, uploadImage } from '@/shared/services/uploads';
 import type { Id, Page, QueryParams } from '@/shared/types/api';
 import { cleanParams } from '@/shared/utils/format';
 import type { AffiliatePart, AffiliatePartCatalogs, AffiliatePartRequest, AffiliatePartStatus } from '../types';
@@ -16,12 +17,17 @@ export const affiliatePartApi = {
   setStatus: (id: Id, estado: AffiliatePartStatus) =>
     http.patch<AffiliatePart>(`${BASE}/${id}/status`, { estado }).then((r) => r.data),
   remove: (id: Id) => http.delete(`${BASE}/${id}`).then(() => undefined),
-  /** Visits of the public catalog. */
+  uploadImage: (id: Id, file: File) => uploadImage<AffiliatePart>(`${BASE}/${id}/image`, file),
+  removeImage: (id: Id) => deleteImage<AffiliatePart>(`${BASE}/${id}/image`),
+  /** Visits of the public catalog (administrator only). */
   visits: () => http.get<{ visitas: number }>(`${BASE}/visits`).then((r) => r.data.visitas),
 
   // Public (no login)
   catalogs: () => http.get<AffiliatePartCatalogs>(`${PUBLIC}/catalogs`).then((r) => r.data),
   publicList: (params: QueryParams = {}) =>
     http.get<Page<AffiliatePart>>(PUBLIC, { params: cleanParams(params) }).then((r) => r.data),
-  registerVisit: () => http.post<{ visitas: number }>(`${PUBLIC}/visits`).then((r) => r.data.visitas),
+  /** Public detail of one part (shareable link). */
+  publicGet: (id: Id) => http.get<AffiliatePart>(`${PUBLIC}/${id}`).then((r) => r.data),
+  /** Counts one visit of the public catalog (the total is only shown to the administrator). */
+  registerVisit: () => http.post(`${PUBLIC}/visits`).then(() => undefined),
 };

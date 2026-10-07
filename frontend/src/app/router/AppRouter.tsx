@@ -1,13 +1,14 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { MainLayout } from '@/layouts/MainLayout';
-import { AffiliatePartsPage, PUBLIC_CATALOG_PATH } from '@/modules/affiliate-parts/pages/AffiliatePartsPage';
+import { AffiliatePartsPage } from '@/modules/affiliate-parts/pages/AffiliatePartsPage';
+import { PublicAffiliatePartPage } from '@/modules/affiliate-parts/pages/PublicAffiliatePartPage';
 import { PublicAffiliatePartsPage } from '@/modules/affiliate-parts/pages/PublicAffiliatePartsPage';
+import { PUBLIC_CATALOG_PATH, publicPartPath } from '@/modules/affiliate-parts/paths';
 import { LoginPage } from '@/modules/auth/pages/LoginPage';
 import { BranchesPage } from '@/modules/branches/pages/BranchesPage';
 import { BrandsPage } from '@/modules/brands/pages/BrandsPage';
 import { CategoriesPage } from '@/modules/categories/pages/CategoriesPage';
 import { ClientsPage } from '@/modules/clients/pages/ClientsPage';
-import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
 import { InventoryPage } from '@/modules/inventory/pages/InventoryPage';
 import { ModelsPage } from '@/modules/models/pages/ModelsPage';
 import { PermissionsPage } from '@/modules/permissions/pages/PermissionsPage';
@@ -28,7 +29,7 @@ import { WorkOrdersPage } from '@/modules/work-orders/pages/WorkOrdersPage';
 import { PublicWorkOrderPage } from '@/modules/work-orders/pages/PublicWorkOrderPage';
 import { EmptyState } from '@/shared/components';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
-import { PermissionRoute, ProtectedRoute } from './guards';
+import { HomeRoute, PermissionRoute, ProtectedRoute } from './guards';
 
 export function AppRouter() {
   return (
@@ -38,10 +39,11 @@ export function AppRouter() {
       <Route path="/orden/:codigo" element={<PublicWorkOrderPage />} />
       {/* Public catalog of the affiliate spare parts; no session needed. */}
       <Route path={PUBLIC_CATALOG_PATH} element={<PublicAffiliatePartsPage />} />
+      <Route path={publicPartPath(':id')} element={<PublicAffiliatePartPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
-          <Route index element={<DashboardPage />} />
+          <Route index element={<HomeRoute />} />
           {/* Every logged user: their data and password change. */}
           <Route path="profile" element={<ProfilePage />} />
 

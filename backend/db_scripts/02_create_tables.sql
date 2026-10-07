@@ -235,6 +235,7 @@ CREATE TABLE affiliate_parts (
     estado      VARCHAR(30)   NOT NULL COMMENT 'DISPONIBLE | VENDIDO',
     descripcion TEXT,
     precio      DECIMAL(12,2),
+    imagen      VARCHAR(255)           COMMENT 'relative path of the photo; NULL = default image',
     created_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT pk_affiliate_parts PRIMARY KEY (id),

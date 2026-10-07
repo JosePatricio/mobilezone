@@ -72,9 +72,9 @@ def test_inactive_branch_is_rejected(client, admin_headers, factory):
     assert response.json()["error"]["code"] == "INVALID_BRANCH"
 
 
-def test_technician_lists_the_branches_for_the_order_form(client, factory):
+def test_seller_lists_the_branches_for_the_order_form(client, factory):
     factory.branch("Cerrada", estado=False)
-    tech = factory.user(SystemRole.TECNICO)
+    tech = factory.user(SystemRole.VENDEDOR)
     response = client.get(f"{API}/work-orders/branches", headers=auth_headers(client, tech.email))
     assert response.status_code == 200
     assert [b["nombre"] for b in response.json()] == ["Matriz"]

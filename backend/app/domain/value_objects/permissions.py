@@ -153,21 +153,8 @@ DEFAULT_ROLES: dict[str, list[str]] = {
         Perm.MODELS_CREATE,
         Perm.MODELS_UPDATE,
     ],
-    "TECNICO": [
-        Perm.PRODUCTS_VIEW,
-        Perm.CLIENTS_VIEW,
-        Perm.CLIENTS_CREATE,
-        Perm.BRANDS_VIEW,
-        Perm.MODELS_VIEW,
-        Perm.WORK_ORDERS_VIEW,
-        Perm.WORK_ORDERS_CREATE,
-        Perm.WORK_ORDERS_UPDATE,
-        Perm.WORK_ORDERS_SPARE_PARTS_ADD,
-        Perm.WORK_ORDERS_SPARE_PARTS_REMOVE,
-        Perm.SPARE_PARTS_VIEW,
-        # Affiliate: publishes their own spare parts in the public catalog.
-        Perm.AFFILIATE_PARTS_MANAGE,
-    ],
+    # Technician = affiliate: only publishes their own spare parts (plus Mi perfil, open to every user).
+    "TECNICO": [Perm.AFFILIATE_PARTS_MANAGE],
     # Clients do not log in and have no permissions.
     "CLIENTE": [],
 }

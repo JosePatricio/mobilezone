@@ -15,6 +15,7 @@ from app.domain.value_objects.affiliate_parts import (
     PartCondition,
 )
 from app.presentation.api.schemas.common import Money, RequestSchema, Schema
+from app.presentation.api.schemas.products import _WithImage
 from app.presentation.api.schemas.work_orders import CatalogOption
 
 PartDescription = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=500)]
@@ -47,7 +48,9 @@ class AffiliateResponse(Schema):
     ciudad: str | None
 
 
-class AffiliatePartResponse(Schema):
+class AffiliatePartResponse(_WithImage):
+    """``imagen_url`` = photo of the part (null = default image)."""
+
     id: int
     tipo: AffiliatePartType
     condicion: PartCondition
@@ -93,4 +96,6 @@ class AffiliatePartCatalogsResponse(Schema):
 
 
 class VisitsResponse(Schema):
+    """Only for the administrator."""
+
     visitas: int = Field(description="Veces que el público visitó el catálogo de repuestos")

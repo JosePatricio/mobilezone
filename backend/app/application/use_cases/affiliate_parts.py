@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from app.application.dto import AffiliatePartData, AffiliatePartFilters
+from app.application.services.files import FileStorage
 from app.application.use_cases.base import UseCase
+from app.application.use_cases.images import replace_image
 from app.domain.entities import AffiliatePart, User
 from app.domain.exceptions import NotFoundError
+from app.domain.repositories import UnitOfWork
 from app.domain.value_objects.affiliate_parts import PUBLIC_CATALOG_PAGE, AffiliatePartStatus
 from app.domain.value_objects.pagination import Page, PageRequest
 from app.domain.value_objects.permissions import Perm
+
+AFFILIATE_PART_IMAGES_FOLDER = "affiliate_parts"
 
 
 def _list(uow, page: PageRequest, filters: AffiliatePartFilters, user_id: int | None, public: bool):
@@ -27,6 +32,10 @@ class AffiliatePartUseCases(UseCase):
 
     With ``affiliate_parts.any`` (administrator) the parts of every affiliate are managed.
     """
+
+    def __init__(self, uow: UnitOfWork, storage: FileStorage | None = None) -> None:
+        super().__init__(uow)
+        self.storage = storage
 
     @staticmethod
     def _manages_all(actor: User) -> bool:
@@ -66,7 +75,18 @@ class AffiliatePartUseCases(UseCase):
 
     def delete(self, actor: User, part_id: int) -> None:
         with self.uow.transaction():
-            self.uow.affiliate_parts.delete(self.get(actor, part_id))
+            part = self.get(actor, part_id)
+            imagen = part.imagen
+            self.uow.affiliate_parts.delete(part)
+        if imagen and self.storage is not None:
+            self.storage.delete(imagen)
+
+    def set_image(self, actor: User, part_id: int, content: bytes | None) -> AffiliatePart:
+        """Uploads (or with ``None`` removes) the photo of the part (JPG, PNG or WEBP, max 2 MB)."""
+        assert self.storage is not None
+        return replace_image(
+            self.uow, self.storage, lambda: self.get(actor, part_id), "imagen", AFFILIATE_PART_IMAGES_FOLDER, content
+        )
 
     def visits(self) -> int:
         """How many times the public catalog was visited."""
@@ -78,6 +98,13 @@ class PublicAffiliatePartsUseCases(UseCase):
 
     def list(self, page: PageRequest, filters: AffiliatePartFilters) -> Page[AffiliatePart]:
         return _list(self.uow, page, filters, filters.user_id, public=True)
+
+    def get(self, part_id: int) -> AffiliatePart:
+        """Public detail of one part (shared link); parts of deactivated affiliates are not public."""
+        part = self.uow.affiliate_parts.get(part_id)
+        if part is None or not part.user.estado:
+            raise NotFoundError("Repuesto no encontrado.", code="AFFILIATE_PART_NOT_FOUND")
+        return part
 
     def register_visit(self) -> int:
         with self.uow.transaction():

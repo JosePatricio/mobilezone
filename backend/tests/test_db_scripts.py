@@ -554,3 +554,44 @@ def test_upgrade_011_delete_permission_for_admin(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_012_technician_keeps_only_affiliate_parts(mysql_engine: Engine):
+    """v11 database with a TECNICO role holding order permissions -> upgrade 012."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (
+        initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005, sql.UPGRADE_006,
+        sql.UPGRADE_007, sql.UPGRADE_008, sql.UPGRADE_009, sql.UPGRADE_010, sql.UPGRADE_011,
+    )
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+            q = conn.exec_driver_sql
+            q("INSERT IGNORE INTO roles (nombre) VALUES ('TECNICO'), ('VENDEDOR')")
+            q("INSERT IGNORE INTO permissions (codigo) VALUES ('work_orders.view'), ('products.view')")
+            q(
+                "INSERT IGNORE INTO role_permissions (role_id, permission_id) SELECT r.id, p.id FROM roles r "
+                "JOIN permissions p ON p.codigo IN ('work_orders.view', 'products.view') "
+                "WHERE r.nombre IN ('TECNICO', 'VENDEDOR')"
+            )
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_012)
+        with mysql_engine.connect() as conn:
+            def codes(role: str) -> list[str]:
+                return sorted(conn.exec_driver_sql(
+                    "SELECT p.codigo FROM role_permissions rp JOIN roles r ON r.id = rp.role_id "
+                    f"JOIN permissions p ON p.id = rp.permission_id WHERE r.nombre = '{role}'"
+                ).scalars())
+
+            assert codes("TECNICO") == ["affiliate_parts.manage"]
+            assert codes("VENDEDOR") == ["products.view", "work_orders.view"]  # other roles untouched
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/app/store/AuthProvider';
+import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
 import { EmptyState, Loading } from '@/shared/components';
+import { DASHBOARD_PERMISSIONS, homePath } from './navigation';
 
 /** Requires an authenticated session; otherwise redirects to /login. */
 export function ProtectedRoute({ children }: { children?: ReactNode }) {
@@ -22,4 +24,11 @@ export function PermissionRoute({ permission, children }: { permission: string |
     );
   }
   return <>{children ?? <Outlet />}</>;
+}
+
+/** "/" shows the dashboard; users without it start in their own module (e.g. TECNICO → Repuestos afiliados). */
+export function HomeRoute() {
+  const { hasAnyPermission } = useAuth();
+  if (hasAnyPermission(DASHBOARD_PERMISSIONS)) return <DashboardPage />;
+  return <Navigate to={homePath(hasAnyPermission)} replace />;
 }

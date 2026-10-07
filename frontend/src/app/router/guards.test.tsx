@@ -2,8 +2,8 @@ import { screen } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { Can } from '@/modules/auth/components/Can';
 import { fakeAuth, renderWithProviders } from '@/test/utils';
-import { visibleNavigation } from './navigation';
-import { PermissionRoute, ProtectedRoute } from './guards';
+import { homePath, visibleNavigation } from './navigation';
+import { HomeRoute, PermissionRoute, ProtectedRoute } from './guards';
 
 function Routing() {
   return (
@@ -65,5 +65,30 @@ describe('navigation', () => {
     const seller = fakeAuth({ permissionCodes: ['products.view', 'inventory.view', 'sales.view', 'sales.create'] });
     const labels = visibleNavigation(seller.hasAnyPermission).flatMap((g) => g.items.map((i) => i.label));
     expect(labels).toEqual(['Ventas', 'Dashboard', 'Mi perfil', 'Productos', 'Inventario']);
+  });
+});
+
+describe('technician (affiliate)', () => {
+  const tech = () => fakeAuth({ permissionCodes: ['affiliate_parts.manage'] });
+
+  it('only sees Mi perfil and Repuestos afiliados', () => {
+    const labels = visibleNavigation(tech().hasAnyPermission).flatMap((g) => g.items.map((i) => i.label));
+    expect(labels).toEqual(['Mi perfil', 'Repuestos afiliados']);
+    expect(homePath(tech().hasAnyPermission)).toBe('/affiliate-parts');
+  });
+
+  it('starts in Repuestos afiliados instead of the dashboard', () => {
+    renderWithProviders(
+      <Routes>
+        <Route path="/" element={<HomeRoute />} />
+        <Route path="/affiliate-parts" element={<p>Repuestos afiliados page</p>} />
+      </Routes>,
+      { auth: tech(), route: '/' },
+    );
+    expect(screen.getByText('Repuestos afiliados page')).toBeInTheDocument();
+  });
+
+  it('a user without any module starts in Mi perfil', () => {
+    expect(homePath(fakeAuth({ permissionCodes: [] }).hasAnyPermission)).toBe('/profile');
   });
 });

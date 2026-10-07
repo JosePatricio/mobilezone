@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, UploadFile, status
 
 from app.application.dto import AffiliatePartData, AffiliatePartFilters
 from app.application.use_cases.affiliate_parts import AffiliatePartUseCases, PublicAffiliatePartsUseCases
 from app.domain.entities import User
 from app.domain.value_objects.affiliate_parts import AffiliatePartStatus, AffiliatePartType, PartCondition
 from app.domain.value_objects.permissions import Perm
-from app.presentation.api.dependencies import PageDep, UowDep, require_permissions
+from app.presentation.api.dependencies import PageDep, StorageDep, UowDep, read_upload, require_permissions
 from app.presentation.api.schemas.affiliate_parts import (
     AffiliatePartCatalogsResponse,
     AffiliatePartRequest,
@@ -23,6 +23,8 @@ router = APIRouter(prefix="/affiliate-parts", tags=["affiliate-parts"])
 public_router = APIRouter(prefix="/public/affiliate-parts", tags=["public"])
 
 CanManage = Annotated[User, Depends(require_permissions(Perm.AFFILIATE_PARTS_MANAGE))]
+# The visit counter and the public catalog link are only for the administrator.
+CanManageAll = Annotated[User, Depends(require_permissions(Perm.AFFILIATE_PARTS_ANY))]
 
 
 def get_filters(
@@ -49,7 +51,7 @@ def list_affiliate_parts(uow: UowDep, page: PageDep, filters: FiltersDep, actor:
 
 
 @router.get("/visits", response_model=VisitsResponse)
-def public_catalog_visits(uow: UowDep, _: CanManage):
+def public_catalog_visits(uow: UowDep, _: CanManageAll):
     """How many times the public catalog of spare parts was visited."""
     return VisitsResponse(visitas=AffiliatePartUseCases(uow).visits())
 
@@ -78,9 +80,21 @@ def set_affiliate_part_status(part_id: int, body: AffiliatePartStatusRequest, uo
     return AffiliatePartResponse.model_validate(part)
 
 
+@router.put("/{part_id}/image", response_model=AffiliatePartResponse)
+def upload_affiliate_part_image(part_id: int, file: UploadFile, uow: UowDep, storage: StorageDep, actor: CanManage):
+    """Photo of the part (JPG, PNG or WEBP, max 2 MB). Without photo the catalog shows a default image."""
+    content = read_upload(file)
+    return AffiliatePartResponse.model_validate(AffiliatePartUseCases(uow, storage).set_image(actor, part_id, content))
+
+
+@router.delete("/{part_id}/image", response_model=AffiliatePartResponse)
+def delete_affiliate_part_image(part_id: int, uow: UowDep, storage: StorageDep, actor: CanManage):
+    return AffiliatePartResponse.model_validate(AffiliatePartUseCases(uow, storage).set_image(actor, part_id, None))
+
+
 @router.delete("/{part_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_affiliate_part(part_id: int, uow: UowDep, actor: CanManage) -> Response:
-    AffiliatePartUseCases(uow).delete(actor, part_id)
+def delete_affiliate_part(part_id: int, uow: UowDep, storage: StorageDep, actor: CanManage) -> Response:
+    AffiliatePartUseCases(uow, storage).delete(actor, part_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -97,7 +111,15 @@ def public_affiliate_parts(uow: UowDep, page: PageDep, filters: FiltersDep):
     return PageResponse[AffiliatePartResponse].from_page(result, AffiliatePartResponse)
 
 
-@public_router.post("/visits", response_model=VisitsResponse)
-def register_public_visit(uow: UowDep):
-    """Counts one visit of the public catalog page (called once when the page opens)."""
-    return VisitsResponse(visitas=PublicAffiliatePartsUseCases(uow).register_visit())
+@public_router.get("/{part_id}", response_model=AffiliatePartResponse)
+def public_affiliate_part(part_id: int, uow: UowDep):
+    """Public detail of one spare part (link shared from the affiliate module). No authentication."""
+    return AffiliatePartResponse.model_validate(PublicAffiliatePartsUseCases(uow).get(part_id))
+
+
+@public_router.post("/visits", status_code=status.HTTP_204_NO_CONTENT)
+def register_public_visit(uow: UowDep) -> Response:
+    """Counts one visit of the public catalog page (called once when the page opens).
+    The total is only shown to the administrator (``GET /affiliate-parts/visits``)."""
+    PublicAffiliatePartsUseCases(uow).register_visit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

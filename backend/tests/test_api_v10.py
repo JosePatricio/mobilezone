@@ -108,12 +108,58 @@ def test_public_catalog_shows_every_affiliate_without_login(client, admin_header
     assert [e["value"] for e in catalogs["estados"]] == ["DISPONIBLE", "VENDIDO"]
 
 
-def test_public_visits_are_counted(client, admin_headers):
+def test_public_visits_are_counted_and_only_the_administrator_sees_them(client, admin_headers):
     _, headers = _affiliate(client, admin_headers)
-    assert client.get(f"{URL}/visits", headers=headers).json() == {"visitas": 0}
-    assert client.post(f"{PUBLIC}/visits").json() == {"visitas": 1}
-    assert client.post(f"{PUBLIC}/visits").json() == {"visitas": 2}
-    assert client.get(f"{URL}/visits", headers=headers).json() == {"visitas": 2}
+    assert client.get(f"{URL}/visits", headers=admin_headers).json() == {"visitas": 0}
+    # The public page counts its visit but never receives the total.
+    first = client.post(f"{PUBLIC}/visits")
+    assert first.status_code == 204 and first.content == b""
+    client.post(f"{PUBLIC}/visits")
+    assert client.get(f"{URL}/visits", headers=admin_headers).json() == {"visitas": 2}
+    assert client.get(f"{URL}/visits", headers=headers).status_code == 403  # affiliates do not see it
+
+
+def test_public_detail_of_one_part(client, admin_headers):
+    ana, headers = _affiliate(client, admin_headers)
+    part = client.post(URL, json=PART, headers=headers).json()
+
+    detail = client.get(f"{PUBLIC}/{part['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["descripcion"] == "Samsung A10"
+    assert detail.json()["afiliado"]["direccion"] == "Av. Amazonas N24-12"
+    assert client.get(f"{PUBLIC}/999").status_code == 404
+
+    client.patch(f"{API}/users/{ana['id']}/status", json={"estado": False}, headers=admin_headers)
+    assert client.get(f"{PUBLIC}/{part['id']}").status_code == 404
+
+
+def test_part_image(client, admin_headers, settings):
+    from pathlib import Path
+
+    from tests.test_api_v5 import _png
+
+    _, headers = _affiliate(client, admin_headers)
+    _, other_headers = _affiliate(client, admin_headers, "otro@example.com", "Calle 10")
+    part = client.post(URL, json=PART, headers=headers).json()
+    assert part["imagen_url"] is None
+
+    uploaded = client.put(f"{URL}/{part['id']}/image", files=_png(), headers=headers)
+    assert uploaded.status_code == 200, uploaded.text
+    url = uploaded.json()["imagen_url"]
+    assert url.startswith("/media/affiliate_parts/")
+    assert client.get(f"{PUBLIC}/{part['id']}").json()["imagen_url"] == url
+    stored = Path(settings.media_dir) / url.removeprefix("/media/")
+    assert stored.exists()
+
+    # Another affiliate cannot change it.
+    assert client.put(f"{URL}/{part['id']}/image", files=_png(), headers=other_headers).status_code == 404
+
+    removed = client.delete(f"{URL}/{part['id']}/image", headers=headers)
+    assert removed.json()["imagen_url"] is None and not stored.exists()
+
+    client.put(f"{URL}/{part['id']}/image", files=_png(), headers=headers)
+    assert client.delete(f"{URL}/{part['id']}", headers=headers).status_code == 204
+    assert not any((Path(settings.media_dir) / "affiliate_parts").iterdir())
 
 
 def test_only_affiliates_manage_parts(client, factory):

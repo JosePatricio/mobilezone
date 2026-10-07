@@ -7,9 +7,12 @@ import {
   Button,
   Checkbox,
   DataList,
+  ImageField,
   MoneyInput,
   Modal,
+  NO_IMAGE_CHANGE,
   PageHeader,
+  ProductThumb,
   SearchInput,
   Select,
   StatusBadge,
@@ -17,19 +20,22 @@ import {
   useConfirm,
   useToast,
   type Column,
+  type ImageSelection,
 } from '@/shared/components';
 import { useListParams } from '@/shared/hooks/useListParams';
 import { getErrorMessage } from '@/shared/services/apiError';
+import { applyImageSelection } from '@/shared/services/uploads';
 import type { Id } from '@/shared/types/api';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatDate, fullName } from '@/shared/utils/format';
 import { formatMoney, isValidMoney, normalizeMoney } from '@/shared/utils/money';
 import { type FormShape, applyServerErrors, zOptionalText, zodForm } from '@/shared/utils/validation';
 import { partStatusTone, useAffiliatePartCatalogs, yesNo } from '../hooks/useAffiliatePartCatalogs';
+import { PUBLIC_CATALOG_PATH, publicPartPath } from '../paths';
 import { AFFILIATE_PARTS_KEY, affiliatePartApi } from '../services/affiliatePartApi';
 import type { AffiliatePart, AffiliatePartRequest, AffiliatePartStatus, AffiliatePartType, PartCondition } from '../types';
 
-export const PUBLIC_CATALOG_PATH = '/repuestos';
+const publicPartUrl = (id: Id) => `${window.location.origin}${publicPartPath(id)}`;
 
 const schema = z.object({
   tipo: z.string().min(1, 'Seleccione el tipo de repuesto'),
@@ -61,7 +67,12 @@ export function AffiliatePartsPage() {
     queryFn: () => affiliatePartApi.list(list.params),
     placeholderData: keepPreviousData,
   });
-  const visits = useQuery({ queryKey: [AFFILIATE_PARTS_KEY, 'visits'], queryFn: affiliatePartApi.visits });
+  // The visit counter and the public catalog link are only for the administrator.
+  const visits = useQuery({
+    queryKey: [AFFILIATE_PARTS_KEY, 'visits'],
+    queryFn: affiliatePartApi.visits,
+    enabled: managesAll,
+  });
   const queryClient = useQueryClient();
   const invalidate = () => queryClient.invalidateQueries({ queryKey: [AFFILIATE_PARTS_KEY] });
   const save = useMutation({
@@ -88,6 +99,15 @@ export function AffiliatePartsPage() {
     }
   };
 
+  const copyLink = async (part: AffiliatePart) => {
+    try {
+      await navigator.clipboard.writeText(publicPartUrl(part.id));
+      toast.success('Enlace copiado.');
+    } catch {
+      toast.error(`No se pudo copiar. Enlace: ${publicPartUrl(part.id)}`);
+    }
+  };
+
   const onDelete = async (part: AffiliatePart) => {
     const ok = await confirm({
       title: 'Eliminar repuesto',
@@ -105,7 +125,17 @@ export function AffiliatePartsPage() {
   };
 
   const columns: Column<AffiliatePart>[] = [
-    { key: 'tipo', header: 'Tipo', render: (r) => r.tipo_label, sortValue: (r) => r.tipo_label },
+    {
+      key: 'tipo',
+      header: 'Tipo',
+      render: (r) => (
+        <div className="cell-with-image">
+          <ProductThumb src={r.imagen_url} alt={r.tipo_label} size="sm" />
+          <span>{r.tipo_label}</span>
+        </div>
+      ),
+      sortValue: (r) => r.tipo_label,
+    },
     { key: 'descripcion', header: 'Descripción', render: (r) => r.descripcion ?? '—' },
     { key: 'condicion', header: 'Estado', render: (r) => r.condicion_label },
     { key: 'garantia', header: 'Garantía', render: (r) => yesNo(r.garantia) },
@@ -119,6 +149,20 @@ export function AffiliatePartsPage() {
       ? [{ key: 'afiliado', header: 'Afiliado', render: (r: AffiliatePart) => fullName(r.afiliado) }]
       : []),
     { key: 'fecha', header: 'Publicado', render: (r) => formatDate(r.created_at), sortValue: (r) => r.created_at },
+    {
+      key: 'detalle',
+      header: 'Detalle público',
+      render: (r) => (
+        <div className="row-actions">
+          <a className="btn btn-ghost btn-sm" href={publicPartPath(r.id)} target="_blank" rel="noreferrer">
+            Ver
+          </a>
+          <Button size="sm" variant="ghost" onClick={() => void copyLink(r)}>
+            Copiar enlace
+          </Button>
+        </div>
+      ),
+    },
     {
       key: 'acciones',
       header: 'Acciones',
@@ -145,9 +189,11 @@ export function AffiliatePartsPage() {
         title={managesAll ? 'Repuestos de afiliados' : 'Mis repuestos'}
         actions={
           <>
-            <a className="btn btn-secondary btn-md" href={PUBLIC_CATALOG_PATH} target="_blank" rel="noreferrer">
-              Ver catálogo público
-            </a>
+            {managesAll && (
+              <a className="btn btn-secondary btn-md" href={PUBLIC_CATALOG_PATH} target="_blank" rel="noreferrer">
+                Ver catálogo público
+              </a>
+            )}
             <Button onClick={() => setEditing(null)}>Nuevo repuesto</Button>
           </>
         }
@@ -156,10 +202,12 @@ export function AffiliatePartsPage() {
       </PageHeader>
 
       <div className="stat-grid">
-        <div className="stat-card stat-info">
-          <span className="stat-label">Visitas al catálogo público</span>
-          <span className="stat-value">{visits.data ?? '—'}</span>
-        </div>
+        {managesAll && (
+          <div className="stat-card stat-info">
+            <span className="stat-label">Visitas al catálogo público</span>
+            <span className="stat-value">{visits.data ?? '—'}</span>
+          </div>
+        )}
         <div className="stat-card stat-success">
           <span className="stat-label">Dirección publicada</span>
           <span>{user?.direccion ?? 'Sin dirección: pida al administrador que la registre en su usuario.'}</span>
@@ -202,8 +250,14 @@ export function AffiliatePartsPage() {
         <AffiliatePartFormModal
           part={editing}
           onClose={() => setEditing(undefined)}
-          onSubmit={async (body) => {
-            await save.mutateAsync({ id: editing?.id, body });
+          onSubmit={async (body, image) => {
+            const saved = await save.mutateAsync({ id: editing?.id, body });
+            await applyImageSelection(
+              image,
+              (file) => affiliatePartApi.uploadImage(saved.id, file),
+              () => affiliatePartApi.removeImage(saved.id),
+            );
+            await invalidate();
             toast.success(editing ? 'Cambios guardados.' : 'Repuesto publicado.');
             setEditing(undefined);
           }}
@@ -220,9 +274,10 @@ function AffiliatePartFormModal({
 }: {
   part: AffiliatePart | null;
   onClose: () => void;
-  onSubmit: (body: AffiliatePartRequest) => Promise<void>;
+  onSubmit: (body: AffiliatePartRequest, image: ImageSelection) => Promise<void>;
 }) {
   const catalogs = useAffiliatePartCatalogs();
+  const [image, setImage] = useState<ImageSelection>(NO_IMAGE_CHANGE);
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -244,12 +299,15 @@ function AffiliatePartFormModal({
   const submit = handleSubmit(async (values) => {
     setServerError(null);
     try {
-      await onSubmit({
-        ...values,
-        tipo: values.tipo as AffiliatePartType,
-        condicion: values.condicion as PartCondition,
-        estado: values.estado as AffiliatePartStatus,
-      });
+      await onSubmit(
+        {
+          ...values,
+          tipo: values.tipo as AffiliatePartType,
+          condicion: values.condicion as PartCondition,
+          estado: values.estado as AffiliatePartStatus,
+        },
+        image,
+      );
     } catch (err) {
       if (!applyServerErrors(err, setError)) setServerError(getErrorMessage(err));
     }
@@ -278,6 +336,9 @@ function AffiliatePartFormModal({
             {serverError}
           </div>
         )}
+        <div className="full">
+          <ImageField label="Imagen" variant="product" currentUrl={part?.imagen_url} value={image} onChange={setImage} />
+        </div>
         <Select
           label="Tipo de repuesto"
           required

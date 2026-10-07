@@ -379,6 +379,7 @@ affiliate_parts_table = Table(
     Column("estado", _str_enum(AffiliatePartStatus), nullable=False, index=True),  # disponible / vendido
     Column("descripcion", Text),
     Column("precio", MONEY),
+    Column("imagen", String(255)),  # relative path in the media storage
     *_timestamps(),
     CheckConstraint("precio IS NULL OR precio >= 0", name="precio_non_negative"),
 )

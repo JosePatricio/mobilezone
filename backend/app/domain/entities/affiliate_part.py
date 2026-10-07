@@ -30,6 +30,7 @@ class AffiliatePart:
     estado: AffiliatePartStatus = AffiliatePartStatus.DISPONIBLE
     descripcion: str | None = None  # e.g. compatible phone model
     precio: Decimal | None = None  # optional: to be agreed with the affiliate
+    imagen: str | None = None  # relative path in the media storage
     id: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

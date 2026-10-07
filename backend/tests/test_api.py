@@ -58,9 +58,16 @@ class TestAuthorization:
         assert response.json()["error"]["code"] == "FORBIDDEN"
 
     def test_permission_granted(self, client, factory):
+        seller = factory.user(SystemRole.VENDEDOR)
+        headers = auth_headers(client, seller.email)
+        assert client.get(f"{API}/products", headers=headers).status_code == 200
+
+    def test_technician_only_manages_affiliate_parts(self, client, factory):
         tech = factory.user(SystemRole.TECNICO)
         headers = auth_headers(client, tech.email)
-        assert client.get(f"{API}/products", headers=headers).status_code == 200
+        assert client.get(f"{API}/affiliate-parts", headers=headers).status_code == 200
+        for path in ("work-orders", "products", "sales", "clients", "spare-parts"):
+            assert client.get(f"{API}/{path}", headers=headers).status_code == 403, path
 
 
 # -------------------------------------------------------------- catalog
@@ -276,8 +283,8 @@ class TestWorkOrders:
         payload.update(overrides)
         return payload
 
-    def test_create_as_technician(self, client, factory):
-        tech = factory.user(SystemRole.TECNICO)
+    def test_create_as_seller(self, client, factory):
+        tech = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, tech.email)
         response = client.post(f"{API}/work-orders", json=self._payload(factory), headers=headers)
         assert response.status_code == 201, response.text
@@ -291,7 +298,7 @@ class TestWorkOrders:
         assert by_number.json()["id"] == order["id"]
 
     def test_saldo_cannot_be_forced_by_client(self, client, factory):
-        tech = factory.user(SystemRole.TECNICO)
+        tech = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, tech.email)
         response = client.post(
             f"{API}/work-orders", json=self._payload(factory, saldo="1.00"), headers=headers
@@ -299,7 +306,7 @@ class TestWorkOrders:
         assert response.status_code == 422  # extra fields are forbidden
 
     def test_advance_exceeding_budget(self, client, factory):
-        tech = factory.user(SystemRole.TECNICO)
+        tech = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, tech.email)
         response = client.post(
             f"{API}/work-orders", json=self._payload(factory, anticipo="200.00"), headers=headers
@@ -308,14 +315,14 @@ class TestWorkOrders:
         assert response.json()["error"]["code"] == "ADVANCE_EXCEEDS_BUDGET"
 
     def test_invalid_status(self, client, factory):
-        tech = factory.user(SystemRole.TECNICO)
+        tech = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, tech.email)
         order = client.post(f"{API}/work-orders", json=self._payload(factory), headers=headers).json()
         response = client.patch(f"{API}/work-orders/{order['id']}/status", json={"estado": 5}, headers=headers)
         assert response.status_code == 422
 
     def test_spare_parts_and_filters(self, client, factory):
-        tech = factory.user(SystemRole.TECNICO)
+        tech = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, tech.email)
         order = client.post(f"{API}/work-orders", json=self._payload(factory), headers=headers).json()
         part = factory.spare_part(precio="85.00")

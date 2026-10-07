@@ -120,7 +120,7 @@ class TestWorkOrdersV5:
         assert catalogs["estados"] and "tipos_garantia" not in catalogs
 
     def test_customer_lookup(self, client, factory):
-        tech = factory.user(SystemRole.TECNICO)
+        tech = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, tech.email)
         existing = factory.user(SystemRole.CLIENTE)
         found = client.get(

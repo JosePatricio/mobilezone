@@ -89,10 +89,7 @@ SELECT r.id, p.id FROM roles r JOIN permissions p ON p.codigo IN (
 -- TECNICO
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p ON p.codigo IN (
-    'products.view', 'clients.view', 'clients.create',
-    'brands.view', 'models.view', 'work_orders.view',
-    'work_orders.create', 'work_orders.update', 'work_orders.spare_parts.add',
-    'work_orders.spare_parts.remove', 'spare_parts.view', 'affiliate_parts.manage'
+    'affiliate_parts.manage'
 ) WHERE r.nombre = 'TECNICO';
 
 -- CLIENTE: no permissions (clients do not log in)
