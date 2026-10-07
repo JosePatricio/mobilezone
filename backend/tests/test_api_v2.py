@@ -102,14 +102,14 @@ class TestUsersAndRoles:
         assert dup.status_code == 409
         assert dup.json()["error"]["code"] == "IDENTIFICATION_ALREADY_EXISTS"
 
-    def test_password_required_except_for_clients_and_sellers(self, client, admin_headers, uow, factory):
+    def test_password_or_cedula_required_except_for_clients(self, client, admin_headers, uow, factory):
         tech = client.post(
             f"{API}/users",
             json={"nombre": "T", "apellido": "T", "email": "t@example.com", "rol_id": _role_id(uow, "TECNICO")},
             headers=admin_headers,
         )
         assert tech.status_code == 400
-        assert tech.json()["error"]["code"] == "PASSWORD_REQUIRED"
+        assert tech.json()["error"]["code"] == "IDENTIFICATION_REQUIRED"
         customer = client.post(
             f"{API}/users",
             json={

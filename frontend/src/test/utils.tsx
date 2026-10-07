@@ -34,6 +34,8 @@ export function fakeAuth(overrides: Partial<AuthState> & { permissionCodes?: str
     user: testUser,
     permissions,
     logoutReason: null,
+    defaultPassword: false,
+    passwordChanged: vi.fn(),
     login: vi.fn(),
     logout: vi.fn(),
     hasPermission: (code) => permissions.has(code),

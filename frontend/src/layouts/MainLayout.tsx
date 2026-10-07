@@ -8,7 +8,7 @@ import { fullName } from '@/shared/utils/format';
 import { TodaySales } from './TodaySales';
 
 export function MainLayout() {
-  const { user, logout, hasAnyPermission } = useAuth();
+  const { user, logout, hasAnyPermission, defaultPassword } = useAuth();
   const confirm = useConfirm();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -77,6 +77,12 @@ export function MainLayout() {
       <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} aria-hidden />
 
       <main className="app-content">
+        {defaultPassword && (
+          <div className="alert alert-warning" role="alert">
+            Su contraseña sigue siendo su cédula / RUC. Por seguridad, cámbiela en{' '}
+            <Link to="/profile">Mi perfil</Link>.
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

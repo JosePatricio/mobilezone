@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/services/apiError';
-import { renderWithProviders } from '@/test/utils';
+import { fakeAuth, renderWithProviders } from '@/test/utils';
 import { ProfilePage } from './ProfilePage';
 
 const api = vi.hoisted(() => ({ changePassword: vi.fn() }));
@@ -27,11 +27,13 @@ describe('ProfilePage', () => {
 
   it('changes the password and clears the form', async () => {
     api.changePassword.mockResolvedValue(undefined);
-    renderWithProviders(<ProfilePage />);
+    const auth = fakeAuth({ defaultPassword: true });
+    renderWithProviders(<ProfilePage />, { auth });
     await fill('Secret1234', 'NuevaClave99', 'NuevaClave99');
     expect(api.changePassword).toHaveBeenCalledWith({ current_password: 'Secret1234', new_password: 'NuevaClave99' });
     expect(await screen.findByText('Contraseña actualizada.')).toBeInTheDocument();
     expect(screen.getByLabelText(/Contraseña actual/)).toHaveValue('');
+    expect(auth.passwordChanged).toHaveBeenCalled(); // hides the warning
   });
 
   it('requires the confirmation to match', async () => {

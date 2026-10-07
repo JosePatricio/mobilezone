@@ -74,6 +74,7 @@ export function ProfilePage() {
 
 function ChangePasswordCard() {
   const toast = useToast();
+  const { passwordChanged } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -88,6 +89,7 @@ function ChangePasswordCard() {
     try {
       await profileApi.changePassword({ current_password, new_password });
       reset(EMPTY);
+      passwordChanged();
       toast.success('Contraseña actualizada.');
     } catch (err) {
       if (!applyServerErrors(err, setError)) setServerError(getErrorMessage(err));

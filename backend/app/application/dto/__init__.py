@@ -245,3 +245,4 @@ class LoginResult:
     expires_at: object = None
     user: object = None
     permissions: list[str] = field(default_factory=list)
+    password_por_defecto: bool = False  # the password is still the cédula / RUC

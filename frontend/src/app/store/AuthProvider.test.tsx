@@ -12,8 +12,8 @@ const future = () => new Date(Date.now() + 3_600_000).toISOString();
 const session = () => ({ token: 'tok-123', expiresAt: future() });
 
 function Status() {
-  const { status, user } = useAuth();
-  return <p>{status === 'authenticated' ? `in:${user?.nombre}` : status}</p>;
+  const { status, user, defaultPassword } = useAuth();
+  return <p>{status === 'authenticated' ? `in:${user?.nombre}${defaultPassword ? ':default' : ''}` : status}</p>;
 }
 
 const renderTab = () =>
@@ -79,5 +79,12 @@ describe('AuthProvider across tabs', () => {
     act(() => otherTab.postMessage({ type: 'logout' }));
     await waitFor(() => expect(screen.getByText('anonymous')).toBeInTheDocument());
     expect(tokenStorage.get()).toBeNull();
+  });
+
+  it('reports a password that is still the cédula / RUC', async () => {
+    api.me.mockResolvedValue({ user: testUser, permissions: [], password_por_defecto: true });
+    tokenStorage.set(session());
+    renderTab();
+    expect(await screen.findByText('in:Ana:default')).toBeInTheDocument();
   });
 });

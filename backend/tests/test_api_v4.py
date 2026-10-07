@@ -83,6 +83,15 @@ class TestSellerPassword:
         assert created.status_code == 201, created.text
         assert auth_headers(client, "vera@example.com", cedula)
 
+    def test_every_role_gets_the_cedula_as_default_password(self, client, admin_headers, uow):
+        for n, role in enumerate(("TECNICO", "ADMIN")):
+            cedula = valid_cedula(400 + n)
+            email = f"{role.lower()}-default@example.com"
+            body = {"nombre": "Tito", "apellido": "T", "email": email, "rol_id": _role_id(uow, role), "identificacion": cedula}
+            created = client.post(f"{API}/users", json=body, headers=admin_headers)
+            assert created.status_code == 201, created.text
+            assert auth_headers(client, email, cedula)
+
     def test_seller_without_cedula_nor_password(self, client, admin_headers, uow, factory):
         response = client.post(
             f"{API}/users",

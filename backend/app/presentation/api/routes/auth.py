@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.application.use_cases.auth import ChangePasswordUseCase, LoginUseCase
+from app.application.use_cases.auth import ChangePasswordUseCase, LoginUseCase, uses_default_password
 from app.presentation.api.dependencies import CurrentUser, HasherDep, TokensDep, UowDep
 from app.presentation.api.schemas.users import (
     ChangePasswordRequest,
@@ -25,6 +25,7 @@ def _token_response(result) -> TokenResponse:
         expires_at=result.expires_at,
         user=UserResponse.model_validate(result.user),
         permissions=result.permissions,
+        password_por_defecto=result.password_por_defecto,
     )
 
 
@@ -43,8 +44,12 @@ def token(
 
 
 @router.get("/me", response_model=CurrentUserResponse)
-def me(user: CurrentUser) -> CurrentUserResponse:
-    return CurrentUserResponse(user=UserResponse.model_validate(user), permissions=sorted(user.permissions))
+def me(user: CurrentUser, hasher: HasherDep) -> CurrentUserResponse:
+    return CurrentUserResponse(
+        user=UserResponse.model_validate(user),
+        permissions=sorted(user.permissions),
+        password_por_defecto=uses_default_password(user, hasher),
+    )
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)

@@ -13,9 +13,12 @@ export interface LoginResponse {
   expires_at: string;
   user: User;
   permissions: string[];
+  /** The password is still the cédula / RUC. */
+  password_por_defecto?: boolean;
 }
 
 export interface CurrentUserResponse {
   user: User;
   permissions: string[];
+  password_por_defecto?: boolean;
 }

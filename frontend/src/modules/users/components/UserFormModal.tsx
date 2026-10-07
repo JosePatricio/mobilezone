@@ -44,22 +44,20 @@ function buildSchema(isEdit: boolean, roles: NamedRef[]) {
       const pwd = v.password ?? '';
       const isClient = roleName(v.rol_id) === SYSTEM_ROLES.CLIENTE;
       const isSeller = roleName(v.rol_id) === SYSTEM_ROLES.VENDEDOR;
-      if (!isEdit && isSeller && !pwd && !v.identificacion) {
-        // A seller without password gets the cédula / RUC as initial password.
+      if (!isEdit && !isClient && !pwd && !v.identificacion) {
+        // Without a password, the cédula / RUC is the initial password (every role).
         ctx.addIssue({
           code: 'custom',
           path: ['identificacion'],
-          message: 'Ingrese la cédula / RUC: será la contraseña inicial del vendedor',
+          message: 'Ingrese la cédula / RUC: será la contraseña inicial',
         });
-      } else if (!isEdit && !isClient && !isSeller && !pwd) {
-        ctx.addIssue({ code: 'custom', path: ['password'], message: 'La contraseña es obligatoria' });
       } else if (pwd && pwd.length < 8) {
         ctx.addIssue({ code: 'custom', path: ['password'], message: 'Mínimo 8 caracteres' });
       }
       if (v.provincia && !v.ciudad) {
         ctx.addIssue({ code: 'custom', path: ['ciudad'], message: 'Seleccione la ciudad' });
       }
-      if (roleName(v.rol_id) === SYSTEM_ROLES.VENDEDOR && v.branch_ids.length === 0) {
+      if (isSeller && v.branch_ids.length === 0) {
         ctx.addIssue({ code: 'custom', path: ['branch_ids'], message: 'Asigne al menos una sucursal al vendedor' });
       }
     });
@@ -119,6 +117,7 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
   });
   const roleName = roleOptions.find((r) => r.id === Number(rolId))?.nombre;
   const isClient = roleName === SYSTEM_ROLES.CLIENTE;
+  const isSeller = roleName === SYSTEM_ROLES.VENDEDOR;
   const selectedBranches = new Set<number>((branchIds as number[] | undefined) ?? []);
 
   const toggleBranch = (id: number) => {
@@ -132,7 +131,7 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
     setServerError(null);
     try {
       await onSubmit(
-        { ...values, password: password && !isClient ? password : null, branch_ids: isClient ? [] : values.branch_ids },
+        { ...values, password: password && !isClient ? password : null, branch_ids: isSeller ? values.branch_ids : [] },
         image,
       );
     } catch (err) {
@@ -208,22 +207,16 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
             label="Contraseña"
             type="password"
             autoComplete="new-password"
-            required={!user && roleName !== SYSTEM_ROLES.VENDEDOR}
-            hint={
-              user
-                ? 'Deje vacío para mantener la actual'
-                : roleName === SYSTEM_ROLES.VENDEDOR
-                  ? 'Si la deja vacía, la contraseña será su cédula / RUC'
-                  : 'Mínimo 8 caracteres'
-            }
+            hint={user ? 'Deje vacío para mantener la actual' : 'Por defecto: su cédula / RUC'}
             error={errors.password?.message}
             {...register('password')}
           />
         )}
-        {!isClient && (
+        {/* Only sellers are assigned to branches (they sell from them). */}
+        {isSeller && (
           <fieldset className="full branch-checks">
             <legend className="field-label">
-              Sucursales asignadas{roleName === SYSTEM_ROLES.VENDEDOR && <span className="field-required"> *</span>}
+              Sucursales asignadas<span className="field-required"> *</span>
             </legend>
             <div className="branch-checks-grid">
               {(branches.data ?? []).map((b) => (

@@ -82,6 +82,7 @@ class UserResponse(_WithPhoto):
 class CurrentUserResponse(Schema):
     user: UserResponse
     permissions: list[str]
+    password_por_defecto: bool = Field(default=False, description="La contraseña sigue siendo la cédula / RUC: se sugiere cambiarla")
 
 
 class TokenResponse(Schema):
@@ -90,6 +91,7 @@ class TokenResponse(Schema):
     expires_at: datetime
     user: UserResponse
     permissions: list[str]
+    password_por_defecto: bool = Field(default=False, description="La contraseña sigue siendo la cédula / RUC: se sugiere cambiarla")
 
 
 class UserRequest(RequestSchema):

@@ -15,6 +15,10 @@ export interface AuthState {
   user: User | null;
   permissions: Set<string>;
   logoutReason: LogoutReason | null;
+  /** The password is still the cédula / RUC: a warning suggests changing it. */
+  defaultPassword: boolean;
+  /** Called after the user changes their password (hides the warning). */
+  passwordChanged: () => void;
   login: (credentials: LoginRequest) => Promise<void>;
   logout: (reason?: LogoutReason) => void;
   hasPermission: (code: string) => boolean;
@@ -31,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<Set<string>>(new Set());
+  const [defaultPassword, setDefaultPassword] = useState(false);
   const [logoutReason, setLogoutReason] = useState<LogoutReason | null>(null);
   const expiryTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -41,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.clear();
       setUser(null);
       setPermissions(new Set());
+      setDefaultPassword(false);
       setLogoutReason(reason);
       setStatus('anonymous');
     },
@@ -77,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (cancelled) return;
           setUser(me.user);
           setPermissions(new Set(me.permissions));
+          setDefaultPassword(Boolean(me.password_por_defecto));
           setLogoutReason(null);
           setStatus('authenticated');
           scheduleExpiry(session.expiresAt);
@@ -117,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionSync.publishSession(session); // other open tabs on the login screen enter too
       setUser(result.user);
       setPermissions(new Set(result.permissions));
+      setDefaultPassword(Boolean(result.password_por_defecto));
       setLogoutReason(null);
       setStatus('authenticated');
       scheduleExpiry(result.expires_at);
@@ -130,12 +138,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       permissions,
       logoutReason,
+      defaultPassword,
+      passwordChanged: () => setDefaultPassword(false),
       login,
       logout,
       hasPermission: (code) => permissions.has(code),
       hasAnyPermission: (codes) => codes.some((c) => permissions.has(c)),
     }),
-    [status, user, permissions, logoutReason, login, logout],
+    [status, user, permissions, logoutReason, defaultPassword, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

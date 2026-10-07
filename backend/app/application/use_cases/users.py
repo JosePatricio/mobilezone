@@ -122,7 +122,7 @@ class UserUseCases(_UserValidation):
             # Clients never log in (no password, email optional); every other role needs both.
             if role.nombre != SystemRole.CLIENTE.value:
                 self._require_email(user)
-                password = data.password or self._default_password(role, user)
+                password = data.password or self._default_password(user)
                 user.password = self.hasher.hash(validate_password(password))
             self.uow.users.add(user)
         return user
@@ -137,19 +137,15 @@ class UserUseCases(_UserValidation):
             )
 
     @staticmethod
-    def _default_password(role: Role, user: User) -> str:
-        """Sellers without an explicit password get their cédula / RUC as initial password."""
-        if role.nombre == SystemRole.VENDEDOR.value:
-            if not user.identificacion:
-                raise ValidationError(
-                    "Ingrese la cédula / RUC del vendedor: será su contraseña inicial.",
-                    code="IDENTIFICATION_REQUIRED",
-                    details={"field": "identificacion"},
-                )
-            return user.identificacion
-        raise ValidationError(
-            "La contraseña es obligatoria.", code="PASSWORD_REQUIRED", details={"field": "password"}
-        )
+    def _default_password(user: User) -> str:
+        """Users of every role without an explicit password get their cédula / RUC as initial password."""
+        if not user.identificacion:
+            raise ValidationError(
+                "Ingrese la cédula / RUC (será la contraseña inicial) o una contraseña.",
+                code="IDENTIFICATION_REQUIRED",
+                details={"field": "identificacion"},
+            )
+        return user.identificacion
 
     def update(self, user_id: int, data: UserData, actor: User) -> User:
         with self.uow.transaction():
@@ -175,7 +171,7 @@ class UserUseCases(_UserValidation):
             if data.password:
                 user.password = self.hasher.hash(validate_password(data.password))
             elif not user.password:  # e.g. a client promoted to seller
-                user.password = self.hasher.hash(validate_password(self._default_password(role, user)))
+                user.password = self.hasher.hash(validate_password(self._default_password(user)))
         return user
 
     def set_user_status(self, user_id: int, estado: bool, actor: User) -> User:

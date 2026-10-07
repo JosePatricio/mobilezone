@@ -11,6 +11,11 @@ from app.domain.repositories import UnitOfWork
 INVALID_CREDENTIALS = "Credenciales inválidas."
 
 
+def uses_default_password(user: User, hasher: PasswordHasher) -> bool:
+    """True while the password is still the cédula / RUC (initial password): the app suggests changing it."""
+    return bool(user.identificacion and user.password and hasher.verify(user.identificacion, user.password))
+
+
 class LoginUseCase(UseCase):
     def __init__(self, uow: UnitOfWork, hasher: PasswordHasher, tokens: TokenService) -> None:
         super().__init__(uow)
@@ -32,6 +37,7 @@ class LoginUseCase(UseCase):
             expires_at=token.expires_at,
             user=user,
             permissions=sorted(user.permissions),
+            password_por_defecto=bool(user.identificacion) and password == user.identificacion,
         )
 
 
