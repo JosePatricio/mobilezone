@@ -246,8 +246,8 @@ describe('NewSalePage', () => {
     renderPage();
     await userEvent.click(screen.getByRole('button', { name: 'Buscar cliente por cédula o RUC' }));
     const modal = await screen.findByRole('dialog', { name: 'Buscar cliente' });
-    await userEvent.type(within(modal).getByLabelText('Cédula o RUC'), '1712345678{Enter}');
-    expect(await within(modal).findByRole('alert')).toHaveTextContent('no es válido');
+    await userEvent.type(within(modal).getByLabelText('Cédula o RUC'), '17123456780011{Enter}');
+    expect(await within(modal).findByRole('alert')).toHaveTextContent(/no es válido|máximo/);
   });
 
   it('asks for a branch when the seller has none', () => {

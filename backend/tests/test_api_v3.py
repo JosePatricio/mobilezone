@@ -2,7 +2,10 @@
 provinces / cities and customer registration from the sales screen."""
 from __future__ import annotations
 
+import pytest
+
 from app.domain.value_objects.enums import SystemRole
+from app.domain.value_objects.identificacion import IDENTIFICACION_VALIDATION_ENABLED
 from tests.conftest import auth_headers, valid_cedula
 
 API = "/api/v1"
@@ -117,6 +120,7 @@ class TestSalesByBranch:
         # Sellers still have no access to the Clientes module.
         assert client.get(f"{API}/clients", headers=headers).status_code == 403
 
+    @pytest.mark.skipif(not IDENTIFICACION_VALIDATION_ENABLED, reason="cédula / RUC validation temporarily disabled")
     def test_customer_with_invalid_cedula_is_rejected(self, client, factory):
         headers = auth_headers(client, factory.user(SystemRole.VENDEDOR).email)
         response = client.post(
@@ -126,6 +130,19 @@ class TestSalesByBranch:
         )
         assert response.status_code == 400
         assert response.json()["error"]["code"] == "INVALID_IDENTIFICATION"
+
+    @pytest.mark.skipif(IDENTIFICACION_VALIDATION_ENABLED, reason="only while cédula / RUC validation is disabled")
+    def test_legacy_customer_with_any_identificacion_is_accepted(self, client, factory):
+        headers = auth_headers(client, factory.user(SystemRole.VENDEDOR).email)
+        response = client.post(
+            f"{API}/sales/customers",
+            json={"nombre": "A", "apellido": "B", "identificacion": "11"},
+            headers=headers,
+        )
+        assert response.status_code == 201, response.text
+        assert response.json()["identificacion"] == "11"
+        found = client.get(f"{API}/sales/customers/lookup", params={"identificacion": "11"}, headers=headers)
+        assert found.status_code == 200, found.text
 
     def test_sale_shows_customer_phone(self, client, factory):
         headers = auth_headers(client, factory.user(SystemRole.VENDEDOR).email)

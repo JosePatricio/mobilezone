@@ -65,7 +65,7 @@ describe('work order form validation', () => {
   });
 
   it('requires a valid client cédula and names', () => {
-    const result = workOrderSchema.safeParse({ ...valid, cliente: { ...valid.cliente, identificacion: '1234567890', nombre: '' } });
+    const result = workOrderSchema.safeParse({ ...valid, cliente: { ...valid.cliente, identificacion: '12345678901234', nombre: '' } });
     expect(result.success).toBe(false);
     const paths = result.error?.issues.map((i) => i.path.join('.'));
     expect(paths).toEqual(expect.arrayContaining(['cliente.identificacion', 'cliente.nombre']));

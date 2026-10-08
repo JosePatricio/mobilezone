@@ -18,6 +18,7 @@ from app.domain.entities import (
 )
 from app.domain.exceptions import ConflictError, InsufficientStockError, ValidationError
 from app.domain.value_objects.enums import SaleStatus, WorkOrderStatus
+from app.domain.value_objects import identificacion as identificacion_module
 from app.domain.value_objects.identificacion import normalize_identificacion
 from app.domain.value_objects.locations import PROVINCES, validate_location
 from app.domain.value_objects.money import to_money
@@ -90,6 +91,11 @@ class TestProduct:
 
 
 class TestIdentificacion:
+    @pytest.fixture(autouse=True)
+    def _validation_enabled(self, monkeypatch):
+        # The Ecuadorian rules stay implemented while the check is temporarily disabled.
+        monkeypatch.setattr(identificacion_module, "IDENTIFICACION_VALIDATION_ENABLED", True)
+
     @pytest.mark.parametrize("value", ["1712345675", "0102030400", "0911111110", "3050000003"])
     def test_valid_cedulas(self, value):
         assert normalize_identificacion(value) == value
@@ -119,6 +125,24 @@ class TestIdentificacion:
 
     def test_spaces_and_dashes_are_ignored(self):
         assert normalize_identificacion(" 171234567-5 ") == "1712345675"
+
+
+class TestIdentificacionValidationDisabled:
+    """Temporary mode for legacy users without a cédula: any value up to 13 characters."""
+
+    @pytest.fixture(autouse=True)
+    def _validation_disabled(self, monkeypatch):
+        monkeypatch.setattr(identificacion_module, "IDENTIFICACION_VALIDATION_ENABLED", False)
+
+    @pytest.mark.parametrize("value", ["11", "2", "3", "1712345678", "ABC-123"])
+    def test_any_value_is_accepted(self, value):
+        assert normalize_identificacion(value) == value.replace("-", "")
+
+    def test_empty_is_none_and_length_is_limited(self):
+        assert normalize_identificacion("  ") is None
+        with pytest.raises(ValidationError) as exc:
+            normalize_identificacion("12345678901234")
+        assert exc.value.code == "INVALID_IDENTIFICATION"
 
 
 class TestLocations:

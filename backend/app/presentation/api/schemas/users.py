@@ -7,11 +7,15 @@ from typing import Annotated
 from pydantic import BeforeValidator, EmailStr, Field, StringConstraints, computed_field
 
 from app.domain.value_objects.enums import WORK_ORDER_STATUS_LABELS, WorkOrderStatus
+from app.domain.value_objects.identificacion import IDENTIFICACION_MAX_LENGTH, IDENTIFICACION_VALIDATION_ENABLED
 from app.presentation.api.schemas.common import Name, RequestSchema, Schema, media_url
 
 Identificacion = Annotated[
     str,
-    StringConstraints(strip_whitespace=True, pattern=r"^\d{10}(\d{3})?$"),
+    StringConstraints(strip_whitespace=True, pattern=r"^\d{10}(\d{3})?$")
+    if IDENTIFICACION_VALIDATION_ENABLED
+    # Temporarily any value (legacy users without cédula); spaces / dashes are removed by the domain.
+    else StringConstraints(strip_whitespace=True, min_length=1, max_length=IDENTIFICACION_MAX_LENGTH + 5),
     Field(description="Cédula (10) o RUC (13), validados con el algoritmo ecuatoriano"),
 ]
 # Empty string from a form = no email (clients do not need one).

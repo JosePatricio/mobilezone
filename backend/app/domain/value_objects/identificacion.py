@@ -15,6 +15,12 @@ import re
 
 from app.domain.exceptions import ValidationError
 
+# TEMPORARY: disabled while legacy users/clients without a real cédula / RUC are
+# loaded (any value such as "11" or "2" is accepted). Set back to True to restore
+# the Ecuadorian validation (keep frontend/src/shared/utils/identification.ts in sync).
+IDENTIFICACION_VALIDATION_ENABLED = False
+IDENTIFICACION_MAX_LENGTH = 13  # users.identificacion column size
+
 
 def _valid_province(code: str) -> bool:
     province = int(code[:2])
@@ -55,6 +61,14 @@ def normalize_identificacion(value: str | None) -> str | None:
     text = re.sub(r"[\s-]", "", value or "")
     if not text:
         return None
+    if not IDENTIFICACION_VALIDATION_ENABLED:
+        if len(text) <= IDENTIFICACION_MAX_LENGTH:
+            return text
+        raise ValidationError(
+            f"La identificación admite máximo {IDENTIFICACION_MAX_LENGTH} caracteres.",
+            code="INVALID_IDENTIFICATION",
+            details={"field": "identificacion"},
+        )
     if len(text) == 10 and is_valid_cedula(text):
         return text
     if len(text) == 13 and is_valid_ruc(text):

@@ -8,6 +8,14 @@ import { z } from 'zod';
  * - RUC public (6) / private (9): province, third digit and establishment code.
  */
 
+/**
+ * TEMPORARY: disabled while legacy users/clients without a real cédula / RUC are loaded
+ * (any value such as "11" or "2" is accepted). Set back to true to restore the Ecuadorian
+ * validation; keep in sync with IDENTIFICACION_VALIDATION_ENABLED in the backend.
+ */
+export const IDENTIFICACION_VALIDATION_ENABLED = false;
+const IDENTIFICACION_MAX_LENGTH = 13;
+
 /** Removes spaces and dashes. */
 export function cleanIdentificacion(value: string): string {
   return value.replace(/[\s-]/g, '');
@@ -44,10 +52,13 @@ export function isValidRuc(value: string): boolean {
 
 export function isValidIdentificacion(value: string): boolean {
   const clean = cleanIdentificacion(value);
+  if (!IDENTIFICACION_VALIDATION_ENABLED) return clean.length > 0 && clean.length <= IDENTIFICACION_MAX_LENGTH;
   return clean.length === 10 ? isValidCedula(clean) : clean.length === 13 ? isValidRuc(clean) : false;
 }
 
-const IDENTIFICACION_MESSAGE = 'La cédula o el RUC no es válido';
+const IDENTIFICACION_MESSAGE = IDENTIFICACION_VALIDATION_ENABLED
+  ? 'La cédula o el RUC no es válido'
+  : `La identificación admite máximo ${IDENTIFICACION_MAX_LENGTH} caracteres`;
 
 export const zIdentificacion = z
   .string()
