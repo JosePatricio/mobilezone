@@ -204,6 +204,10 @@ class SaleRepository(Repository[Sale]):
         """``desde`` inclusive / ``hasta`` exclusive (UTC); ``identificacion`` = client cédula / RUC (prefix)."""
 
     @abstractmethod
+    def confirmed_totals(self, *, desde: datetime, hasta: datetime) -> list[tuple[datetime, Decimal]]:
+        """Date and amount charged (total_pagar) of every confirmed sale in ``[desde, hasta)``."""
+
+    @abstractmethod
     def summary(self, *, user_id: int, desde: datetime, hasta: datetime) -> tuple[int, Decimal]:
         """Number of confirmed sales of the user in the range and the amount charged (total_pagar)."""
 
@@ -237,6 +241,10 @@ class SparePartRepository(Repository[SparePart]):
 
 
 class WorkOrderRepository(Repository[WorkOrder]):
+    @abstractmethod
+    def reception_dates(self, *, desde: date, hasta: date) -> list[date]:
+        """Reception date of every order received between ``desde`` and ``hasta`` (inclusive)."""
+
     @abstractmethod
     def get_by_num_orden(self, num_orden: int) -> WorkOrder | None: ...
 

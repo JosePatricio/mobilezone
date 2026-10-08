@@ -363,6 +363,15 @@ class SqlAlchemySaleRepository(SqlAlchemyRepository[Sale], ports.SaleRepository)
             stmt = stmt.where(c.cliente_id.in_(clients))
         return self._paginate(stmt.order_by(c.fecha.desc(), c.id.desc()), page)
 
+    def confirmed_totals(self, *, desde, hasta):
+        c = sales_table.c
+        rows = self.session.execute(
+            select(c.fecha, c.total_pagar).where(
+                c.estado == SaleStatus.CONFIRMADA, c.fecha >= _utc_naive(desde), c.fecha < _utc_naive(hasta)
+            )
+        ).all()
+        return [(fecha, Decimal(total)) for fecha, total in rows]
+
     def summary(self, *, user_id, desde, hasta):
         c = sales_table.c
         row = self.session.execute(
@@ -438,6 +447,10 @@ class SqlAlchemyWorkOrderRepository(SqlAlchemyRepository[WorkOrder], ports.WorkO
             entity.num_orden = entity.id
             self.session.flush()
         return entity
+
+    def reception_dates(self, *, desde, hasta):
+        c = work_orders_table.c
+        return list(self.session.scalars(select(c.fecha).where(c.fecha >= desde, c.fecha <= hasta)))
 
     def get_by_num_orden(self, num_orden: int) -> WorkOrder | None:
         return self.session.scalars(select(WorkOrder).where(work_orders_table.c.num_orden == num_orden)).first()

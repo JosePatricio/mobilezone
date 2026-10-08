@@ -8,6 +8,7 @@ import { WORK_ORDERS_KEY, workOrderApi } from '@/modules/work-orders/services/wo
 import { Card, PageHeader } from '@/shared/components';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { todayIso } from '@/shared/utils/format';
+import { DashboardCharts } from '../components/DashboardCharts';
 
 /** Simple overview. The definitive dashboard is pending (spec §35.5). */
 export function DashboardPage() {
@@ -64,6 +65,7 @@ export function DashboardPage() {
           </Link>
         )}
       </div>
+      {(canSales || canOrders) && <DashboardCharts />}
       <Card title="Accesos rápidos">
         <div className="quick-links">
           {hasPermission(P.SALES_CREATE) && (
