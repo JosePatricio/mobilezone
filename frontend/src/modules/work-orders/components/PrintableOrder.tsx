@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/app/store/AuthProvider';
-import { formatDate, formatDateTime, formatOrderNumber, formatWarrantyDays, fullName } from '@/shared/utils/format';
+import { formatDateTime, formatOrderNumber, formatWarrantyDays, fullName } from '@/shared/utils/format';
 import { formatMoney } from '@/shared/utils/money';
 import type { WorkOrder } from '../types';
 import { useOrderQr } from './OrderQr';
@@ -43,7 +43,7 @@ export function PrintableOrder({ order }: { order: WorkOrder }) {
         <p>Orden de trabajo</p>
         <p className="receipt-strong">N.º {formatOrderNumber(order.num_orden)}</p>
       </header>
-      <Row label="Ingreso">{formatDate(order.fecha)}</Row>
+      <Row label="Ingreso">{formatDateTime(order.fecha_hora)}</Row>
       <Row label="Entrega">{order.fecha_entrega ? formatDateTime(order.fecha_entrega) : 'Por confirmar'}</Row>
 
       <h2>Cliente</h2>

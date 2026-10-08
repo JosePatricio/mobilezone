@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { Can } from '@/modules/auth/components/Can';
+import { PERMISSIONS } from '@/shared/types/permissions';
 import { fakeAuth, renderWithProviders } from '@/test/utils';
 import { homePath, visibleNavigation } from './navigation';
 import { HomeRoute, PermissionRoute, ProtectedRoute } from './guards';
@@ -55,25 +56,43 @@ describe('Can', () => {
 });
 
 describe('navigation', () => {
+  const labels = (codes: string[]) =>
+    visibleNavigation(fakeAuth({ permissionCodes: codes }).hasAnyPermission).flatMap((g) => g.items.map((i) => i.label));
+
   it('adapts the menu to the user permissions', () => {
-    const auth = fakeAuth({ permissionCodes: ['work_orders.view'] });
-    const labels = visibleNavigation(auth.hasAnyPermission).flatMap((g) => g.items.map((i) => i.label));
-    expect(labels).toEqual(['Dashboard', 'Mi perfil', 'Órdenes']);
+    expect(labels(['work_orders.view'])).toEqual(['Dashboard', 'Órdenes']);
   });
 
-  it('shows Ventas first; a seller sees Ventas, Productos and Inventario', () => {
-    const seller = fakeAuth({ permissionCodes: ['products.view', 'inventory.view', 'sales.view', 'sales.create'] });
-    const labels = visibleNavigation(seller.hasAnyPermission).flatMap((g) => g.items.map((i) => i.label));
-    expect(labels).toEqual(['Ventas', 'Dashboard', 'Mi perfil', 'Productos', 'Inventario']);
+  it('a seller sees Dashboard, Ventas and their commercial options', () => {
+    expect(labels(['products.view', 'inventory.view', 'sales.view', 'sales.create'])).toEqual([
+      'Dashboard',
+      'Ventas',
+      'Productos',
+      'Inventario',
+    ]);
+  });
+
+  it('the administrator sees the menu in this order, with Comercial and Configuración as trees', () => {
+    const all = Object.values(PERMISSIONS);
+    const groups = visibleNavigation(fakeAuth({ permissionCodes: all }).hasAnyPermission);
+    expect(groups.map((g) => [g.label ?? null, g.items.map((i) => i.label)])).toEqual([
+      [null, ['Dashboard', 'Órdenes', 'Ventas', 'Repuestos afiliados']],
+      ['Comercial', ['Productos', 'Inventario', 'Categorías', 'Marcas', 'Modelos', 'Clientes']],
+      ['Configuración', ['Usuarios', 'Sucursales', 'Roles', 'Permisos', 'Metas de venta']],
+    ]);
+    expect(groups.filter((g) => g.collapsible).map((g) => g.label)).toEqual(['Comercial', 'Configuración']);
+    // Removed from the menu: Repuestos, Mi perfil (opened from the header) and "vaciar datos".
+    expect(labels(all)).not.toContain('Repuestos');
+    expect(labels(all)).not.toContain('Mi perfil');
   });
 });
 
 describe('technician (affiliate)', () => {
   const tech = () => fakeAuth({ permissionCodes: ['affiliate_parts.manage'] });
 
-  it('only sees Mi perfil and Repuestos afiliados', () => {
+  it('only sees Repuestos afiliados (the profile is in the header)', () => {
     const labels = visibleNavigation(tech().hasAnyPermission).flatMap((g) => g.items.map((i) => i.label));
-    expect(labels).toEqual(['Mi perfil', 'Repuestos afiliados']);
+    expect(labels).toEqual(['Repuestos afiliados']);
     expect(homePath(tech().hasAnyPermission)).toBe('/affiliate-parts');
   });
 

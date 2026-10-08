@@ -326,7 +326,9 @@ work_orders_table = Table(
     Column("presupuesto", MONEY, nullable=False),
     Column("anticipo", MONEY, nullable=False),
     Column("saldo", MONEY, nullable=False),
-    Column("fecha", Date, nullable=False, index=True),
+    Column("fecha", Date, nullable=False, index=True),  # local day of fecha_hora (filters, dashboard)
+    # Reception date and time (UTC); editable in the form, defaults to now.
+    Column("fecha_hora", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
     Column("fecha_entrega", TIMESTAMP),  # promised delivery date and time (UTC)
     *_timestamps(),
     CheckConstraint("estado IN (0, 1, 2)", name="estado_valid"),
@@ -390,6 +392,22 @@ page_visits_table = Table(
     metadata,
     Column("pagina", String(50), primary_key=True),
     Column("visitas", Integer, nullable=False, default=0, server_default=FALSE),
+    Column(
+        "updated_at",
+        TIMESTAMP,
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+        server_default=text("CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)"),
+    ),
+)
+
+# Configurable values of the system (e.g. the sales goals of the header).
+settings_table = Table(
+    "settings",
+    metadata,
+    Column("clave", String(50), primary_key=True),
+    Column("valor", String(255), nullable=False),
     Column(
         "updated_at",
         TIMESTAMP,

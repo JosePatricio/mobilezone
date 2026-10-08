@@ -143,6 +143,19 @@ class UserData:
 
 
 @dataclass(frozen=True)
+class ProfileData:
+    """Own data the logged user can change (Perfil). Role, branches and cédula stay with the administrator."""
+
+    nombre: str
+    apellido: str
+    email: str
+    celular: str | None = None
+    provincia: str | None = None
+    ciudad: str | None = None
+    direccion: str | None = None
+
+
+@dataclass(frozen=True)
 class ClientData:
     nombre: str
     apellido: str
@@ -191,6 +204,7 @@ class WorkOrderData:
     modelo_tecnico: str | None = None  # technical model code of the phone, e.g. SM-A105M
     fecha_entrega: datetime | None = None  # timezone-aware
     branch_id: int | None = None  # sucursal (local); None = the user's branch
+    fecha_hora: datetime | None = None  # reception date and time (timezone-aware); None = now
 
 
 @dataclass(frozen=True)

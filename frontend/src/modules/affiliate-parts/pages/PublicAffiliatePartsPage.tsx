@@ -5,6 +5,7 @@ import {
   EmptyState,
   ErrorState,
   Loading,
+  Logo,
   Pagination,
   ProductThumb,
   SearchInput,
@@ -47,10 +48,8 @@ export function PublicAffiliatePartsPage() {
     <div className="public-page">
       <div className="public-catalog">
         <div className="app-brand">
-          <span className="brand-mark" aria-hidden>
-            MZ
-          </span>
-          <span>MobileZone · Repuestos de afiliados</span>
+          <Logo />
+          <span>Repuestos de afiliados</span>
         </div>
 
         <div className="toolbar">

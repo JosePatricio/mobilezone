@@ -66,18 +66,16 @@ describe('ColumnChart', () => {
 });
 
 describe('DashboardCharts', () => {
-  it('shows the current period with its change and switches the grouping', async () => {
+  it('shows the charts (no sales boxes) and switches the grouping', async () => {
     renderWithProviders(<DashboardCharts />);
-    expect(await screen.findByText('Hoy · cobrado')).toBeInTheDocument();
-    expect(screen.getByText('Ventas (total cobrado)')).toBeInTheDocument();
+    expect(await screen.findByText('Ventas (total cobrado)')).toBeInTheDocument();
     expect(screen.getByText('Órdenes de trabajo recibidas')).toBeInTheDocument();
-    expect(screen.getByText(/201 % vs ayer/)).toBeInTheDocument(); // 40 -> 120.50
+    expect(screen.queryByText(/cobrado$/, { selector: '.stat-label' })).not.toBeInTheDocument();
     expect(api.charts).toHaveBeenCalledWith('dia');
 
     await userEvent.click(screen.getByRole('radio', { name: 'Mes' }));
-    expect(await screen.findByText('Este mes · cobrado')).toBeInTheDocument();
+    expect((await screen.findAllByText('Oct 2026')).length).toBeGreaterThan(0);
     expect(api.charts).toHaveBeenCalledWith('mes');
-    expect(screen.getByText(/67 % vs el mes anterior/)).toBeInTheDocument(); // 900 -> 300
   });
 
   it('hides the sales without permission (null in the API)', async () => {
@@ -86,7 +84,7 @@ describe('DashboardCharts', () => {
       periodos: [period('2026-10-07', '07/10', null, null, 1), period('2026-10-08', '08/10', null, null, 2)],
     });
     renderWithProviders(<DashboardCharts />);
-    expect(await screen.findByText('Hoy · órdenes recibidas')).toBeInTheDocument();
+    expect(await screen.findByText('Órdenes de trabajo recibidas')).toBeInTheDocument();
     expect(screen.queryByText('Ventas (total cobrado)')).not.toBeInTheDocument();
   });
 });

@@ -10,7 +10,6 @@ from app.infrastructure.repositories.sqlalchemy import (
     SqlAlchemyBranchRepository,
     SqlAlchemyBrandRepository,
     SqlAlchemyCategoryRepository,
-    SqlAlchemyDataResetRepository,
     SqlAlchemyDeviceModelRepository,
     SqlAlchemyInventoryRepository,
     SqlAlchemyPageVisitRepository,
@@ -18,6 +17,7 @@ from app.infrastructure.repositories.sqlalchemy import (
     SqlAlchemyProductRepository,
     SqlAlchemyRoleRepository,
     SqlAlchemySaleRepository,
+    SqlAlchemySettingsRepository,
     SqlAlchemySparePartRepository,
     SqlAlchemyStockMovementRepository,
     SqlAlchemyUserRepository,
@@ -45,7 +45,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.work_orders = SqlAlchemyWorkOrderRepository(session)
         self.affiliate_parts = SqlAlchemyAffiliatePartRepository(session)
         self.page_visits = SqlAlchemyPageVisitRepository(session)
-        self.data_reset = SqlAlchemyDataResetRepository(session)
+        self.settings = SqlAlchemySettingsRepository(session)
 
     def _translate(self, exc: IntegrityError) -> ConflictError:
         return ConflictError(

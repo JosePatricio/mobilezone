@@ -6,7 +6,7 @@ import { SALES_KEY } from '@/modules/sales/services/saleApi';
 import { Button, Card, ErrorState, Loading, PageHeader, useConfirm, useToast } from '@/shared/components';
 import { getErrorMessage } from '@/shared/services/apiError';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
-import { formatDate, formatDateTime, formatOrderNumber, formatWarrantyDays, fullName } from '@/shared/utils/format';
+import { formatDateTime, formatOrderNumber, formatWarrantyDays, fullName } from '@/shared/utils/format';
 import { formatMoney } from '@/shared/utils/money';
 import { AddSparePartModal } from '../components/AddSparePartModal';
 import { BalanceSummary } from '../components/BalanceSummary';
@@ -106,7 +106,7 @@ export function WorkOrderDetailPage() {
           </>
         }
       >
-        Registrada por <strong>{fullName(order.user)}</strong> · {formatDate(order.fecha)}
+        Registrada por <strong>{fullName(order.user)}</strong> · {formatDateTime(order.fecha_hora)}
       </PageHeader>
       {finalized && (
         <div className="alert alert-info" role="status">

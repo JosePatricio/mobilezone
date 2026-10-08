@@ -247,6 +247,14 @@ CREATE INDEX ix_affiliate_parts_estado ON affiliate_parts (estado);
 CREATE INDEX ix_affiliate_parts_tipo ON affiliate_parts (tipo);
 CREATE INDEX ix_affiliate_parts_user_id ON affiliate_parts (user_id);
 
+-- Configurable values (e.g. 'ventas_meta_baja' / 'ventas_meta_alta': header emoji).
+CREATE TABLE settings (
+    clave      VARCHAR(50)  NOT NULL,
+    valor      VARCHAR(255) NOT NULL,
+    updated_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_settings PRIMARY KEY (clave)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Visit counters of public pages (e.g. 'repuestos_afiliados').
 CREATE TABLE page_visits (
     pagina     VARCHAR(50)  NOT NULL,
@@ -280,7 +288,8 @@ CREATE TABLE work_orders (
     presupuesto DECIMAL(12,2) NOT NULL,
     anticipo    DECIMAL(12,2) NOT NULL,
     saldo       DECIMAL(12,2) NOT NULL COMMENT 'presupuesto - anticipo (computed by the backend)',
-    fecha       DATE          NOT NULL COMMENT 'reception date (local day of the shop)',
+    fecha       DATE          NOT NULL COMMENT 'reception date (local day of fecha_hora)',
+    fecha_hora  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'reception date and time (UTC)',
     fecha_entrega DATETIME(6)          COMMENT 'promised delivery date and time (UTC)',
     created_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),

@@ -57,8 +57,10 @@ export interface WorkOrderListItem {
   presupuesto: Money;
   anticipo: Money;
   saldo: Money;
-  /** Reception date (today when the order is registered). */
+  /** Reception date (local day of fecha_hora). */
   fecha: string;
+  /** Reception date and time (ISO 8601). */
+  fecha_hora: string;
   /** Promised delivery date and time (ISO 8601). */
   fecha_entrega: string | null;
 }
@@ -156,12 +158,15 @@ export interface WorkOrderRequest {
   fecha_entrega: string | null;
   /** Sucursal (local) that receives the device; null = the user's branch. */
   branch_id: Id | null;
+  /** Reception date and time (ISO 8601); defaults to now in the form. */
+  fecha_hora: string | null;
 }
 
 /** Public status page (QR): no client data and no unlock code. */
 export interface PublicWorkOrder {
   num_orden: number;
   fecha: string;
+  fecha_hora: string;
   estado: number;
   estado_label: string;
   marca: NamedRef;

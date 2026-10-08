@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Response, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+from app.application.dto import ProfileData
 from app.application.use_cases.auth import ChangePasswordUseCase, LoginUseCase, uses_default_password
-from app.presentation.api.dependencies import CurrentUser, HasherDep, TokensDep, UowDep
+from app.application.use_cases.users import UserUseCases
+from app.presentation.api.dependencies import CurrentUser, HasherDep, StorageDep, TokensDep, UowDep, read_upload
 from app.presentation.api.schemas.users import (
     ChangePasswordRequest,
     CurrentUserResponse,
     LoginRequest,
+    ProfileRequest,
     TokenResponse,
     UserResponse,
 )
@@ -57,3 +60,20 @@ def change_password(body: ChangePasswordRequest, user: CurrentUser, uow: UowDep,
     """Mi perfil: the logged user changes their own password (the current one is required)."""
     ChangePasswordUseCase(uow, hasher).execute(user, body.current_password, body.new_password)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put("/me", response_model=UserResponse)
+def update_profile(body: ProfileRequest, user: CurrentUser, uow: UowDep, hasher: HasherDep):
+    """Perfil: the logged user updates their own data (role, branches and cédula: administrator)."""
+    return UserResponse.model_validate(UserUseCases(uow, hasher).update_profile(user, ProfileData(**body.model_dump())))
+
+
+@router.put("/me/photo", response_model=UserResponse)
+def upload_profile_photo(file: UploadFile, user: CurrentUser, uow: UowDep, hasher: HasherDep, storage: StorageDep):
+    content = read_upload(file)
+    return UserResponse.model_validate(UserUseCases(uow, hasher, storage).set_photo(user.id, content))  # type: ignore[arg-type]
+
+
+@router.delete("/me/photo", response_model=UserResponse)
+def delete_profile_photo(user: CurrentUser, uow: UowDep, hasher: HasherDep, storage: StorageDep):
+    return UserResponse.model_validate(UserUseCases(uow, hasher, storage).set_photo(user.id, None))  # type: ignore[arg-type]

@@ -1,2 +1,2 @@
-En Modulo Dashboard
-Tambien implementa dashboard graficos animados de las ventas y ordenes , puede ser por dia, semanal, mensual, etc.. 
+En el modulo Ordenes
+Agregar al ultimo un campo fecha, hora, por defecto que muestra la actual

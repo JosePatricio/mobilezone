@@ -626,3 +626,88 @@ def test_upgrade_014_delete_users_permission_for_admin(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_015_settings_table_and_permissions(mysql_engine: Engine):
+    """v14 database with reset permission granted -> upgrade 015."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (
+        initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005, sql.UPGRADE_006, sql.UPGRADE_007,
+        sql.UPGRADE_008, sql.UPGRADE_009, sql.UPGRADE_010, sql.UPGRADE_011, sql.UPGRADE_012, sql.UPGRADE_013,
+        sql.UPGRADE_014,
+    )
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+            q = conn.exec_driver_sql
+            q("INSERT IGNORE INTO roles (nombre) VALUES ('ADMIN')")
+            q("INSERT IGNORE INTO permissions (codigo) VALUES ('settings.reset_data')")
+            q(
+                "INSERT IGNORE INTO role_permissions (role_id, permission_id) SELECT r.id, p.id FROM roles r "
+                "JOIN permissions p ON p.codigo = 'settings.reset_data' WHERE r.nombre = 'ADMIN'"
+            )
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_015)
+        with mysql_engine.connect() as conn:
+            q = conn.exec_driver_sql
+            assert "settings" in set(q("SHOW TABLES").scalars())
+            codes = set(
+                q(
+                    "SELECT p.codigo FROM role_permissions rp JOIN roles r ON r.id = rp.role_id "
+                    "JOIN permissions p ON p.id = rp.permission_id WHERE r.nombre = 'ADMIN'"
+                ).scalars()
+            )
+            assert "settings.manage" in codes and "settings.reset_data" not in codes
+            assert q("SELECT COUNT(*) FROM permissions WHERE codigo = 'settings.reset_data'").scalar() == 0
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_016_reception_date_and_time(mysql_engine: Engine):
+    """v15 database with an order -> upgrade 016 gives it its registration moment."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (
+        initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005, sql.UPGRADE_006, sql.UPGRADE_007,
+        sql.UPGRADE_008, sql.UPGRADE_009, sql.UPGRADE_010, sql.UPGRADE_011, sql.UPGRADE_012, sql.UPGRADE_013,
+        sql.UPGRADE_014, sql.UPGRADE_015,
+    )
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+            q = conn.exec_driver_sql
+            q("INSERT IGNORE INTO roles (nombre) VALUES ('ADMIN')")
+            q(
+                "INSERT INTO users (nombre, apellido, email, password, rol_id) VALUES "
+                "('A','A','a@x.com','h',(SELECT id FROM roles WHERE nombre='ADMIN'))"
+            )
+            q("INSERT INTO brands (nombre) VALUES ('Samsung')")
+            q("INSERT INTO models (brand_id, nombre) VALUES ((SELECT id FROM brands), 'A10')")
+            q(
+                "INSERT INTO work_orders (user_id, cliente_id, marca_id, modelo_id, estado, motivo_ingreso, "
+                "codigo_publico, presupuesto, anticipo, saldo, fecha, created_at) VALUES "
+                "((SELECT id FROM users), (SELECT id FROM users), (SELECT id FROM brands), (SELECT id FROM models), "
+                "0, 'OTROS', 'c1', 10, 0, 10, '2026-09-01', '2026-09-01 15:20:00')"
+            )
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_016)
+        with mysql_engine.connect() as conn:
+            value = conn.exec_driver_sql("SELECT fecha_hora FROM work_orders").scalar()
+            assert str(value).startswith("2026-09-01 15:20:00")
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

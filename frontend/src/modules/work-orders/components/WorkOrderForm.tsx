@@ -58,6 +58,7 @@ export const workOrderSchema = z
     anticipo: zMoney,
     fecha_entrega: z.string().optional(),
     branch_id: zOptionalId,
+    fecha_hora: z.string().min(1, 'Ingrese la fecha y hora de ingreso'),
   })
   .superRefine((v, ctx) => {
     if (toCents(v.anticipo) > toCents(v.presupuesto)) {
@@ -72,6 +73,9 @@ export const workOrderSchema = z
     if (v.bloqueo_tipo === 'PIN' && !/^\d{4,12}$/.test(v.pin ?? '')) {
       ctx.addIssue({ code: 'custom', path: ['pin'], message: 'El PIN debe tener entre 4 y 12 dígitos' });
     }
+    if (!fromDateTimeLocal(v.fecha_hora)) {
+      ctx.addIssue({ code: 'custom', path: ['fecha_hora'], message: 'Fecha y hora inválidas' });
+    }
     if (v.fecha_entrega && !fromDateTimeLocal(v.fecha_entrega)) {
       ctx.addIssue({ code: 'custom', path: ['fecha_entrega'], message: 'Fecha de entrega inválida' });
     }
@@ -81,6 +85,7 @@ export const workOrderSchema = z
     tipo_display: v.motivo_ingreso === DISPLAY_CHANGE ? v.tipo_display : null,
     bloqueo_valor: v.bloqueo_tipo === 'PATRON' ? (patron ?? null) : v.bloqueo_tipo === 'PIN' ? (pin ?? null) : null,
     fecha_entrega: fromDateTimeLocal(v.fecha_entrega),
+    fecha_hora: fromDateTimeLocal(v.fecha_hora),
   }));
 type FormInput = FormShape<typeof workOrderSchema>;
 type FormOutput = z.output<typeof workOrderSchema>;
@@ -136,6 +141,8 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
       presupuesto: order?.presupuesto ?? '0.00',
       anticipo: order?.anticipo ?? '0.00',
       fecha_entrega: toDateTimeLocal(order?.fecha_entrega),
+      // Reception: now for a new order (editable), the registered one when editing.
+      fecha_hora: toDateTimeLocal(order?.fecha_hora ?? new Date().toISOString()),
       branch_id: order ? (order.branch_id ?? '') : (user?.branches[0]?.id ?? ''),
     },
   });
@@ -485,6 +492,19 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           </div>
         </div>
         <p className="field-hint">El saldo definitivo es calculado por el sistema al guardar.</p>
+      </Card>
+
+      <Card title="Ingreso">
+        <div className="form-grid">
+          <Input
+            label="Fecha y hora de ingreso"
+            type="datetime-local"
+            required
+            hint="Por defecto, la fecha y hora actuales"
+            error={errors.fecha_hora?.message}
+            {...register('fecha_hora')}
+          />
+        </div>
       </Card>
 
       <div className="form-actions">

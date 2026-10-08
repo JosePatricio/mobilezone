@@ -123,6 +123,7 @@ class WorkOrder:
     bloqueo_tipo: LockType = LockType.NINGUNO
     bloqueo_valor: str | None = None
     fecha: date | None = None  # reception date (local day of the shop)
+    fecha_hora: datetime | None = None  # reception date and time (timezone-aware)
     fecha_entrega: datetime | None = None  # promised delivery date and time
     tecnico_id: int | None = None  # technician: the user who registered the order
     branch_id: int | None = None  # sucursal (local) that receives the device

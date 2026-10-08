@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/app/store/AuthProvider';
-import { Button, Checkbox, Input } from '@/shared/components';
+import { Button, Checkbox, Input, Logo } from '@/shared/components';
 import { getErrorMessage } from '@/shared/services/apiError';
 
 const schema = z.object({
@@ -42,10 +42,8 @@ export function LoginPage() {
     <div className="login-page">
       <form className="login-card card" onSubmit={onSubmit} noValidate>
         <div className="login-brand">
-          <span className="brand-mark" aria-hidden>
-            MZ
-          </span>
-          <h1>MobileZone</h1>
+          <Logo size="lg" />
+          <h1 className="sr-only">MobileZone</h1>
           <p className="muted">Ventas y órdenes de trabajo</p>
         </div>
 

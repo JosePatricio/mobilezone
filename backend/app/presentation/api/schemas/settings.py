@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-from app.presentation.api.schemas.common import RequestSchema, Schema
+from decimal import Decimal
+
+from pydantic import Field
+
+from app.presentation.api.schemas.common import Money, RequestSchema, Schema
 
 
-class ResetDataRequest(RequestSchema):
-    confirmacion: str
+class SalesGoalsRequest(RequestSchema):
+    baja: Money = Field(description="Debajo de este monto vendido en el día: 😞")
+    alta: Money = Field(description="Sobre este monto: 🤑 (entre ambas metas: 😊)")
 
 
-class ResetDataResponse(Schema):
-    eliminados: dict[str, int]
+class SalesGoalsResponse(Schema):
+    baja: Decimal
+    alta: Decimal

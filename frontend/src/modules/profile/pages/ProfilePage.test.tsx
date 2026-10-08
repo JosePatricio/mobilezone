@@ -1,12 +1,19 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/services/apiError';
-import { fakeAuth, renderWithProviders } from '@/test/utils';
+import { fakeAuth, renderWithProviders, testUser } from '@/test/utils';
 import { ProfilePage } from './ProfilePage';
 
-const api = vi.hoisted(() => ({ changePassword: vi.fn() }));
+const api = vi.hoisted(() => ({ changePassword: vi.fn(), update: vi.fn(), uploadPhoto: vi.fn(), removePhoto: vi.fn() }));
 vi.mock('../services/profileApi', () => ({ profileApi: api }));
+vi.mock('@/shared/services/httpClient', () => ({
+  http: {
+    get: (url: string) =>
+      Promise.resolve({ data: url === '/locations/provinces' ? [{ nombre: 'Pichincha', ciudades: ['Quito'] }] : [] }),
+  },
+  onUnauthorized: () => () => undefined,
+}));
 
 const fill = async (current: string, next: string, confirm: string) => {
   await userEvent.type(screen.getByLabelText(/Contraseña actual/), current);
@@ -18,11 +25,30 @@ const fill = async (current: string, next: string, confirm: string) => {
 beforeEach(() => vi.clearAllMocks());
 
 describe('ProfilePage', () => {
-  it('shows the data of the logged user', () => {
-    renderWithProviders(<ProfilePage />);
-    expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
-    expect(screen.getByText('ana@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Quito, Pichincha')).toBeInTheDocument();
+  it('updates the own data of the logged user', async () => {
+    api.update.mockImplementation((body: object) => Promise.resolve({ ...testUser, ...body }));
+    const auth = fakeAuth();
+    renderWithProviders(<ProfilePage />, { auth });
+    expect(screen.getByLabelText(/^Nombre/)).toHaveValue('Ana');
+    expect(screen.getByLabelText(/^Email/)).toHaveValue('ana@example.com');
+    expect(screen.getByText('VENDEDOR')).toBeInTheDocument(); // role: read only
+
+    await userEvent.clear(screen.getByLabelText(/^Celular/));
+    await userEvent.type(screen.getByLabelText(/^Celular/), '0998887777');
+    await userEvent.type(screen.getByLabelText(/^Dirección/), 'Av. Amazonas N24-12');
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => expect(api.update).toHaveBeenCalled());
+    expect(api.update.mock.calls[0][0]).toMatchObject({
+      nombre: 'Ana',
+      apellido: 'Pérez',
+      email: 'ana@example.com',
+      celular: '0998887777',
+      direccion: 'Av. Amazonas N24-12',
+    });
+    expect(api.uploadPhoto).not.toHaveBeenCalled();
+    await waitFor(() => expect(auth.updateUser).toHaveBeenCalled()); // header shows the new data
+    expect(await screen.findByText('Datos actualizados.')).toBeInTheDocument();
   });
 
   it('changes the password and clears the form', async () => {

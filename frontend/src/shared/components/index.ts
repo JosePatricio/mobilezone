@@ -21,3 +21,4 @@ export {
   type ImageSelection,
 } from './Images';
 export { LocationFields, useProvinces, type Province } from './LocationFields';
+export { Logo, LOGO_URL } from './Logo';

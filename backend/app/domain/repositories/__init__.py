@@ -242,6 +242,10 @@ class SparePartRepository(Repository[SparePart]):
 
 class WorkOrderRepository(Repository[WorkOrder]):
     @abstractmethod
+    def day_activity(self, *, day: date, desde: datetime, hasta: datetime) -> tuple[int, int, int]:
+        """Orders received on ``day`` and orders that changed to En proceso / Finalizado in ``[desde, hasta)``."""
+
+    @abstractmethod
     def reception_dates(self, *, desde: date, hasta: date) -> list[date]:
         """Reception date of every order received between ``desde`` and ``hasta`` (inclusive)."""
 
@@ -293,17 +297,14 @@ class PageVisitRepository(ABC):
     def count(self, pagina: str) -> int: ...
 
 
-class DataResetRepository(ABC):
-    @abstractmethod
-    def delete_business_data(self, client_role: str) -> tuple[dict[str, int], list[str]]:
-        """Deletes the business data (orders, sales, inventory, catalogs and clients).
-
-        Returns the rows deleted per module and the stored files they referenced.
-        """
+class SettingsRepository(ABC):
+    """Configurable values of the system (key / value)."""
 
     @abstractmethod
-    def restart_numbering(self) -> None:
-        """Order numbers, sale numbers, etc. start again from 1 (run after the commit)."""
+    def get_values(self, claves: list[str]) -> dict[str, str]: ...
+
+    @abstractmethod
+    def set_value(self, clave: str, valor: str) -> None: ...
 
 
 class UnitOfWork(ABC):
@@ -324,7 +325,7 @@ class UnitOfWork(ABC):
     work_orders: WorkOrderRepository
     affiliate_parts: AffiliatePartRepository
     page_visits: PageVisitRepository
-    data_reset: DataResetRepository
+    settings: SettingsRepository
 
     @abstractmethod
     def flush(self) -> None: ...

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
 
-from app.application.use_cases.dashboard import DashboardChartsUseCase, Grouping
+from app.application.use_cases.dashboard import DashboardChartsUseCase, DayOrdersUseCase, Grouping
 from app.domain.entities import User
 from app.domain.value_objects.permissions import Perm
-from app.presentation.api.dependencies import UowDep, require_any_permission
-from app.presentation.api.schemas.dashboard import DashboardChartsResponse
+from app.presentation.api.dependencies import UowDep, require_any_permission, require_permissions
+from app.presentation.api.schemas.dashboard import DashboardChartsResponse, DayOrdersResponse
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -29,3 +30,15 @@ def dashboard_charts(
         orders=actor.has_permission(Perm.WORK_ORDERS_VIEW),
     )
     return DashboardChartsResponse(agrupacion=agrupacion, periodos=periods)
+
+
+@router.get("/orders-day", response_model=DayOrdersResponse)
+def orders_of_the_day(
+    request: Request,
+    uow: UowDep,
+    _: Annotated[User, Depends(require_permissions(Perm.WORK_ORDERS_VIEW))],
+    fecha: date | None = None,
+):
+    """Orders received, moved to En proceso and finalized on ``fecha`` (default: today, shop time zone)."""
+    tz = ZoneInfo(request.app.state.settings.timezone)
+    return DayOrdersResponse.model_validate(DayOrdersUseCase(uow, tz).execute(fecha))

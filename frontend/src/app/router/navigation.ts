@@ -9,52 +9,48 @@ export interface NavItem {
 
 export interface NavGroup {
   label?: string;
+  /** Tree in the sidebar: the label opens / closes its options. */
+  collapsible?: boolean;
   items: NavItem[];
 }
 
-/** The dashboard summarizes orders, sales and products: without them there is nothing to show. */
-export const DASHBOARD_PERMISSIONS: string[] = [P.WORK_ORDERS_VIEW, P.SALES_VIEW, P.PRODUCTS_VIEW];
+/** The dashboard shows work orders and sales: without them there is nothing to show. */
+export const DASHBOARD_PERMISSIONS: string[] = [P.WORK_ORDERS_VIEW, P.SALES_VIEW];
 
-/** Sidebar menu. Items are filtered by the permissions of the current user. */
+/**
+ * Sidebar menu, in this order. Items are filtered by the permissions of the current user.
+ * The profile is opened from the user data in the header (top right).
+ */
 export const NAVIGATION: NavGroup[] = [
-  // Ventas is the first menu entry.
-  { items: [{ to: '/sales', label: 'Ventas', permissions: [P.SALES_VIEW, P.SALES_CREATE] }] },
   {
     items: [
       { to: '/', label: 'Dashboard', permissions: DASHBOARD_PERMISSIONS },
-      { to: '/profile', label: 'Mi perfil', permissions: [] },
+      { to: '/work-orders', label: 'Órdenes', permissions: [P.WORK_ORDERS_VIEW] },
+      { to: '/sales', label: 'Ventas', permissions: [P.SALES_VIEW, P.SALES_CREATE] },
+      { to: '/affiliate-parts', label: 'Repuestos afiliados', permissions: [P.AFFILIATE_PARTS_MANAGE] },
     ],
   },
   {
     label: 'Comercial',
+    collapsible: true,
     items: [
       { to: '/products', label: 'Productos', permissions: [P.PRODUCTS_VIEW] },
       { to: '/inventory', label: 'Inventario', permissions: [P.INVENTORY_VIEW] },
       { to: '/categories', label: 'Categorías', permissions: [P.CATEGORIES_VIEW] },
-    ],
-  },
-  {
-    label: 'Taller',
-    items: [
-      { to: '/work-orders', label: 'Órdenes', permissions: [P.WORK_ORDERS_VIEW] },
-      { to: '/spare-parts', label: 'Repuestos', permissions: [P.SPARE_PARTS_VIEW] },
+      { to: '/brands', label: 'Marcas', permissions: [P.BRANDS_VIEW] },
+      { to: '/models', label: 'Modelos', permissions: [P.MODELS_VIEW] },
       { to: '/clients', label: 'Clientes', permissions: [P.CLIENTS_VIEW] },
     ],
   },
   {
-    label: 'Afiliados',
-    items: [{ to: '/affiliate-parts', label: 'Repuestos afiliados', permissions: [P.AFFILIATE_PARTS_MANAGE] }],
-  },
-  {
     label: 'Configuración',
+    collapsible: true,
     items: [
-      { to: '/branches', label: 'Sucursales', permissions: [P.BRANCHES_VIEW] },
-      { to: '/brands', label: 'Marcas', permissions: [P.BRANDS_VIEW] },
-      { to: '/models', label: 'Modelos', permissions: [P.MODELS_VIEW] },
       { to: '/users', label: 'Usuarios', permissions: [P.USERS_VIEW] },
+      { to: '/branches', label: 'Sucursales', permissions: [P.BRANCHES_VIEW] },
       { to: '/roles', label: 'Roles', permissions: [P.ROLES_VIEW] },
       { to: '/permissions', label: 'Permisos', permissions: [P.PERMISSIONS_VIEW] },
-      { to: '/settings', label: 'Configuración', permissions: [P.SETTINGS_RESET_DATA] },
+      { to: '/settings', label: 'Metas de venta', permissions: [P.SETTINGS_MANAGE] },
     ],
   },
 ];

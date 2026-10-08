@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { Card, ErrorState, Loading } from '@/shared/components';
+import { Card, ErrorState, Loading, Logo } from '@/shared/components';
 import { toApiError } from '@/shared/services/apiError';
 import { PUBLIC_CATALOG_PATH } from '../paths';
 import { affiliatePartApi } from '../services/affiliatePartApi';
@@ -20,10 +20,8 @@ export function PublicAffiliatePartPage() {
     <div className="public-page">
       <div className="public-card">
         <div className="app-brand">
-          <span className="brand-mark" aria-hidden>
-            MZ
-          </span>
-          <span>MobileZone · Repuestos de afiliados</span>
+          <Logo />
+          <span>Repuestos de afiliados</span>
         </div>
         {notFound ? (
           <Card title="Repuesto no encontrado">

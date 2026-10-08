@@ -130,6 +130,13 @@ class _WorkOrderValidation(UseCase):
             raise ValidationError("Registre una sucursal activa.", code="BRANCH_REQUIRED", details={"field": "branch_id"})
         return min(active, key=lambda b: b.id or 0)
 
+    tz: tzinfo = timezone.utc
+
+    def _reception(self, fecha_hora: datetime | None) -> dict:
+        """Reception date and time, and its local day (``fecha``, used by filters and the dashboard)."""
+        moment = (fecha_hora or datetime.now(self.tz)).astimezone(timezone.utc)
+        return {"fecha_hora": moment, "fecha": moment.astimezone(self.tz).date()}
+
     def _validate_device(self, marca_id: int, modelo_id: int) -> None:
         brand = self.uow.brands.get(marca_id)
         if brand is None:
@@ -142,7 +149,8 @@ class _WorkOrderValidation(UseCase):
 
 
 class CreateWorkOrderUseCase(_WorkOrderValidation):
-    """The logged user registers the order and is its technician; the date is today (shop time zone)."""
+    """The logged user registers the order and is its technician; reception date and time: now
+    unless given (the day is taken in the shop time zone)."""
 
     def __init__(self, uow: UnitOfWork, tz: tzinfo = timezone.utc) -> None:
         super().__init__(uow)
@@ -166,7 +174,7 @@ class CreateWorkOrderUseCase(_WorkOrderValidation):
                 color=data.color,
                 presupuesto=data.presupuesto,
                 anticipo=data.anticipo,
-                fecha=datetime.now(self.tz).date(),
+                **self._reception(data.fecha_hora),
                 codigo_publico=secrets.token_hex(12),  # unguessable code for the public status page (QR)
             )
             self._apply(order, data)
@@ -176,6 +184,10 @@ class CreateWorkOrderUseCase(_WorkOrderValidation):
 
 
 class UpdateWorkOrderUseCase(_WorkOrderValidation):
+    def __init__(self, uow: UnitOfWork, tz: tzinfo = timezone.utc) -> None:
+        super().__init__(uow)
+        self.tz = tz
+
     def execute(self, work_order_id: int, data: WorkOrderData, actor: User) -> WorkOrder:
         with self.uow.transaction():
             order = _get_order(self.uow, work_order_id)
@@ -184,6 +196,9 @@ class UpdateWorkOrderUseCase(_WorkOrderValidation):
             self._validate_device(data.marca_id, data.modelo_id)
             order.cliente_id = client.id  # type: ignore[assignment]
             order.marca_id, order.modelo_id = data.marca_id, data.modelo_id
+            if data.fecha_hora is not None:  # without it the reception date and time are kept
+                reception = self._reception(data.fecha_hora)
+                order.fecha_hora, order.fecha = reception["fecha_hora"], reception["fecha"]
             if data.branch_id is not None or order.branch_id is None:
                 order.branch_id = self._resolve_branch(data.branch_id, actor).id
             normalized = WorkOrder(

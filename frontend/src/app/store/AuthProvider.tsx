@@ -19,6 +19,8 @@ export interface AuthState {
   defaultPassword: boolean;
   /** Called after the user changes their password (hides the warning). */
   passwordChanged: () => void;
+  /** Replaces the logged user after editing the profile (header, menus). */
+  updateUser: (user: User) => void;
   login: (credentials: LoginRequest) => Promise<void>;
   logout: (reason?: LogoutReason) => void;
   hasPermission: (code: string) => boolean;
@@ -140,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logoutReason,
       defaultPassword,
       passwordChanged: () => setDefaultPassword(false),
+      updateUser: setUser,
       login,
       logout,
       hasPermission: (code) => permissions.has(code),

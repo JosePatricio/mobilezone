@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.application.dto import ClientData, UserData
+from app.application.dto import ClientData, ProfileData, UserData
 from app.application.services.files import FileStorage
 from app.application.services.security import PasswordHasher
 from app.application.use_cases.base import CrudUseCases
@@ -230,6 +230,25 @@ class UserUseCases(_UserValidation):
     def set_photo(self, user_id: int, content: bytes | None) -> User:
         assert self.storage is not None
         return replace_image(self.uow, self.storage, lambda: self.get(user_id), "foto", USER_PHOTOS_FOLDER, content)
+
+    def update_profile(self, actor: User, data: ProfileData) -> User:
+        """The logged user updates their own data (Perfil)."""
+        with self.uow.transaction():
+            user = self.get(actor.id)  # type: ignore[arg-type]
+            changes = User(
+                nombre=data.nombre,
+                apellido=data.apellido,
+                email=data.email,
+                celular=data.celular,
+                provincia=data.provincia,
+                ciudad=data.ciudad,
+                direccion=data.direccion,
+            )
+            self._require_email(changes)
+            self._ensure_unique(changes.email, None, current_id=user.id)
+            for attr in ("nombre", "apellido", "email", "celular", "provincia", "ciudad", "direccion"):
+                setattr(user, attr, getattr(changes, attr))
+        return user
 
 
 class ClientUseCases(_UserValidation):

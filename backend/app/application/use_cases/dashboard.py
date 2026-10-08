@@ -95,3 +95,27 @@ class DashboardChartsUseCase(UseCase):
                 if stats is not None:
                     stats.ordenes += 1  # type: ignore[operator]
         return list(periods.values())
+
+
+@dataclass
+class DayOrders:
+    fecha: date
+    recibidas: int
+    en_proceso: int
+    finalizadas: int
+
+
+class DayOrdersUseCase(UseCase):
+    """Work orders of one day (shop time zone): received that day, and moved to En proceso /
+    Finalizado that day (from the status history)."""
+
+    def __init__(self, uow: UnitOfWork, tz: tzinfo = timezone.utc) -> None:
+        super().__init__(uow)
+        self.tz = tz
+
+    def execute(self, day: date | None = None) -> DayOrders:
+        day = day or datetime.now(self.tz).date()
+        since = datetime.combine(day, time.min, self.tz)
+        until = datetime.combine(day + timedelta(days=1), time.min, self.tz)
+        recibidas, en_proceso, finalizadas = self.uow.work_orders.day_activity(day=day, desde=since, hasta=until)
+        return DayOrders(fecha=day, recibidas=recibidas, en_proceso=en_proceso, finalizadas=finalizadas)

@@ -1,8 +1,8 @@
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Card, ErrorState, Loading, StatusBadge } from '@/shared/components';
+import { Card, ErrorState, Loading, Logo, StatusBadge } from '@/shared/components';
 import { toApiError } from '@/shared/services/apiError';
-import { formatDate, formatDateTime, formatOrderNumber, formatWarrantyDays } from '@/shared/utils/format';
+import { formatDateTime, formatOrderNumber, formatWarrantyDays } from '@/shared/utils/format';
 import { formatMoney } from '@/shared/utils/money';
 import { statusTone } from '../hooks/useWorkOrderStatuses';
 import { workOrderApi } from '../services/workOrderApi';
@@ -23,10 +23,7 @@ export function PublicWorkOrderPage() {
     <div className="public-page">
       <div className="public-card">
         <div className="app-brand">
-          <span className="brand-mark" aria-hidden>
-            MZ
-          </span>
-          <span>MobileZone</span>
+          <Logo />
         </div>
         {query.isLoading ? (
           <Loading />
@@ -54,7 +51,7 @@ export function PublicWorkOrderPage() {
                 {order.tipo_display ? ` (${order.tipo_display})` : ''}
               </dd>
               <dt>Fecha de ingreso</dt>
-              <dd>{formatDate(order.fecha)}</dd>
+              <dd>{formatDateTime(order.fecha_hora)}</dd>
               <dt>Fecha de entrega</dt>
               <dd>{order.fecha_entrega ? formatDateTime(order.fecha_entrega) : 'Por confirmar'}</dd>
               <dt>Garantía</dt>

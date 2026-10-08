@@ -5,7 +5,7 @@ import { userApi } from '@/modules/users/services/userApi';
 import { Button, DataList, DatePicker, Input, PageHeader, SearchInput, Select, type Column } from '@/shared/components';
 import { useListParams } from '@/shared/hooks/useListParams';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
-import { formatDate, formatDateTime, formatOrderNumber, fullName } from '@/shared/utils/format';
+import { formatDateTime, formatOrderNumber, fullName } from '@/shared/utils/format';
 import { formatMoney, toCents } from '@/shared/utils/money';
 import { useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
 import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
@@ -35,7 +35,7 @@ export function WorkOrdersPage() {
       render: (r) => (
         <>
           <strong>{formatOrderNumber(r.num_orden)}</strong>
-          <small className="muted d-block">{formatDate(r.fecha)}</small>
+          <small className="muted d-block">{formatDateTime(r.fecha_hora)}</small>
         </>
       ),
       sortValue: (r) => r.num_orden,

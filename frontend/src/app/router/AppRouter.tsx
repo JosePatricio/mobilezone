@@ -20,7 +20,6 @@ import { EditSalePage } from '@/modules/sales/pages/EditSalePage';
 import { NewSalePage } from '@/modules/sales/pages/NewSalePage';
 import { SaleDetailPage } from '@/modules/sales/pages/SaleDetailPage';
 import { SalesPage } from '@/modules/sales/pages/SalesPage';
-import { SparePartsPage } from '@/modules/spare-parts/pages/SparePartsPage';
 import { SettingsPage } from '@/modules/settings/pages/SettingsPage';
 import { UsersPage } from '@/modules/users/pages/UsersPage';
 import { WorkOrderDetailPage } from '@/modules/work-orders/pages/WorkOrderDetailPage';
@@ -84,9 +83,6 @@ export function AppRouter() {
             <Route path="work-orders/:id/edit" element={<WorkOrderFormPage />} />
           </Route>
 
-          <Route element={<PermissionRoute permission={P.SPARE_PARTS_VIEW} />}>
-            <Route path="spare-parts" element={<SparePartsPage />} />
-          </Route>
           <Route element={<PermissionRoute permission={P.AFFILIATE_PARTS_MANAGE} />}>
             <Route path="affiliate-parts" element={<AffiliatePartsPage />} />
           </Route>
@@ -109,7 +105,7 @@ export function AppRouter() {
           <Route element={<PermissionRoute permission={P.PERMISSIONS_VIEW} />}>
             <Route path="permissions" element={<PermissionsPage />} />
           </Route>
-          <Route element={<PermissionRoute permission={P.SETTINGS_RESET_DATA} />}>
+          <Route element={<PermissionRoute permission={P.SETTINGS_MANAGE} />}>
             <Route path="settings" element={<SettingsPage />} />
           </Route>
 

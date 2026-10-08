@@ -5,29 +5,17 @@ import { formatMoney, toCents } from '@/shared/utils/money';
 import { DASHBOARD_KEY, dashboardApi, type Grouping, type PeriodStats } from '../services/dashboardApi';
 import { ColumnChart } from './ColumnChart';
 
-const GROUPINGS: { value: Grouping; label: string; current: string; previous: string }[] = [
-  { value: 'dia', label: 'Día', current: 'Hoy', previous: 'ayer' },
-  { value: 'semana', label: 'Semana', current: 'Esta semana', previous: 'la semana anterior' },
-  { value: 'mes', label: 'Mes', current: 'Este mes', previous: 'el mes anterior' },
-  { value: 'anio', label: 'Año', current: 'Este año', previous: 'el año anterior' },
+const GROUPINGS: { value: Grouping; label: string }[] = [
+  { value: 'dia', label: 'Día' },
+  { value: 'semana', label: 'Semana' },
+  { value: 'mes', label: 'Mes' },
+  { value: 'anio', label: 'Año' },
 ];
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 const amount = (p: PeriodStats) => toCents(p.monto ?? '0') / 100;
 /** Axis ticks of money without decimals ($ 1.250); the tooltip keeps the cents. */
 const formatMoneyTick = (value: number) => formatMoney(value).replace(/,00$/, '');
-
-/** Change against the previous period: arrow + text (never color alone). */
-function Delta({ current, previous, label }: { current: number; previous: number; label: string }) {
-  if (previous === current) return <span className="stat-delta">= que {label}</span>;
-  const up = current > previous;
-  const pct = previous > 0 ? `${Math.round((Math.abs(current - previous) / previous) * 100)} %` : 'nuevo';
-  return (
-    <span className={`stat-delta ${up ? 'stat-delta-up' : 'stat-delta-down'}`}>
-      <span aria-hidden>{up ? '▲' : '▼'}</span> {pct} vs {label}
-    </span>
-  );
-}
 
 /** Animated charts of sales and work orders per day, week, month or year. */
 export function DashboardCharts() {
@@ -44,7 +32,7 @@ export function DashboardCharts() {
 
   const { periodos, agrupacion } = query.data;
   const current = periodos[periodos.length - 1];
-  const previous = periodos[periodos.length - 2];
+  if (!current) return null; // no periods: nothing to draw
   const showSales = current.ventas !== null;
   const showOrders = current.ordenes !== null;
   // Remount the charts when new data arrives so the columns grow again.
@@ -65,30 +53,6 @@ export function DashboardCharts() {
             {g.label}
           </button>
         ))}
-      </div>
-
-      <div className="stat-grid">
-        {showSales && (
-          <>
-            <div className="stat-card">
-              <span className="stat-label">{meta.current} · cobrado</span>
-              <span className="stat-value">{formatMoney(current.monto)}</span>
-              {previous && <Delta current={amount(current)} previous={amount(previous)} label={meta.previous} />}
-            </div>
-            <div className="stat-card">
-              <span className="stat-label">{meta.current} · ventas</span>
-              <span className="stat-value">{current.ventas}</span>
-              {previous && <Delta current={current.ventas ?? 0} previous={previous.ventas ?? 0} label={meta.previous} />}
-            </div>
-          </>
-        )}
-        {showOrders && (
-          <div className="stat-card stat-warning">
-            <span className="stat-label">{meta.current} · órdenes recibidas</span>
-            <span className="stat-value">{current.ordenes}</span>
-            {previous && <Delta current={current.ordenes ?? 0} previous={previous.ordenes ?? 0} label={meta.previous} />}
-          </div>
-        )}
       </div>
 
       <div className="chart-grid">

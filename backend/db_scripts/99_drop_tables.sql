@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS work_orders;
 DROP TABLE IF EXISTS spare_parts;
 DROP TABLE IF EXISTS affiliate_parts;
 DROP TABLE IF EXISTS page_visits;
+DROP TABLE IF EXISTS settings;
 DROP TABLE IF EXISTS models;
 DROP TABLE IF EXISTS brands;
 DROP TABLE IF EXISTS stock_movements;

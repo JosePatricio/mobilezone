@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { vi } from 'vitest';
 import { ApiError } from '@/shared/services/apiError';
+import { todayIso } from '@/shared/utils/format';
 import { fakeAuth, renderWithProviders } from '@/test/utils';
 import { PublicWorkOrderPage } from '../pages/PublicWorkOrderPage';
 import type { PublicWorkOrder, WorkOrderRequest } from '../types';
@@ -31,6 +32,7 @@ const catalogs = {
 const publicOrder: PublicWorkOrder = {
   num_orden: 15,
   fecha: '2026-10-01',
+  fecha_hora: '2026-10-01T14:30:00Z',
   estado: 0,
   estado_label: 'Recibido',
   marca: { id: 1, nombre: 'Samsung' },
@@ -101,6 +103,10 @@ describe('WorkOrderForm', () => {
     expect(screen.getByText('Ana Pérez (usted)')).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Fecha\s*\*?$/)).not.toBeInTheDocument();
     expect(screen.getByLabelText('Fecha de entrega')).toHaveAttribute('type', 'datetime-local');
+    // Last field: reception date and time, prefilled with now.
+    const reception = screen.getByLabelText(/Fecha y hora de ingreso/) as HTMLInputElement;
+    expect(reception).toHaveAttribute('type', 'datetime-local');
+    expect(reception.value.startsWith(todayIso())).toBe(true);
   });
 
   it('queries brands and models again every time a selector is opened', async () => {

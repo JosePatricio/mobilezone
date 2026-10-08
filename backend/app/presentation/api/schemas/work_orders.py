@@ -58,6 +58,10 @@ class WorkOrderRequest(RequestSchema):
     branch_id: int | None = Field(
         default=None, description="Sucursal (local) que recibe el equipo; vacío = sucursal del usuario"
     )
+    fecha_hora: datetime | None = Field(
+        default=None,
+        description="Fecha y hora de ingreso (ISO 8601; sin zona = hora local). Vacío: ahora al crear, sin cambio al editar",
+    )
 
 
 class WorkOrderStatusOption(Schema):
@@ -207,6 +211,7 @@ class WorkOrderListItem(Schema):
     anticipo: Decimal
     saldo: Decimal
     fecha: date
+    fecha_hora: datetime = Field(description="Fecha y hora de ingreso")
     fecha_entrega: datetime | None
 
     @computed_field  # type: ignore[prop-decorator]
@@ -243,6 +248,7 @@ class PublicWorkOrderResponse(Schema):
 
     num_orden: int
     fecha: date
+    fecha_hora: datetime
     estado: int
     marca: BrandSummary
     modelo: DeviceModelSummary

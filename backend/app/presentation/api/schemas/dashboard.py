@@ -20,3 +20,10 @@ class PeriodStatsResponse(Schema):
 class DashboardChartsResponse(Schema):
     agrupacion: Grouping
     periodos: list[PeriodStatsResponse]
+
+
+class DayOrdersResponse(Schema):
+    fecha: date
+    recibidas: int = Field(description="Órdenes recibidas ese día")
+    en_proceso: int = Field(description="Órdenes que pasaron a En proceso ese día")
+    finalizadas: int = Field(description="Órdenes finalizadas ese día")

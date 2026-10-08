@@ -59,7 +59,7 @@ INSERT INTO permissions (codigo, descripcion) VALUES
     ('spare_parts.create', 'Crear repuestos'),
     ('spare_parts.update', 'Editar y activar/desactivar repuestos'),
     ('spare_parts.delete', 'Eliminar repuestos'),
-    ('settings.reset_data', 'Configuración: vaciar todos los datos del negocio'),
+    ('settings.manage', 'Configuración: metas de venta del día (emoji de la cabecera)'),
     ('affiliate_parts.manage', 'Repuestos de afiliados: publicar y administrar sus propios repuestos'),
     ('affiliate_parts.any', 'Repuestos de afiliados: administrar los repuestos de todos los afiliados')
 ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion);

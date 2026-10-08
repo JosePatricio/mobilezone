@@ -116,6 +116,18 @@ class UserRequest(RequestSchema):
     branch_ids: list[int] = Field(default_factory=list, description="Sucursales (obligatorio para VENDEDOR)")
 
 
+class ProfileRequest(RequestSchema):
+    """Own data of the logged user (Perfil)."""
+
+    nombre: Name
+    apellido: Name
+    email: EmailStr
+    celular: Celular = None
+    provincia: Provincia = None
+    ciudad: Ciudad = None
+    direccion: Direccion = None
+
+
 class ClientRequest(RequestSchema):
     nombre: Name
     apellido: Name

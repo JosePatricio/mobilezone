@@ -69,14 +69,14 @@ def _tz(request: Request) -> ZoneInfo:
 
 
 def _data(body: WorkOrderRequest, tz: ZoneInfo) -> WorkOrderData:
-    values = body.model_dump(mode="json", exclude={"cliente", "presupuesto", "anticipo", "fecha_entrega"})
-    entrega = _local(body.fecha_entrega, tz)
+    values = body.model_dump(mode="json", exclude={"cliente", "presupuesto", "anticipo", "fecha_entrega", "fecha_hora"})
     return WorkOrderData(
         **values,
         cliente=WorkOrderClientData(**body.cliente.model_dump()),
         presupuesto=body.presupuesto,
         anticipo=body.anticipo,
-        fecha_entrega=entrega,
+        fecha_entrega=_local(body.fecha_entrega, tz),
+        fecha_hora=_local(body.fecha_hora, tz),
     )
 
 
@@ -159,7 +159,8 @@ def create_work_order(
 
 @router.put("/{work_order_id}", response_model=WorkOrderResponse)
 def update_work_order(request: Request, work_order_id: int, body: WorkOrderRequest, uow: UowDep, actor: CanUpdate):
-    order = UpdateWorkOrderUseCase(uow).execute(work_order_id, _data(body, _tz(request)), actor)
+    tz = _tz(request)
+    order = UpdateWorkOrderUseCase(uow, tz).execute(work_order_id, _data(body, tz), actor)
     return WorkOrderResponse.model_validate(order)
 
 
