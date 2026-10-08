@@ -7,7 +7,7 @@ from app.application.use_cases.base import CrudUseCases
 from app.application.use_cases.images import replace_image
 from app.domain.entities import Branch, Role, User
 from app.domain.exceptions import ConflictError, NotFoundError, ValidationError
-from app.domain.repositories import Repository, UnitOfWork
+from app.domain.repositories import Repository, UnitOfWork, UserUsage
 from app.domain.value_objects.enums import SystemRole
 from app.domain.value_objects.identificacion import normalize_identificacion
 from app.domain.value_objects.pagination import Page, PageRequest
@@ -173,6 +173,54 @@ class UserUseCases(_UserValidation):
             elif not user.password:  # e.g. a client promoted to seller
                 user.password = self.hasher.hash(validate_password(self._default_password(user)))
         return user
+
+    def usage(self, user_id: int) -> UserUsage:
+        """Sales and orders of the user, shown in the confirmation before deleting it."""
+        self.get(user_id)
+        return self.uow.users.usage(user_id)
+
+    def delete_user(self, user_id: int, actor: User, reassign_to: int | None = None) -> None:
+        """Deletes the user. Its sales, orders and other records are first reassigned to ``reassign_to``
+        (required when it has any), so no history or registered money is lost."""
+        if user_id == actor.id:
+            raise ValidationError("No puede eliminar su propio usuario.", code="CANNOT_DELETE_SELF")
+        with self.uow.transaction():
+            user = self.get(user_id)
+            usage = self.uow.users.usage(user_id, limit=1)
+            if usage.has_records:
+                if reassign_to is None:
+                    raise ConflictError(
+                        "El usuario tiene ventas u órdenes: elija a qué usuario se reasignan.",
+                        code="USER_HAS_RECORDS",
+                        details={"ventas": usage.ventas_total, "ordenes": usage.ordenes_total, "otros": usage.otros_total},
+                    )
+                target = self._reassign_target(user, reassign_to)
+                self.uow.users.reassign_references(user.id, target.id)  # type: ignore[arg-type]
+            foto = user.foto
+            self.uow.users.delete(user)
+        if foto and self.storage is not None:
+            self.storage.delete(foto)
+
+    def _reassign_target(self, user: User, target_id: int) -> User:
+        target = self.uow.users.get(target_id)
+        if target is None or target.id == user.id:
+            raise ValidationError(
+                "Seleccione el usuario que recibirá las ventas y órdenes.",
+                code="INVALID_REASSIGN_USER",
+                details={"field": "reassign_to"},
+            )
+        if not target.estado:
+            raise ValidationError(
+                "El usuario seleccionado está inactivo.", code="INVALID_REASSIGN_USER", details={"field": "reassign_to"}
+            )
+        if target.is_client != user.is_client:
+            raise ValidationError(
+                "Los registros de un cliente se reasignan a otro cliente, y los de un usuario del sistema "
+                "a otro usuario del sistema.",
+                code="INVALID_REASSIGN_USER",
+                details={"field": "reassign_to"},
+            )
+        return target
 
     def set_user_status(self, user_id: int, estado: bool, actor: User) -> User:
         if user_id == actor.id and not estado:

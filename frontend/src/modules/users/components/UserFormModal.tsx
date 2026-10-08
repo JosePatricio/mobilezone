@@ -118,6 +118,8 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
   const roleName = roleOptions.find((r) => r.id === Number(rolId))?.nombre;
   const isClient = roleName === SYSTEM_ROLES.CLIENTE;
   const isSeller = roleName === SYSTEM_ROLES.VENDEDOR;
+  // Sellers sell from their branches; the administrator can also update theirs.
+  const hasBranches = isSeller || roleName === SYSTEM_ROLES.ADMIN;
   const selectedBranches = new Set<number>((branchIds as number[] | undefined) ?? []);
 
   const toggleBranch = (id: number) => {
@@ -131,7 +133,7 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
     setServerError(null);
     try {
       await onSubmit(
-        { ...values, password: password && !isClient ? password : null, branch_ids: isSeller ? values.branch_ids : [] },
+        { ...values, password: password && !isClient ? password : null, branch_ids: hasBranches ? values.branch_ids : [] },
         image,
       );
     } catch (err) {
@@ -212,11 +214,11 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
             {...register('password')}
           />
         )}
-        {/* Only sellers are assigned to branches (they sell from them). */}
-        {isSeller && (
+        {/* Only sellers (required) and the administrator are assigned to branches. */}
+        {hasBranches && (
           <fieldset className="full branch-checks">
             <legend className="field-label">
-              Sucursales asignadas<span className="field-required"> *</span>
+              Sucursales asignadas{isSeller && <span className="field-required"> *</span>}
             </legend>
             <div className="branch-checks-grid">
               {(branches.data ?? []).map((b) => (

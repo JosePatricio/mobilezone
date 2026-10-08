@@ -10,6 +10,7 @@ class Perm:
     USERS_VIEW = "users.view"
     USERS_CREATE = "users.create"
     USERS_UPDATE = "users.update"
+    USERS_DELETE = "users.delete"
 
     ROLES_VIEW = "roles.view"
     ROLES_MANAGE = "roles.manage"
@@ -75,6 +76,7 @@ PERMISSION_CATALOG: dict[str, str] = {
     Perm.USERS_VIEW: "Ver usuarios",
     Perm.USERS_CREATE: "Crear usuarios",
     Perm.USERS_UPDATE: "Editar y activar/desactivar usuarios",
+    Perm.USERS_DELETE: "Eliminar usuarios (sus ventas y órdenes pasan a otro usuario)",
     Perm.ROLES_VIEW: "Ver roles",
     Perm.ROLES_MANAGE: "Crear, editar roles y asignar permisos",
     Perm.PERMISSIONS_VIEW: "Ver permisos",

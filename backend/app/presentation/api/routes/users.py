@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, UploadFile, status
+from fastapi import APIRouter, Depends, Query, Response, UploadFile, status
 
 from app.application.dto import ClientData, UserData
 from app.application.use_cases.users import ClientUseCases, UserUseCases
@@ -25,6 +25,7 @@ from app.presentation.api.schemas.users import (
     UserRequest,
     UserResponse,
     UserSummary,
+    UserUsageResponse,
 )
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -32,6 +33,7 @@ clients_router = APIRouter(prefix="/clients", tags=["clients"])
 
 CanViewUsers = Annotated[User, Depends(require_permissions(Perm.USERS_VIEW))]
 CanUpdateUsers = Annotated[User, Depends(require_permissions(Perm.USERS_UPDATE))]
+CanDeleteUsers = Annotated[User, Depends(require_permissions(Perm.USERS_DELETE))]
 CanViewClients = Annotated[User, Depends(require_permissions(Perm.CLIENTS_VIEW))]
 CanUpdateClients = Annotated[User, Depends(require_permissions(Perm.CLIENTS_UPDATE))]
 
@@ -84,6 +86,27 @@ def create_user(
 def update_user(user_id: int, body: UserRequest, uow: UowDep, hasher: HasherDep, actor: CanUpdateUsers):
     user = UserUseCases(uow, hasher).update(user_id, UserData(**body.model_dump()), actor)
     return UserResponse.model_validate(user)
+
+
+@router.get("/{user_id}/usage", response_model=UserUsageResponse)
+def user_usage(user_id: int, uow: UowDep, hasher: HasherDep, _: CanDeleteUsers):
+    """Sales and work orders of the user (confirmation before deleting it)."""
+    usage = UserUseCases(uow, hasher).usage(user_id)
+    return UserUsageResponse.model_validate({**usage.__dict__, "has_records": usage.has_records})
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: int,
+    uow: UowDep,
+    hasher: HasherDep,
+    storage: StorageDep,
+    actor: CanDeleteUsers,
+    reassign_to: Annotated[int | None, Query(description="Usuario que recibe sus ventas y órdenes")] = None,
+) -> Response:
+    """Deletes the user. If it has sales or orders, ``reassign_to`` is required (409 USER_HAS_RECORDS)."""
+    UserUseCases(uow, hasher, storage).delete_user(user_id, actor, reassign_to)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch("/{user_id}/status", response_model=UserResponse)

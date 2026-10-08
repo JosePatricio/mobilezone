@@ -60,7 +60,7 @@ Estado de servidor con TanStack Query, formularios con react-hook-form + zod.
 | Módulo | Endpoints |
 |---|---|
 | auth | `POST /auth/login`, `GET /auth/me` (`POST /auth/token` para Swagger) |
-| users | CRUD (provincia/ciudad, `branch_ids`) + `PATCH /{id}/status`, `PUT/DELETE /{id}/photo`, `GET /users/technicians` (filtro `rol_id`) |
+| users | CRUD (provincia/ciudad, `branch_ids`) + `PATCH /{id}/status`, `GET /{id}/usage` y `DELETE /{id}?reassign_to=` (eliminar: sus ventas y órdenes pasan a otro usuario), `PUT/DELETE /{id}/photo`, `GET /users/technicians` (filtro `rol_id`) |
 | clients | CRUD + status + `PUT/DELETE /{id}/photo` (usuarios con rol `CLIENTE`) |
 | roles / permissions | CRUD roles, `PUT /roles/{id}/permissions`, `POST/DELETE /roles/{id}/permissions/{pid}`, `GET /permissions` |
 | categories, brands, models, spare-parts | `GET`, `GET /{id}`, `POST`, `PUT /{id}`, `PATCH /{id}/status`, `DELETE /{id}` (409 si tiene registros asociados) |

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Annotated
 
 from pydantic import BeforeValidator, EmailStr, Field, StringConstraints, computed_field
 
+from app.domain.value_objects.enums import WORK_ORDER_STATUS_LABELS, WorkOrderStatus
 from app.presentation.api.schemas.common import Name, RequestSchema, Schema, media_url
 
 Identificacion = Annotated[
@@ -146,3 +148,37 @@ class ClientResponse(_WithPhoto):
     estado: bool
     created_at: datetime
     updated_at: datetime
+
+
+class UserSaleUsage(Schema):
+    id: int
+    fecha: datetime
+    total_pagar: Decimal
+    estado: str
+    rol: str = Field(description="Vendedor | Cliente")
+
+
+class UserOrderUsage(Schema):
+    id: int
+    num_orden: int | None
+    fecha: date
+    estado: int
+    rol: str = Field(description="Registró | Cliente | Técnico")
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def estado_label(self) -> str:
+        return WORK_ORDER_STATUS_LABELS[WorkOrderStatus(self.estado)]
+
+
+class UserUsageResponse(Schema):
+    """What references the user: shown in the confirmation before deleting it."""
+
+    ventas: list[UserSaleUsage]
+    ventas_total: int
+    ordenes: list[UserOrderUsage]
+    ordenes_total: int
+    otros_total: int = Field(
+        description="Historial de estados, repuestos de órdenes, movimientos de stock y repuestos de afiliados"
+    )
+    has_records: bool

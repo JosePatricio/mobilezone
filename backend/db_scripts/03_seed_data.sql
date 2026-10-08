@@ -15,6 +15,7 @@ INSERT INTO permissions (codigo, descripcion) VALUES
     ('users.view', 'Ver usuarios'),
     ('users.create', 'Crear usuarios'),
     ('users.update', 'Editar y activar/desactivar usuarios'),
+    ('users.delete', 'Eliminar usuarios (sus ventas y órdenes pasan a otro usuario)'),
     ('roles.view', 'Ver roles'),
     ('roles.manage', 'Crear, editar roles y asignar permisos'),
     ('permissions.view', 'Ver permisos'),

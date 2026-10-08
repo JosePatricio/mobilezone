@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/app/store/AuthProvider';
 import { usePermission } from '@/modules/auth/components/Can';
@@ -22,6 +22,7 @@ import { useStatusToggle } from '@/shared/hooks/useStatusToggle';
 import { applyImageSelection } from '@/shared/services/uploads';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatDateTime } from '@/shared/utils/format';
+import { DeleteUserModal } from '../components/DeleteUserModal';
 import { UserFormModal } from '../components/UserFormModal';
 import { USERS_KEY, userApi } from '../services/userApi';
 import type { User } from '../types';
@@ -30,6 +31,7 @@ export function UsersPage() {
   const { user: me } = useAuth();
   const canCreate = usePermission(P.USERS_CREATE);
   const canUpdate = usePermission(P.USERS_UPDATE);
+  const canDelete = usePermission(P.USERS_DELETE);
   const canViewRoles = usePermission(P.ROLES_VIEW);
   const list = useListParams<{ rol_id: string; estado: string }>({ rol_id: '', estado: '' });
   const query = useCrudList(USERS_KEY, userApi, list.params);
@@ -40,6 +42,9 @@ export function UsersPage() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<User | null | undefined>(undefined);
   const [viewing, setViewing] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState<User | null>(null);
+  // Stable: the modal refocuses itself whenever onClose changes, which would interrupt typing.
+  const closeDelete = useCallback(() => setDeleting(null), []);
   const roleRefs = (roles.data ?? []).map((r) => ({ id: r.id, nombre: r.nombre }));
 
   const columns: Column<User>[] = [
@@ -95,6 +100,11 @@ export function UsersPage() {
               )}
             </>
           )}
+          {canDelete && r.id !== me?.id && (
+            <Button size="sm" variant="ghost" className="text-danger" onClick={() => setDeleting(r)}>
+              Eliminar
+            </Button>
+          )}
         </div>
       ),
     },
@@ -141,6 +151,18 @@ export function UsersPage() {
             await queryClient.invalidateQueries({ queryKey: [USERS_KEY] });
             toast.success(editing ? 'Cambios guardados.' : 'Usuario creado.');
             setEditing(undefined);
+          }}
+        />
+      )}
+
+      {deleting && (
+        <DeleteUserModal
+          user={deleting}
+          onClose={closeDelete}
+          onDeleted={() => {
+            void queryClient.invalidateQueries();
+            toast.success('Usuario eliminado.');
+            setDeleting(null);
           }}
         />
       )}

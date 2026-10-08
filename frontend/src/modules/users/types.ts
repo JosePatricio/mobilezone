@@ -1,4 +1,4 @@
-import type { Id, NamedRef, Timestamps } from '@/shared/types/api';
+import type { Id, Money, NamedRef, Timestamps } from '@/shared/types/api';
 
 /** System roles. The role is the only "type" of a user (clients have the CLIENTE role). */
 export const SYSTEM_ROLES = {
@@ -47,4 +47,14 @@ export interface UserRequest {
 
 export function hasRole(user: { role?: NamedRef | null } | null | undefined, role: string): boolean {
   return user?.role?.nombre === role;
+}
+
+/** Records of a user, shown before deleting it (they are reassigned to another user). */
+export interface UserUsage {
+  ventas: { id: Id; fecha: string; total_pagar: Money; estado: string; rol: string }[];
+  ventas_total: number;
+  ordenes: { id: Id; num_orden: number | null; fecha: string; estado: number; estado_label: string; rol: string }[];
+  ordenes_total: number;
+  otros_total: number;
+  has_records: boolean;
 }

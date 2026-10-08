@@ -595,3 +595,34 @@ def test_upgrade_012_technician_keeps_only_affiliate_parts(mysql_engine: Engine)
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_014_delete_users_permission_for_admin(mysql_engine: Engine):
+    """v13 database with the ADMIN role -> upgrade 014 grants users.delete."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (
+        initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005, sql.UPGRADE_006, sql.UPGRADE_007,
+        sql.UPGRADE_008, sql.UPGRADE_009, sql.UPGRADE_010, sql.UPGRADE_011, sql.UPGRADE_012, sql.UPGRADE_013,
+    )
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+            conn.exec_driver_sql("INSERT IGNORE INTO roles (nombre) VALUES ('ADMIN'), ('VENDEDOR')")
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_014)
+        with mysql_engine.connect() as conn:
+            granted = conn.exec_driver_sql(
+                "SELECT r.nombre FROM role_permissions rp JOIN roles r ON r.id = rp.role_id "
+                "JOIN permissions p ON p.id = rp.permission_id WHERE p.codigo = 'users.delete'"
+            ).scalars().all()
+            assert granted == ["ADMIN"]
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

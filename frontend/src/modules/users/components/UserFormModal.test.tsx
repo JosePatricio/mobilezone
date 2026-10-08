@@ -92,4 +92,10 @@ describe('UserFormModal password and branches', () => {
     await userEvent.selectOptions(screen.getByLabelText(/^Rol/), 'VENDEDOR');
     expect(screen.getByText('Sucursales asignadas')).toBeInTheDocument();
   });
+
+  it('the administrator can update their branches (optional)', async () => {
+    renderWithProviders(<UserFormModal user={null} roles={roles} onClose={() => undefined} onSubmit={vi.fn()} />);
+    await userEvent.selectOptions(screen.getByLabelText(/^Rol/), 'ADMIN');
+    expect(screen.getByText('Sucursales asignadas')).toBeInTheDocument();
+  });
 });

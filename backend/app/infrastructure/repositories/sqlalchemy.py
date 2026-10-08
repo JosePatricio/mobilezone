@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Generic, TypeVar
 
-from sqlalchemy import Select, and_, delete, func, or_, select, text
+from sqlalchemy import Select, and_, case, delete, func, or_, select, text, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import Session
 
@@ -87,6 +87,66 @@ class SqlAlchemyRepository(Generic[T]):
 
 class SqlAlchemyUserRepository(SqlAlchemyRepository[User], ports.UserRepository):
     entity = User
+
+    # Every column that references users.id (user_branches is deleted in cascade).
+    REFERENCES = (
+        (sales_table, "user_id"),
+        (sales_table, "cliente_id"),
+        (work_orders_table, "user_id"),
+        (work_orders_table, "cliente_id"),
+        (work_orders_table, "tecnico_id"),
+        (work_order_status_changes_table, "user_id"),
+        (work_order_spare_parts_table, "technician_id"),
+        (stock_movements_table, "user_id"),
+        (affiliate_parts_table, "user_id"),
+    )
+
+    def usage(self, user_id: int, limit: int = 50) -> ports.UserUsage:
+        s = sales_table.c
+        sale_filter = or_(s.user_id == user_id, s.cliente_id == user_id)
+        sales = self.session.execute(
+            select(
+                s.id, s.fecha, s.total_pagar, s.estado,
+                case((s.user_id == user_id, "Vendedor"), else_="Cliente"),
+            )
+            .where(sale_filter)
+            .order_by(s.fecha.desc(), s.id.desc())
+            .limit(limit)
+        ).all()
+        w = work_orders_table.c
+        order_filter = or_(w.user_id == user_id, w.cliente_id == user_id, w.tecnico_id == user_id)
+        orders = self.session.execute(
+            select(
+                w.id, w.num_orden, w.fecha, w.estado,
+                case((w.user_id == user_id, "Registró"), (w.cliente_id == user_id, "Cliente"), else_="Técnico"),
+            )
+            .where(order_filter)
+            .order_by(w.num_orden.desc())
+            .limit(limit)
+        ).all()
+
+        def count(table, condition) -> int:
+            return self.session.scalar(select(func.count()).select_from(table).where(condition)) or 0
+
+        otros = (
+            count(work_order_status_changes_table, work_order_status_changes_table.c.user_id == user_id)
+            + count(work_order_spare_parts_table, work_order_spare_parts_table.c.technician_id == user_id)
+            + count(stock_movements_table, stock_movements_table.c.user_id == user_id)
+            + count(affiliate_parts_table, affiliate_parts_table.c.user_id == user_id)
+        )
+        return ports.UserUsage(
+            ventas=[ports.UserSaleRef(r[0], r[1], Decimal(r[2]), str(getattr(r[3], "value", r[3])), r[4]) for r in sales],
+            ventas_total=count(sales_table, sale_filter),
+            ordenes=[ports.UserOrderRef(*r) for r in orders],
+            ordenes_total=count(work_orders_table, order_filter),
+            otros_total=otros,
+        )
+
+    def reassign_references(self, from_user_id: int, to_user_id: int) -> None:
+        for table, column in self.REFERENCES:
+            self.session.execute(
+                update(table).where(table.c[column] == from_user_id).values({column: to_user_id})
+            )
 
     def get_by_email(self, email: str) -> User | None:
         return self.session.scalars(select(User).where(func.lower(users_table.c.email) == email.lower())).first()

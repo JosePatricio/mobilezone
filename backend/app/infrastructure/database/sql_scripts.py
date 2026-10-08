@@ -22,6 +22,7 @@ UPGRADE_010 = "upgrades/010_sucursal_orden.sql"
 UPGRADE_011 = "upgrades/011_eliminar_ordenes.sql"
 UPGRADE_012 = "upgrades/012_tecnico_afiliado.sql"
 UPGRADE_013 = "upgrades/013_imagen_repuesto_afiliado.sql"
+UPGRADE_014 = "upgrades/014_eliminar_usuarios.sql"
 
 
 def read_statements(script: str | Path) -> list[str]:

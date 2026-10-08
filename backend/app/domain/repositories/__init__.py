@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Generic, Iterator, TypeVar
@@ -41,7 +42,47 @@ class Repository(ABC, Generic[T]):
     def delete(self, entity: T) -> None: ...
 
 
+@dataclass(frozen=True)
+class UserSaleRef:
+    id: int
+    fecha: datetime
+    total_pagar: Decimal
+    estado: str
+    rol: str  # "Vendedor" | "Cliente"
+
+
+@dataclass(frozen=True)
+class UserOrderRef:
+    id: int
+    num_orden: int | None
+    fecha: date
+    estado: int
+    rol: str  # "Registró" | "Cliente" | "Técnico"
+
+
+@dataclass(frozen=True)
+class UserUsage:
+    """Records that reference a user (shown before deleting it)."""
+
+    ventas: list[UserSaleRef] = field(default_factory=list)  # most recent first (limited)
+    ventas_total: int = 0
+    ordenes: list[UserOrderRef] = field(default_factory=list)
+    ordenes_total: int = 0
+    otros_total: int = 0  # status history, spare parts, stock movements, affiliate parts
+
+    @property
+    def has_records(self) -> bool:
+        return bool(self.ventas_total or self.ordenes_total or self.otros_total)
+
+
 class UserRepository(Repository[User]):
+    @abstractmethod
+    def usage(self, user_id: int, limit: int = 50) -> UserUsage: ...
+
+    @abstractmethod
+    def reassign_references(self, from_user_id: int, to_user_id: int) -> None:
+        """Every sale, order, history entry, stock movement and affiliate part of ``from`` goes to ``to``."""
+
     @abstractmethod
     def get_by_email(self, email: str) -> User | None: ...
 

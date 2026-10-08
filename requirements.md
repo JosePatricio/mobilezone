@@ -1,5 +1,4 @@
-En Modulo Repuestos afiliados
-Agregar en la tabla una columna para ver el detalle de ese repuesto, es decir una url publica donde todos puedan verlo.
-Agrega campo imagen tambien
+En Modulo Usuario
+Crear opcion para eliminar usuario, si el usuario tiene alguna venta o algun orden primero mostrar un modal de confirmacion con el detalle de venta u orden.
 
-Ese boton Ver catalogo publico habilitalo solo para el rol Administrador, tambien el campo de las visitas, solo debe saber el rol administrador
+El usuario admin tiene que tener habilitado la opcion para actualizar su sucursal
