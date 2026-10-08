@@ -119,9 +119,9 @@ class UserUseCases(_UserValidation):
             user = self._build(data)
             self._ensure_unique(user.email, user.identificacion)
             user.set_branches(self._resolve_branches(role, data.branch_ids))
-            # Clients never log in (no password, email optional); every other role needs both.
+            # Clients never log in (no password). Email is optional for every role, but a user
+            # without email cannot log in until one is added.
             if role.nombre != SystemRole.CLIENTE.value:
-                self._require_email(user)
                 password = data.password or self._default_password(user)
                 user.password = self.hasher.hash(validate_password(password))
             self.uow.users.add(user)
@@ -167,7 +167,6 @@ class UserUseCases(_UserValidation):
             if role.nombre == SystemRole.CLIENTE.value:
                 user.password = None
                 return user
-            self._require_email(user)
             if data.password:
                 user.password = self.hasher.hash(validate_password(data.password))
             elif not user.password:  # e.g. a client promoted to seller

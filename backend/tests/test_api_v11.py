@@ -95,3 +95,15 @@ def test_users_with_their_own_password_get_no_warning(client, factory):
     assert login.json()["password_por_defecto"] is False
     me = client.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {login.json()['access_token']}"})
     assert me.json()["password_por_defecto"] is False
+
+
+def test_email_is_optional_for_every_role(client, admin_headers, uow):
+    from tests.test_api_v2 import _role_id
+
+    body = {"nombre": "Sin", "apellido": "Correo", "email": "", "rol_id": _role_id(uow, "TECNICO"), "identificacion": "11"}
+    created = client.post(f"{API}/users", json=body, headers=admin_headers)
+    assert created.status_code == 201, created.text
+    assert created.json()["email"] is None
+    updated = client.put(f"{API}/users/{created.json()['id']}", json={**body, "email": None}, headers=admin_headers)
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["email"] is None

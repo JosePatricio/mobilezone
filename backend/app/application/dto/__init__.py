@@ -130,7 +130,7 @@ class UserData:
 
     nombre: str
     apellido: str
-    email: str | None  # required except for clients
+    email: str | None  # optional; needed to log in
     rol_id: int
     password: str | None = None  # on update, None keeps the current password
     identificacion: str | None = None

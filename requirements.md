@@ -1,2 +1,2 @@
 En el modulo usuarios
-Temporalmente deshabilita la validacion de cedula o ruc, vamos a ingresar usuario antiguos que no tienen dni entonces elimina la validacion, debo poder poner cualquier valor como 11,2, 3, etc
+Campo correo debe ser opcional y no obligatorio

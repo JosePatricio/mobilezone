@@ -103,7 +103,7 @@ class TokenResponse(Schema):
 class UserRequest(RequestSchema):
     nombre: Name
     apellido: Name
-    email: OptionalEmail = Field(default=None, description="Obligatorio salvo para el rol CLIENTE")
+    email: OptionalEmail = Field(default=None, description="Opcional; sin email el usuario no puede iniciar sesión")
     password: str | None = Field(
         default=None,
         min_length=8,

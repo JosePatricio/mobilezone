@@ -12,7 +12,7 @@ export interface User extends Timestamps {
   id: Id;
   nombre: string;
   apellido: string;
-  /** Login; null only for clients. */
+  /** Login; optional (a user without email cannot log in). */
   email: string | null;
   identificacion: string | null;
   celular: string | null;
@@ -32,7 +32,7 @@ export interface User extends Timestamps {
 export interface UserRequest {
   nombre: string;
   apellido: string;
-  email: string;
+  email: string | null;
   password?: string | null;
   rol_id: Id;
   identificacion: string | null;

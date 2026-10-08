@@ -16,7 +16,7 @@ import {
 import { getErrorMessage } from '@/shared/services/apiError';
 import type { NamedRef } from '@/shared/types/api';
 import { zCelular, zOptionalIdentificacion } from '@/shared/utils/identification';
-import { type FormShape, zodForm, applyServerErrors, zOptionalText, zRequiredId, zText } from '@/shared/utils/validation';
+import { type FormShape, zodForm, applyServerErrors, zOptionalEmail, zOptionalText, zRequiredId, zText } from '@/shared/utils/validation';
 import { SYSTEM_ROLES, type User, type UserRequest } from '../types';
 
 /** Location preselected for new users. */
@@ -29,7 +29,7 @@ function buildSchema(isEdit: boolean, roles: NamedRef[]) {
     .object({
       nombre: zText(100),
       apellido: zText(100),
-      email: z.string().trim().min(1, 'Campo obligatorio').email('Email inválido'),
+      email: zOptionalEmail,
       identificacion: zOptionalIdentificacion,
       celular: zCelular,
       provincia: zOptionalText(100),
@@ -178,7 +178,13 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
           error={errors.identificacion?.message}
           {...register('identificacion')}
         />
-        <Input label="Email" type="email" required error={errors.email?.message} {...register('email')} />
+        <Input
+          label="Email"
+          type="email"
+          hint="Opcional (necesario para iniciar sesión)"
+          error={errors.email?.message}
+          {...register('email')}
+        />
         <Input label="Celular" type="tel" inputMode="tel" error={errors.celular?.message} {...register('celular')} />
         <Select
           label="Rol"
