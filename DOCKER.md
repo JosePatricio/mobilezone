@@ -310,10 +310,5 @@ git pull
 docker compose up -d --build
 
 
- magenta: #FF006F
- GRIS #E8E8E8
- NEGRO #241D18
- TOMATE FF7014
-
 
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { usePermission } from '@/modules/auth/components/Can';
@@ -12,6 +13,7 @@ import {
   Modal,
   PageHeader,
   SearchInput,
+  Loading,
   Select,
   STATUS_FILTER_OPTIONS,
   StatusBadge,
@@ -20,17 +22,17 @@ import {
   useToast,
   type Column,
 } from '@/shared/components';
-import { useCrudList, useCrudMutations, useOptions } from '@/shared/hooks/useCrud';
+import { useCrudList, useCrudMutations } from '@/shared/hooks/useCrud';
 import { useListParams } from '@/shared/hooks/useListParams';
 import { useStatusToggle } from '@/shared/hooks/useStatusToggle';
 import { getErrorMessage } from '@/shared/services/apiError';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
-import { type FormShape, zodForm, applyServerErrors, zOptionalText, zRequiredId, zText } from '@/shared/utils/validation';
+import { type FormShape, zodForm, applyServerErrors, zOptionalText, zText } from '@/shared/utils/validation';
 import { MODELS_KEY, modelApi } from '../services/modelApi';
 import type { DeviceModel } from '../types';
 
+// The brand is not chosen in the form: it is the brand the screen was opened for.
 const schema = z.object({
-  brand_id: zRequiredId('Seleccione una marca'),
   nombre: zText(100),
   descripcion: zOptionalText(2000),
   estado: z.boolean(),
@@ -38,27 +40,37 @@ const schema = z.object({
 type FormInput = FormShape<typeof schema>;
 type FormOutput = z.output<typeof schema>;
 
+/** Models of one brand: opened from Marcas (the name of a brand) as /models?brand_id=4. */
 export function ModelsPage() {
+  const [searchParams] = useSearchParams();
+  const brandId = Number(searchParams.get('brand_id'));
+  // Without a brand there is nothing to show: Modelos is reached from Marcas.
+  if (!Number.isInteger(brandId) || brandId <= 0) return <Navigate to="/brands" replace />;
+  return <BrandModels key={brandId} brandId={brandId} />;
+}
+
+function BrandModels({ brandId }: { brandId: number }) {
   const canCreate = usePermission(P.MODELS_CREATE);
   const canUpdate = usePermission(P.MODELS_UPDATE);
   const canDelete = usePermission(P.MODELS_DELETE);
-  // Opened from Marcas (the name of a brand): filtered by that brand.
-  const [searchParams] = useSearchParams();
-  const list = useListParams<{ brand_id: string; estado: string }>({ brand_id: searchParams.get('brand_id') ?? '', estado: '' });
+  const list = useListParams<{ brand_id: string; estado: string }>({ brand_id: String(brandId), estado: '' });
   const query = useCrudList(MODELS_KEY, modelApi, list.params);
-  const brands = useOptions(BRANDS_KEY, brandApi);
+  const brand = useQuery({ queryKey: [BRANDS_KEY, 'detail', brandId], queryFn: () => brandApi.get(brandId) });
   const mutations = useCrudMutations(MODELS_KEY, modelApi);
+  // Marcas shows how many models each brand has.
+  const queryClient = useQueryClient();
+  const refreshBrandCounts = () => queryClient.invalidateQueries({ queryKey: [BRANDS_KEY] });
   const toggleStatus = useStatusToggle(mutations.setStatus, 'el modelo');
   const confirm = useConfirm();
   const toast = useToast();
   const [editing, setEditing] = useState<DeviceModel | null | undefined>(undefined);
-  const brandOptions = (brands.data ?? []).map((b) => ({ value: b.id, label: b.nombre }));
 
   const onDelete = async (m: DeviceModel) => {
     if (!(await confirm({ title: 'Eliminar modelo', message: `¿Eliminar "${m.nombre}"?`, danger: true, confirmLabel: 'Eliminar' })))
       return;
     try {
       await mutations.remove.mutateAsync(m.id);
+      void refreshBrandCounts();
       toast.success('Modelo eliminado.');
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -67,7 +79,6 @@ export function ModelsPage() {
 
   const columns: Column<DeviceModel>[] = [
     { key: 'id', header: 'ID', render: (r) => r.id, sortValue: (r) => r.id },
-    { key: 'marca', header: 'Marca', render: (r) => r.brand.nombre, sortValue: (r) => r.brand.nombre.toLowerCase() },
     { key: 'nombre', header: 'Modelo', render: (r) => r.nombre, sortValue: (r) => r.nombre.toLowerCase() },
     { key: 'descripcion', header: 'Descripción', render: (r) => r.descripcion ?? '—' },
     { key: 'estado', header: 'Estado', render: (r) => <StatusBadge active={r.estado} /> },
@@ -97,20 +108,21 @@ export function ModelsPage() {
     },
   ];
 
+  if (brand.isPending) return <Loading />;
+  // An unknown brand (e.g. deleted, or a wrong link): back to Marcas.
+  if (brand.isError) return <Navigate to="/brands" replace />;
+  const brandName = brand.data.nombre;
+
   return (
     <>
-      <PageHeader title="Modelos" actions={canCreate && <Button onClick={() => setEditing(null)}>Nuevo modelo</Button>}>
+      <PageHeader
+        title={`Modelos de ${brandName}`}
+        actions={canCreate && <Button onClick={() => setEditing(null)}>Nuevo modelo</Button>}
+      >
         <Link to="/brands">← Volver a Marcas</Link>
       </PageHeader>
       <div className="toolbar">
         <SearchInput value={list.search} onChange={list.setSearch} placeholder="Buscar modelo…" />
-        <Select
-          aria-label="Filtrar por marca"
-          value={list.filters.brand_id}
-          onChange={(e) => list.setFilter('brand_id', e.target.value)}
-          options={brandOptions}
-          placeholder="Todas las marcas"
-        />
         <Select
           aria-label="Filtrar por estado"
           value={list.filters.estado}
@@ -124,11 +136,15 @@ export function ModelsPage() {
       {editing !== undefined && (
         <ModelFormModal
           model={editing}
-          brandOptions={brandOptions}
+          brandName={brandName}
           onClose={() => setEditing(undefined)}
-          onSubmit={async (body) => {
+          onSubmit={async (values) => {
+            const body = { ...values, brand_id: brandId };
             if (editing) await mutations.update.mutateAsync({ id: editing.id, body });
-            else await mutations.create.mutateAsync(body);
+            else {
+              await mutations.create.mutateAsync(body);
+              void refreshBrandCounts();
+            }
             toast.success(editing ? 'Cambios guardados.' : 'Modelo creado.');
             setEditing(undefined);
           }}
@@ -140,20 +156,16 @@ export function ModelsPage() {
 
 function ModelFormModal({
   model,
-  brandOptions,
+  brandName,
   onClose,
   onSubmit,
 }: {
   model: DeviceModel | null;
-  brandOptions: { value: number; label: string }[];
+  brandName: string;
   onClose: () => void;
   onSubmit: (body: FormOutput) => Promise<void>;
 }) {
   const [serverError, setServerError] = useState<string | null>(null);
-  const options =
-    model && !brandOptions.some((b) => b.value === model.brand_id)
-      ? [...brandOptions, { value: model.brand_id, label: model.brand.nombre }]
-      : brandOptions;
   const {
     register,
     handleSubmit,
@@ -162,7 +174,6 @@ function ModelFormModal({
   } = useForm<FormInput, unknown, FormOutput>({
     resolver: zodForm(schema),
     defaultValues: {
-      brand_id: model?.brand_id ?? '',
       nombre: model?.nombre ?? '',
       descripcion: model?.descripcion ?? '',
       estado: model?.estado ?? true,
@@ -181,7 +192,7 @@ function ModelFormModal({
   return (
     <Modal
       open
-      title={model ? 'Editar modelo' : 'Nuevo modelo'}
+      title={model ? `Editar modelo de la marca ${brandName}` : `Ingresar modelo de la marca ${brandName}`}
       onClose={onClose}
       dismissible={!isSubmitting}
       footer={
@@ -201,14 +212,6 @@ function ModelFormModal({
             {serverError}
           </div>
         )}
-        <Select
-          label="Marca"
-          required
-          options={options}
-          placeholder="Seleccione…"
-          error={errors.brand_id?.message}
-          {...register('brand_id')}
-        />
         <Input label="Modelo" required error={errors.nombre?.message} {...register('nombre')} />
         <Textarea label="Descripción" className="full" error={errors.descripcion?.message} {...register('descripcion')} />
         <Checkbox label="Activo" toggle {...register('estado')} />
