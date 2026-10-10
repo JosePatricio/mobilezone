@@ -102,6 +102,27 @@ def _str_enum(enum_cls: type) -> Enum:
     )
 
 
+class StrEnumList(TypeDecorator):
+    """A list of enum values stored as comma separated codes in a VARCHAR ("PANTALLA,BATERIA")."""
+
+    impl = String(255)
+    cache_ok = True
+
+    def __init__(self, enum_cls: type, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.enum_cls = enum_cls
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return ",".join(self.enum_cls(v).value for v in value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return [self.enum_cls(v) for v in value.split(",") if v]
+
+
 def _timestamps() -> list[Column]:
     return [
         Column("created_at", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
@@ -315,7 +336,7 @@ work_orders_table = Table(
     Column("modelo_id", ForeignKey("models.id"), nullable=False),
     Column("observacion", Text),
     Column("estado", Integer, nullable=False, default=0, server_default=FALSE, index=True),
-    Column("motivo_ingreso", _str_enum(EntryReason), nullable=False),
+    Column("motivo_ingreso", StrEnumList(EntryReason), nullable=False),  # one or more, comma separated
     Column("tipo_display", _str_enum(DisplayType)),  # only for CAMBIO_DISPLAY
     Column("garantia_dias", Integer, nullable=False, default=0, server_default=FALSE),  # tiempo de garantía
     Column("bloqueo_tipo", _str_enum(LockType), nullable=False, server_default=text("'NINGUNO'")),
@@ -498,7 +519,16 @@ def start_mappers() -> None:
             "work_order": relationship(WorkOrder, lazy="selectin", viewonly=True),
         },
     )
-    mapper_registry.map_imperatively(Brand, brands_table)
+    modelos_count = (
+        select(func.count(models_table.c.id))
+        .where(models_table.c.brand_id == brands_table.c.id)
+        .correlate_except(models_table)
+        .scalar_subquery()
+    )
+    mapper_registry.map_imperatively(
+        # Read-only. Deferred: brands are joined into models and orders, only the brand list needs it.
+        Brand, brands_table, properties={"modelos_count": column_property(modelos_count, deferred=True)}
+    )
     mapper_registry.map_imperatively(
         DeviceModel, models_table, properties={"brand": relationship(Brand, lazy="joined")}
     )

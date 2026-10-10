@@ -192,7 +192,7 @@ class WorkOrderData:
     cliente: WorkOrderClientData
     marca_id: int
     modelo_id: int
-    motivo_ingreso: str
+    motivo_ingreso: list[str]  # one or more entry reasons
     presupuesto: Decimal  # costo de reparación
     anticipo: Decimal
     tipo_display: str | None = None  # only for CAMBIO_DISPLAY

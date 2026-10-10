@@ -15,7 +15,7 @@ const order = {
   modelo: { id: 2, nombre: 'A10' },
   modelo_tecnico: null,
   color: null,
-  motivo_ingreso: 'PANTALLA',
+  motivo_ingreso: ['PANTALLA'],
   motivo_ingreso_label: 'Pantalla',
   tipo_display: null,
   bloqueo_tipo: 'NINGUNO',

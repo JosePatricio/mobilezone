@@ -38,7 +38,6 @@ export const NAVIGATION: NavGroup[] = [
       { to: '/inventory', label: 'Inventario', permissions: [P.INVENTORY_VIEW] },
       { to: '/categories', label: 'Categorías', permissions: [P.CATEGORIES_VIEW] },
       { to: '/brands', label: 'Marcas', permissions: [P.BRANDS_VIEW] },
-      { to: '/models', label: 'Modelos', permissions: [P.MODELS_VIEW] },
       { to: '/clients', label: 'Clientes', permissions: [P.CLIENTS_VIEW] },
     ],
   },

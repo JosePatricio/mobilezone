@@ -7,7 +7,7 @@ from typing import Generic, TypeVar
 
 from sqlalchemy import Select, and_, case, func, or_, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, undefer
 
 from app.domain import repositories as ports
 from app.domain.entities import (
@@ -393,7 +393,7 @@ class SqlAlchemyBrandRepository(SqlAlchemyRepository[Brand], ports.BrandReposito
 
     def list(self, page, *, search=None, estado=None):
         c = brands_table.c
-        stmt = select(Brand)
+        stmt = select(Brand).options(undefer(Brand.modelos_count))
         if search:
             stmt = stmt.where(func.lower(c.nombre).like(_like(search), escape="\\"))
         if estado is not None:

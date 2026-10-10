@@ -10,7 +10,7 @@ import { Button, Card, Input, Modal, MoneyInput, Select, Textarea } from '@/shar
 import { Combobox } from '@/shared/components/Combobox';
 import { useOptions } from '@/shared/hooks/useCrud';
 import { getErrorMessage, toApiError } from '@/shared/services/apiError';
-import { fromDateTimeLocal, fullName, toDateTimeLocal } from '@/shared/utils/format';
+import { fromDateTimeLocal, toDateTimeLocal } from '@/shared/utils/format';
 import { cleanIdentificacion, isValidIdentificacion, zCelular, zIdentificacion } from '@/shared/utils/identification';
 import { calculateBalance, formatMoney, isValidMoney, toCents } from '@/shared/utils/money';
 import { type FormShape, zodForm, applyServerErrors, zMoney, zOptionalEmail, zOptionalId, zOptionalText, zRequiredId, zText } from '@/shared/utils/validation';
@@ -39,7 +39,7 @@ export const workOrderSchema = z
     modelo_id: zRequiredId('Seleccione un modelo'),
     color: zOptionalText(50),
     modelo_tecnico: zOptionalText(50),
-    motivo_ingreso: z.string().min(1, 'Seleccione el motivo de ingreso'),
+    motivo_ingreso: z.array(z.string()).min(1, 'Seleccione al menos un motivo de ingreso'),
     tipo_display: z.string().optional().transform((v) => (v ? v : null)),
     garantia_dias: z.preprocess(
       (v) => (v === '' || v === null || v === undefined ? 0 : Number(v)),
@@ -64,7 +64,7 @@ export const workOrderSchema = z
     if (toCents(v.anticipo) > toCents(v.presupuesto)) {
       ctx.addIssue({ code: 'custom', path: ['anticipo'], message: 'El anticipo no puede ser mayor que el costo de reparación' });
     }
-    if (v.motivo_ingreso === DISPLAY_CHANGE && !v.tipo_display) {
+    if (v.motivo_ingreso.includes(DISPLAY_CHANGE) && !v.tipo_display) {
       ctx.addIssue({ code: 'custom', path: ['tipo_display'], message: 'Seleccione el tipo de display' });
     }
     if (v.bloqueo_tipo === 'PATRON' && parsePattern(v.patron).length < MIN_PATTERN_DOTS) {
@@ -82,7 +82,7 @@ export const workOrderSchema = z
   })
   .transform(({ patron, pin, ...v }) => ({
     ...v,
-    tipo_display: v.motivo_ingreso === DISPLAY_CHANGE ? v.tipo_display : null,
+    tipo_display: v.motivo_ingreso.includes(DISPLAY_CHANGE) ? v.tipo_display : null,
     bloqueo_valor: v.bloqueo_tipo === 'PATRON' ? (patron ?? null) : v.bloqueo_tipo === 'PIN' ? (pin ?? null) : null,
     fecha_entrega: fromDateTimeLocal(v.fecha_entrega),
     fecha_hora: fromDateTimeLocal(v.fecha_hora),
@@ -131,7 +131,7 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
       modelo_id: order?.modelo_id ?? '',
       color: order?.color ?? '',
       modelo_tecnico: order?.modelo_tecnico ?? '',
-      motivo_ingreso: order?.motivo_ingreso ?? '',
+      motivo_ingreso: order?.motivo_ingreso ?? [],
       tipo_display: order?.tipo_display ?? '',
       garantia_dias: order?.garantia_dias ?? 0,
       bloqueo_tipo: order?.bloqueo_tipo ?? 'NINGUNO',
@@ -149,7 +149,8 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
 
   const marcaId = useWatch({ control, name: 'marca_id' });
 
-  // Sucursal (local): its address and phone are printed on the order.
+  // Sucursal (local): its address and phone are printed on the order. Not shown in the form:
+  // a new order takes the user's (or the first) branch, an edited one keeps its own.
   const branches = useQuery({ queryKey: [WORK_ORDERS_KEY, 'branches'], queryFn: workOrderApi.branches, staleTime: 60_000 });
   const branchesLoaded = Boolean(branches.data);
   useEffect(() => {
@@ -160,7 +161,7 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
     setValue('branch_id', current || (order ? '' : (first ?? '')));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchesLoaded]);
-  const motivo = useWatch({ control, name: 'motivo_ingreso' });
+  const motivos = useWatch({ control, name: 'motivo_ingreso' }) as string[] | undefined;
   const bloqueo = useWatch({ control, name: 'bloqueo_tipo' }) as LockType;
   const [presupuesto, anticipo] = useWatch({ control, name: ['presupuesto', 'anticipo'] });
   const brands = useOptions(BRANDS_KEY, brandApi);
@@ -263,12 +264,6 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
 
   const safeMoney = (v: unknown) => (typeof v === 'string' && isValidMoney(v) ? v : '0');
   const saldo = calculateBalance(safeMoney(presupuesto), safeMoney(anticipo));
-  const branchOptions = withCurrent(
-    (branches.data ?? []).map((b) => ({ value: b.id, label: b.nombre })),
-    order?.branch_id ?? undefined,
-    order?.branch?.nombre,
-  );
-  const technician = order ? (order.tecnico ? fullName(order.tecnico) : 'Sin asignar') : `${fullName(user)} (usted)`;
 
   return (
     <form onSubmit={submit} noValidate>
@@ -368,14 +363,15 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
               <Combobox
                 label="Motivo de ingreso"
                 required
+                multiple
                 options={catalogs.motivos_ingreso}
-                value={field.value as string}
+                value={field.value as string[]}
                 onChange={field.onChange}
                 error={fieldState.error?.message}
               />
             )}
           />
-          {motivo === DISPLAY_CHANGE && (
+          {motivos?.includes(DISPLAY_CHANGE) && (
             <Select
               label="Tipo de display"
               required
@@ -457,18 +453,6 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           <Textarea label="Observaciones" rows={4} className="full" error={errors.observacion?.message} {...register('observacion')} />
           <div className="full">
             <PhotoSlots value={photos} onChange={setPhotos} />
-          </div>
-          <Select
-            label="Sucursal"
-            options={branchOptions}
-            placeholder="Seleccione…"
-            hint="Su dirección y teléfono se imprimen en la orden"
-            error={errors.branch_id?.message}
-            {...register('branch_id')}
-          />
-          <div className="field">
-            <span className="field-label">Vendedor</span>
-            <p className="readonly-value">{technician}</p>
           </div>
           <Input
             label="Fecha de entrega"

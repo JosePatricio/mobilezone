@@ -47,7 +47,8 @@ export interface WorkOrderListItem {
   modelo: NamedRef;
   estado: number;
   estado_label: string;
-  motivo_ingreso: string;
+  /** One or more entry reasons. */
+  motivo_ingreso: string[];
   motivo_ingreso_label: string;
   tipo_display: string | null;
   /** Tiempo de garantía in days (0 = sin garantía). */
@@ -146,7 +147,8 @@ export interface WorkOrderRequest {
   modelo_id: Id;
   color: string | null;
   modelo_tecnico: string | null;
-  motivo_ingreso: string;
+  /** One or more entry reasons. */
+  motivo_ingreso: string[];
   tipo_display: string | null;
   garantia_dias: number;
   bloqueo_tipo: LockType;
@@ -172,7 +174,8 @@ export interface PublicWorkOrder {
   marca: NamedRef;
   modelo: NamedRef;
   color: string | null;
-  motivo_ingreso: string;
+  /** One or more entry reasons. */
+  motivo_ingreso: string[];
   motivo_ingreso_label: string;
   tipo_display: string | null;
   garantia_dias: number;

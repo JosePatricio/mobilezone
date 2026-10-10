@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { usePermission } from '@/modules/auth/components/Can';
@@ -41,7 +42,9 @@ export function ModelsPage() {
   const canCreate = usePermission(P.MODELS_CREATE);
   const canUpdate = usePermission(P.MODELS_UPDATE);
   const canDelete = usePermission(P.MODELS_DELETE);
-  const list = useListParams<{ brand_id: string; estado: string }>({ brand_id: '', estado: '' });
+  // Opened from Marcas (the name of a brand): filtered by that brand.
+  const [searchParams] = useSearchParams();
+  const list = useListParams<{ brand_id: string; estado: string }>({ brand_id: searchParams.get('brand_id') ?? '', estado: '' });
   const query = useCrudList(MODELS_KEY, modelApi, list.params);
   const brands = useOptions(BRANDS_KEY, brandApi);
   const mutations = useCrudMutations(MODELS_KEY, modelApi);
@@ -96,7 +99,9 @@ export function ModelsPage() {
 
   return (
     <>
-      <PageHeader title="Modelos" actions={canCreate && <Button onClick={() => setEditing(null)}>Nuevo modelo</Button>} />
+      <PageHeader title="Modelos" actions={canCreate && <Button onClick={() => setEditing(null)}>Nuevo modelo</Button>}>
+        <Link to="/brands">← Volver a Marcas</Link>
+      </PageHeader>
       <div className="toolbar">
         <SearchInput value={list.search} onChange={list.setSearch} placeholder="Buscar modelo…" />
         <Select

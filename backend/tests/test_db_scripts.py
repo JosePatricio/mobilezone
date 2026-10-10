@@ -711,3 +711,46 @@ def test_upgrade_016_reception_date_and_time(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_017_several_entry_reasons(mysql_engine: Engine):
+    """v16 database with an order -> upgrade 017 keeps its reason and accepts a list of reasons."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (
+        initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005, sql.UPGRADE_006, sql.UPGRADE_007,
+        sql.UPGRADE_008, sql.UPGRADE_009, sql.UPGRADE_010, sql.UPGRADE_011, sql.UPGRADE_012, sql.UPGRADE_013,
+        sql.UPGRADE_014, sql.UPGRADE_015, sql.UPGRADE_016,
+    )
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+            q = conn.exec_driver_sql
+            q("INSERT IGNORE INTO roles (nombre) VALUES ('ADMIN')")
+            q(
+                "INSERT INTO users (nombre, apellido, email, password, rol_id) VALUES "
+                "('A','A','a@x.com','h',(SELECT id FROM roles WHERE nombre='ADMIN'))"
+            )
+            q("INSERT INTO brands (nombre) VALUES ('Samsung')")
+            q("INSERT INTO models (brand_id, nombre) VALUES ((SELECT id FROM brands), 'A10')")
+            q(
+                "INSERT INTO work_orders (user_id, cliente_id, marca_id, modelo_id, estado, motivo_ingreso, "
+                "codigo_publico, presupuesto, anticipo, saldo, fecha) VALUES "
+                "((SELECT id FROM users), (SELECT id FROM users), (SELECT id FROM brands), (SELECT id FROM models), "
+                "0, 'BATERIA', 'c1', 10, 0, 10, '2026-09-01')"
+            )
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_017)
+            many = "CAMBIO_DISPLAY,PANTALLA,PIN_CARGA,BATERIA,TAPA,CRISTAL_CAMARA,GLASS,DIAGNOSTICO,OTROS"
+            conn.exec_driver_sql(f"UPDATE work_orders SET motivo_ingreso = '{many}' WHERE codigo_publico = 'c1'")
+        with mysql_engine.connect() as conn:
+            assert conn.exec_driver_sql("SELECT motivo_ingreso FROM work_orders").scalar() == many
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

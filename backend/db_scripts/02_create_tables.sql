@@ -277,7 +277,7 @@ CREATE TABLE work_orders (
     modelo_id   INTEGER       NOT NULL,
     observacion TEXT,
     estado      INTEGER       NOT NULL DEFAULT 0 COMMENT '0 Recibido | 1 En proceso | 2 Finalizado (closed, sale registered)',
-    motivo_ingreso VARCHAR(30) NOT NULL COMMENT 'CAMBIO_DISPLAY | PIN_CARGA | BATERIA | TAPA | ... | OTROS',
+    motivo_ingreso VARCHAR(255) NOT NULL COMMENT 'one or more, comma separated: CAMBIO_DISPLAY,PIN_CARGA,BATERIA,TAPA,...,OTROS',
     tipo_display   VARCHAR(30)          COMMENT 'INCELL | OLED | ORIGINAL (only for CAMBIO_DISPLAY)',
     garantia_dias  INTEGER     NOT NULL DEFAULT 0 COMMENT 'tiempo de garantia in days (0 = sin garantia)',
     bloqueo_tipo   VARCHAR(30) NOT NULL DEFAULT 'NINGUNO' COMMENT 'NINGUNO | PATRON | PIN',

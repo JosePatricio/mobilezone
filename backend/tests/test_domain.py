@@ -22,6 +22,7 @@ from app.domain.value_objects import identificacion as identificacion_module
 from app.domain.value_objects.identificacion import normalize_identificacion
 from app.domain.value_objects.locations import PROVINCES, validate_location
 from app.domain.value_objects.money import to_money
+from app.domain.value_objects.work_orders import DisplayType, EntryReason, entry_reasons_label, validate_entry
 
 
 def make_product(precio: str = "10.00") -> Product:
@@ -211,6 +212,29 @@ class TestWorkOrderBalance:
         order = WorkOrder(user_id=1, cliente_id=2, marca_id=1, modelo_id=1)
         order.add_spare_part(WorkOrderSparePart(spare_part_id=1, technician_id=3, cantidad=2, precio=Decimal("10")))
         assert order.spare_parts_total == Decimal("20.00")
+
+
+class TestEntryReasons:
+    def test_one_or_more_reasons(self):
+        assert validate_entry("BATERIA", None) == ([EntryReason.BATERIA], None)  # a single code is accepted
+        assert validate_entry(["TAPA", "BATERIA", "TAPA"], None) == ([EntryReason.TAPA, EntryReason.BATERIA], None)
+        assert entry_reasons_label([EntryReason.TAPA, EntryReason.BATERIA]) == "Tapa, Batería"
+
+    def test_at_least_one_reason(self):
+        with pytest.raises(ValidationError) as exc:
+            validate_entry([], None)
+        assert exc.value.code == "ENTRY_REASON_REQUIRED"
+
+    def test_display_type_only_with_display_change(self):
+        with pytest.raises(ValidationError) as exc:
+            validate_entry(["BATERIA", "CAMBIO_DISPLAY"], None)
+        assert exc.value.code == "DISPLAY_TYPE_REQUIRED"
+        assert validate_entry(["BATERIA", "CAMBIO_DISPLAY"], "OLED")[1] == DisplayType.OLED
+        assert validate_entry(["BATERIA"], "OLED")[1] is None
+
+    def test_invalid_reason(self):
+        with pytest.raises(ValidationError):
+            validate_entry(["BATERIA", "NOPE"], None)
 
 
 class TestUser:

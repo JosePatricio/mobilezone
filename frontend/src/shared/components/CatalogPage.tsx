@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useCrudList, useCrudMutations } from '@/shared/hooks/useCrud';
@@ -41,27 +41,41 @@ const schema = z.object({
 type FormInput = FormShape<typeof schema>;
 type FormOutput = z.output<typeof schema>;
 
-interface CatalogPageProps {
+interface CatalogPageProps<T extends CatalogItem> {
   title: string;
   entityLabel: string;
   queryKey: string;
-  api: CrudApi<CatalogItem, CatalogRequest>;
+  api: CrudApi<T, CatalogRequest>;
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
+  /** Content of the name cell (e.g. a link); defaults to the plain name. */
+  renderName?: (item: T) => ReactNode;
+  /** Columns shown after the description. */
+  extraColumns?: Column<T>[];
 }
 
 /** Generic list + form screen for simple catalogs (nombre / descripción / estado). */
-export function CatalogPage({ title, entityLabel, queryKey, api, canCreate, canUpdate, canDelete }: CatalogPageProps) {
+export function CatalogPage<T extends CatalogItem>({
+  title,
+  entityLabel,
+  queryKey,
+  api,
+  canCreate,
+  canUpdate,
+  canDelete,
+  renderName = (r) => r.nombre,
+  extraColumns = [],
+}: CatalogPageProps<T>) {
   const list = useListParams<{ estado: string }>({ estado: '' });
   const query = useCrudList(queryKey, api, list.params);
   const mutations = useCrudMutations(queryKey, api);
   const toggleStatus = useStatusToggle(mutations.setStatus, `la ${entityLabel}`);
   const confirm = useConfirm();
   const toast = useToast();
-  const [editing, setEditing] = useState<CatalogItem | null | undefined>(undefined);
+  const [editing, setEditing] = useState<T | null | undefined>(undefined);
 
-  const onDelete = async (item: CatalogItem) => {
+  const onDelete = async (item: T) => {
     const ok = await confirm({
       title: `Eliminar ${entityLabel}`,
       message: `¿Está seguro de que desea eliminar "${item.nombre}"? Esta acción no se puede deshacer.`,
@@ -77,10 +91,11 @@ export function CatalogPage({ title, entityLabel, queryKey, api, canCreate, canU
     }
   };
 
-  const columns: Column<CatalogItem>[] = [
+  const columns: Column<T>[] = [
     { key: 'id', header: 'ID', render: (r) => r.id, sortValue: (r) => r.id },
-    { key: 'nombre', header: 'Nombre', render: (r) => r.nombre, sortValue: (r) => r.nombre.toLowerCase() },
+    { key: 'nombre', header: 'Nombre', render: renderName, sortValue: (r) => r.nombre.toLowerCase() },
     { key: 'descripcion', header: 'Descripción', render: (r) => r.descripcion ?? '—' },
+    ...extraColumns,
     { key: 'estado', header: 'Estado', render: (r) => <StatusBadge active={r.estado} /> },
     {
       key: 'acciones',

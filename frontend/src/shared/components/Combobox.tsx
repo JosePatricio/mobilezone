@@ -1,16 +1,29 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { SelectOption } from './Select';
 
-interface ComboboxProps {
+interface BaseProps {
   label: string;
   options: SelectOption[];
-  value: string | number | null | undefined;
-  onChange: (value: string) => void;
   placeholder?: string;
   error?: string;
   required?: boolean;
   disabled?: boolean;
 }
+
+interface SingleProps extends BaseProps {
+  multiple?: false;
+  value: string | number | null | undefined;
+  onChange: (value: string) => void;
+}
+
+/** Several options can be chosen: the list stays open and each click toggles an option. */
+interface MultipleProps extends BaseProps {
+  multiple: true;
+  value: string[] | null | undefined;
+  onChange: (value: string[]) => void;
+}
+
+type ComboboxProps = SingleProps | MultipleProps;
 
 const normalize = (text: string) =>
   text
@@ -19,14 +32,18 @@ const normalize = (text: string) =>
     .toLowerCase();
 
 /** Select with a search box (filters the options while typing; accents are ignored). */
-export function Combobox({ label, options, value, onChange, placeholder = 'Seleccione…', error, required, disabled }: ComboboxProps) {
+export function Combobox(props: ComboboxProps) {
+  const { label, options, placeholder = 'Seleccione…', error, required, disabled } = props;
   const id = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [active, setActive] = useState(0);
-  const selected = options.find((o) => String(o.value) === String(value ?? ''));
+  const values = props.multiple ? (props.value ?? []).map(String) : props.value ? [String(props.value)] : [];
+  const isSelected = (option: SelectOption) => values.includes(String(option.value));
+  // Labels in the order they were chosen.
+  const selectedLabels = values.map((v) => options.find((o) => String(o.value) === v)?.label).filter(Boolean);
 
   const filtered = useMemo(() => {
     const q = normalize(search.trim());
@@ -47,7 +64,12 @@ export function Combobox({ label, options, value, onChange, placeholder = 'Selec
 
   const choose = (option: SelectOption | undefined) => {
     if (!option) return;
-    onChange(String(option.value));
+    const value = String(option.value);
+    if (props.multiple) {
+      props.onChange(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+      return;
+    }
+    props.onChange(value);
     setOpen(false);
   };
 
@@ -83,8 +105,8 @@ export function Combobox({ label, options, value, onChange, placeholder = 'Selec
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
       >
-        <span id={`${id}-value`} className={selected ? '' : 'muted'}>
-          {selected?.label ?? placeholder}
+        <span id={`${id}-value`} className={selectedLabels.length ? '' : 'muted'}>
+          {selectedLabels.length ? selectedLabels.join(', ') : placeholder}
         </span>
         <span aria-hidden>▾</span>
       </button>
@@ -104,18 +126,29 @@ export function Combobox({ label, options, value, onChange, placeholder = 'Selec
             }}
             onKeyDown={onKey}
           />
-          <ul id={`${id}-list`} role="listbox" aria-labelledby={`${id}-label`} className="combobox-list">
+          <ul
+            id={`${id}-list`}
+            role="listbox"
+            aria-labelledby={`${id}-label`}
+            aria-multiselectable={props.multiple || undefined}
+            className="combobox-list"
+          >
             {filtered.length === 0 && <li className="muted combobox-empty">Sin resultados</li>}
             {filtered.map((option, i) => (
               <li
                 key={option.value}
                 role="option"
-                aria-selected={String(option.value) === String(value ?? '')}
+                aria-selected={isSelected(option)}
                 className={i === active ? 'active' : ''}
                 onMouseEnter={() => setActive(i)}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => choose(option)}
               >
+                {props.multiple && (
+                  <span className="combobox-check" aria-hidden>
+                    {isSelected(option) ? '✓' : ''}
+                  </span>
+                )}
                 {option.label}
               </li>
             ))}

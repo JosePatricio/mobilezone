@@ -86,25 +86,27 @@ const affiliateAuth = () =>
   });
 
 describe('AffiliatePartsPage', () => {
-  it('lists the parts of the affiliate with their address and a public link per part', async () => {
+  it('lists the parts of the affiliate with a public link per part', async () => {
     renderWithProviders(<AffiliatePartsPage />, { auth: affiliateAuth() });
     expect(await screen.findByText('Samsung A10')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Mis repuestos' })).toBeInTheDocument();
-    expect(screen.getByText('Av. Amazonas N24-12')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver' })).toHaveAttribute('href', '/repuestos/7');
-    // Only the administrator sees the visits, the catalog link and the affiliate column.
+    // The visits and published address boxes are not shown; only the administrator sees the
+    // catalog link and the affiliate column.
     expect(screen.queryByText('Visitas al catálogo público')).not.toBeInTheDocument();
+    expect(screen.queryByText('Dirección publicada')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Ver catálogo público' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /Afiliado/ })).not.toBeInTheDocument();
     expect(api.visits).not.toHaveBeenCalled();
   });
 
-  it('the administrator sees the visits and the public catalog', async () => {
+  it('the administrator sees the public catalog link (no visits box)', async () => {
     const admin = fakeAuth({ permissionCodes: [P.AFFILIATE_PARTS_MANAGE, P.AFFILIATE_PARTS_ANY] });
     renderWithProviders(<AffiliatePartsPage />, { auth: admin });
-    expect(await screen.findByText('12')).toBeInTheDocument();
-    expect(screen.getByText('Visitas al catálogo público')).toBeInTheDocument();
+    expect(await screen.findByText('Samsung A10')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver catálogo público' })).toHaveAttribute('href', '/repuestos');
+    expect(screen.queryByText('Visitas al catálogo público')).not.toBeInTheDocument();
+    expect(screen.queryByText('Dirección publicada')).not.toBeInTheDocument();
   });
 
   it('publishes a new spare part', async () => {
@@ -157,7 +159,6 @@ describe('PublicAffiliatePartsPage', () => {
   it('shows the parts of every affiliate with their address and counts the visit once', async () => {
     renderWithProviders(<PublicAffiliatePartsPage />, { auth: fakeAuth({ status: 'anonymous', user: null }) });
     expect(await screen.findByRole('heading', { name: 'Display' })).toBeInTheDocument();
-    expect(screen.getByText('Av. Amazonas N24-12')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '0991234567' })).toHaveAttribute('href', 'tel:0991234567');
     expect(screen.getByRole('link', { name: 'Display' })).toHaveAttribute('href', '/repuestos/7');
     expect(api.registerVisit).toHaveBeenCalledTimes(1);
@@ -181,7 +182,6 @@ describe('PublicAffiliatePartPage', () => {
     renderDetail('/repuestos/7');
     expect(await screen.findByRole('heading', { name: 'Display' })).toBeInTheDocument();
     expect(screen.getByText('Samsung A10')).toBeInTheDocument();
-    expect(screen.getByText('Av. Amazonas N24-12')).toBeInTheDocument();
     expect(api.publicGet).toHaveBeenCalledWith(7);
     expect(screen.getByRole('link', { name: 'Ver todos los repuestos' })).toHaveAttribute('href', '/repuestos');
   });

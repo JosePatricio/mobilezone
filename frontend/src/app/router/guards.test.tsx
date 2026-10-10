@@ -77,7 +77,7 @@ describe('navigation', () => {
     const groups = visibleNavigation(fakeAuth({ permissionCodes: all }).hasAnyPermission);
     expect(groups.map((g) => [g.label ?? null, g.items.map((i) => i.label)])).toEqual([
       [null, ['Dashboard', 'Órdenes', 'Ventas', 'Repuestos afiliados']],
-      ['Comercial', ['Productos', 'Inventario', 'Categorías', 'Marcas', 'Modelos', 'Clientes']],
+      ['Comercial', ['Productos', 'Inventario', 'Categorías', 'Marcas', 'Clientes']],
       ['Configuración', ['Usuarios', 'Sucursales', 'Roles', 'Permisos', 'Metas de venta']],
     ]);
     expect(groups.filter((g) => g.collapsible).map((g) => g.label)).toEqual(['Comercial', 'Configuración']);

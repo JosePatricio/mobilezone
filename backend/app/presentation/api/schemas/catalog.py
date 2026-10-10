@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import StringConstraints
+from pydantic import Field, StringConstraints
 
 from app.presentation.api.schemas.common import Description, Money, Name, RequestSchema, Schema
 
@@ -35,7 +35,7 @@ class BrandSummary(Schema):
 
 
 class BrandResponse(CategoryResponse):
-    pass
+    modelos_count: int = Field(default=0, description="Número de modelos asignados a la marca")
 
 
 class DeviceModelRequest(CatalogRequest):

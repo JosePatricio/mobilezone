@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
@@ -117,7 +118,7 @@ class WorkOrder:
     cliente_id: int  # client (users table, role CLIENTE)
     marca_id: int
     modelo_id: int
-    motivo_ingreso: EntryReason = EntryReason.OTROS
+    motivo_ingreso: list[EntryReason] = field(default_factory=lambda: [EntryReason.OTROS])  # one or more
     tipo_display: DisplayType | None = None  # only for CAMBIO_DISPLAY
     garantia_dias: int = 0  # tiempo de garantía in days (0 = sin garantía)
     bloqueo_tipo: LockType = LockType.NINGUNO
@@ -181,7 +182,7 @@ class WorkOrder:
     def set_amounts(self, presupuesto: Decimal, anticipo: Decimal) -> None:
         self.presupuesto, self.anticipo, self.saldo = calculate_balance(presupuesto, anticipo)
 
-    def set_entry(self, motivo_ingreso: str, tipo_display: str | None) -> None:
+    def set_entry(self, motivo_ingreso: str | Iterable[str], tipo_display: str | None) -> None:
         self.motivo_ingreso, self.tipo_display = validate_entry(motivo_ingreso, tipo_display)
 
     def set_lock(self, tipo: str, valor: str | None) -> None:

@@ -6,6 +6,7 @@ frontend never hardcodes them.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from enum import Enum
 
 from app.domain.exceptions import ValidationError
@@ -101,18 +102,37 @@ def _parse(enum_cls, value, field: str, message: str):
         raise ValidationError(message, code="INVALID_OPTION", details={"field": field}) from exc
 
 
-def validate_entry(motivo: str, tipo_display: str | None) -> tuple[EntryReason, DisplayType | None]:
-    """The display type is required for ``CAMBIO_DISPLAY`` and not allowed otherwise."""
-    reason = _parse(EntryReason, motivo, "motivo_ingreso", "Seleccione un motivo de ingreso válido.")
-    if reason == EntryReason.CAMBIO_DISPLAY:
+def validate_entry(
+    motivos: str | Iterable[str], tipo_display: str | None
+) -> tuple[list[EntryReason], DisplayType | None]:
+    """One or more entry reasons (duplicates removed, order kept).
+
+    The display type is required when ``CAMBIO_DISPLAY`` is among them and not allowed otherwise.
+    """
+    values = [motivos] if isinstance(motivos, str) else list(motivos or [])
+    reasons: list[EntryReason] = []
+    for value in values:
+        reason = _parse(EntryReason, value, "motivo_ingreso", "Seleccione un motivo de ingreso válido.")
+        if reason not in reasons:
+            reasons.append(reason)
+    if not reasons:
+        raise ValidationError(
+            "Seleccione al menos un motivo de ingreso.", code="ENTRY_REASON_REQUIRED", details={"field": "motivo_ingreso"}
+        )
+    if EntryReason.CAMBIO_DISPLAY in reasons:
         if not tipo_display:
             raise ValidationError(
                 "Seleccione el tipo de display (INCELL, OLED u ORIGINAL).",
                 code="DISPLAY_TYPE_REQUIRED",
                 details={"field": "tipo_display"},
             )
-        return reason, _parse(DisplayType, tipo_display, "tipo_display", "Tipo de display inválido.")
-    return reason, None
+        return reasons, _parse(DisplayType, tipo_display, "tipo_display", "Tipo de display inválido.")
+    return reasons, None
+
+
+def entry_reasons_label(reasons: Iterable[EntryReason]) -> str:
+    """Labels of the entry reasons, comma separated (orders, printouts, public page)."""
+    return ", ".join(ENTRY_REASON_LABELS[EntryReason(r)] for r in reasons)
 
 
 def validate_lock(tipo: str, valor: str | None) -> tuple[LockType, str | None]:

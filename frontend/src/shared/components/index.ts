@@ -1,4 +1,5 @@
 export { Button } from './Button';
+export { ActionsMenu, type MenuAction } from './ActionsMenu';
 export { FormField, Input, Textarea } from './FormField';
 export { Select, STATUS_FILTER_OPTIONS, type SelectOption } from './Select';
 export { Checkbox } from './Checkbox';

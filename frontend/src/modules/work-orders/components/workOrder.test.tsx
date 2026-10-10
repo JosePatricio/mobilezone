@@ -24,7 +24,7 @@ const valid = {
   modelo_id: '2',
   color: 'Negro',
   modelo_tecnico: ' SM-A105M ',
-  motivo_ingreso: 'BATERIA',
+  motivo_ingreso: ['BATERIA'],
   tipo_display: '',
   garantia_dias: '30',
   bloqueo_tipo: 'NINGUNO',
@@ -77,10 +77,15 @@ describe('work order form validation', () => {
     expect(result.error?.issues[0].path).toEqual(['anticipo']);
   });
 
+  it('requires at least one entry reason', () => {
+    const result = workOrderSchema.safeParse({ ...valid, motivo_ingreso: [] });
+    expect(result.error?.issues[0].path).toEqual(['motivo_ingreso']);
+  });
+
   it('requires the display type only for a display change', () => {
-    const missing = workOrderSchema.safeParse({ ...valid, motivo_ingreso: 'CAMBIO_DISPLAY' });
+    const missing = workOrderSchema.safeParse({ ...valid, motivo_ingreso: ['BATERIA', 'CAMBIO_DISPLAY'] });
     expect(missing.error?.issues[0].path).toEqual(['tipo_display']);
-    const ok = workOrderSchema.parse({ ...valid, motivo_ingreso: 'CAMBIO_DISPLAY', tipo_display: 'OLED' });
+    const ok = workOrderSchema.parse({ ...valid, motivo_ingreso: ['BATERIA', 'CAMBIO_DISPLAY'], tipo_display: 'OLED' });
     expect(ok.tipo_display).toBe('OLED');
     expect(workOrderSchema.parse({ ...valid, tipo_display: 'OLED' }).tipo_display).toBeNull();
   });
@@ -217,5 +222,18 @@ describe('searchable select (motivo de ingreso)', () => {
     await userEvent.keyboard('{Enter}');
     expect(selected).toBe('CRISTAL_CAMARA');
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('toggles several options when multiple', async () => {
+    const onChange = vi.fn();
+    render(<Combobox label="Motivo de ingreso" multiple options={options} value={['BATERIA']} onChange={onChange} />);
+    expect(screen.getByRole('button', { name: /Motivo de ingreso/ })).toHaveTextContent('Batería');
+    await userEvent.click(screen.getByRole('button', { name: /Motivo de ingreso/ }));
+    expect(screen.getByRole('listbox')).toHaveAttribute('aria-multiselectable', 'true');
+    await userEvent.click(screen.getByRole('option', { name: /Cambio de display/ }));
+    expect(onChange).toHaveBeenLastCalledWith(['BATERIA', 'CAMBIO_DISPLAY']);
+    await userEvent.click(screen.getByRole('option', { name: /Batería/ }));
+    expect(onChange).toHaveBeenLastCalledWith([]);
+    expect(screen.getByRole('listbox')).toBeInTheDocument(); // stays open
   });
 });

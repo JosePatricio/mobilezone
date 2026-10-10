@@ -54,7 +54,7 @@ type FormOutput = z.output<typeof schema>;
 
 /** Module of the affiliates (role TECNICO): they publish and see the spare parts they upload. */
 export function AffiliatePartsPage() {
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const managesAll = hasPermission(P.AFFILIATE_PARTS_ANY);
   const catalogs = useAffiliatePartCatalogs();
   const list = useListParams<{ tipo: string; condicion: string; estado: string }>({
@@ -66,12 +66,6 @@ export function AffiliatePartsPage() {
     queryKey: [AFFILIATE_PARTS_KEY, 'list', list.params],
     queryFn: () => affiliatePartApi.list(list.params),
     placeholderData: keepPreviousData,
-  });
-  // The visit counter and the public catalog link are only for the administrator.
-  const visits = useQuery({
-    queryKey: [AFFILIATE_PARTS_KEY, 'visits'],
-    queryFn: affiliatePartApi.visits,
-    enabled: managesAll,
   });
   const queryClient = useQueryClient();
   const invalidate = () => queryClient.invalidateQueries({ queryKey: [AFFILIATE_PARTS_KEY] });
@@ -200,19 +194,6 @@ export function AffiliatePartsPage() {
       >
         Los repuestos que publica son públicos: todos pueden verlos en el catálogo.
       </PageHeader>
-
-      <div className="stat-grid">
-        {managesAll && (
-          <div className="stat-card stat-info">
-            <span className="stat-label">Visitas al catálogo público</span>
-            <span className="stat-value">{visits.data ?? '—'}</span>
-          </div>
-        )}
-        <div className="stat-card stat-success">
-          <span className="stat-label">Dirección publicada</span>
-          <span>{user?.direccion ?? 'Sin dirección: pida al administrador que la registre en su usuario.'}</span>
-        </div>
-      </div>
 
       <div className="toolbar">
         <SearchInput value={list.search} onChange={list.setSearch} placeholder="Buscar por descripción…" />

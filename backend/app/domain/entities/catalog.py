@@ -30,6 +30,9 @@ class Brand(Activatable):
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
+    if TYPE_CHECKING:
+        modelos_count: int  # read-only: number of models of the brand
+
     def __post_init__(self) -> None:
         self.nombre = require_text(self.nombre, "nombre", 100)
         self.descripcion = optional_text(self.descripcion)

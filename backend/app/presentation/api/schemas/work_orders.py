@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import Field, StringConstraints, computed_field
+from pydantic import BeforeValidator, Field, StringConstraints, computed_field
 
 from app.domain.value_objects.enums import WORK_ORDER_STATUS_LABELS, PaymentMethod, WorkOrderStatus
 from app.domain.value_objects.work_orders import (
@@ -15,10 +15,19 @@ from app.domain.value_objects.work_orders import (
     EntryReason,
     LockType,
     MAX_WARRANTY_DAYS,
+    entry_reasons_label,
 )
 from app.presentation.api.schemas.catalog import BrandSummary, DeviceModelSummary, SparePartSummary
 from app.presentation.api.schemas.common import Money, Name, RequestSchema, Schema, media_url
 from app.presentation.api.schemas.users import Celular, ClientSummary, Identificacion, OptionalEmail, UserSummary
+
+
+def _as_list(value):
+    """A single entry reason (as sent before multiple reasons were allowed) is taken as a list of one."""
+    return [value] if isinstance(value, str) else value
+
+
+EntryReasons = Annotated[list[EntryReason], BeforeValidator(_as_list)]
 
 
 class WorkOrderClientRequest(RequestSchema):
@@ -42,8 +51,8 @@ class WorkOrderRequest(RequestSchema):
     modelo_tecnico: Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=50)] = Field(
         default=None, description="Modelo técnico del teléfono, p. ej. SM-A105M"
     )
-    motivo_ingreso: EntryReason
-    tipo_display: DisplayType | None = Field(default=None, description="Obligatorio si el motivo es CAMBIO_DISPLAY")
+    motivo_ingreso: EntryReasons = Field(min_length=1, description="Uno o más motivos de ingreso")
+    tipo_display: DisplayType | None = Field(default=None, description="Obligatorio si uno de los motivos es CAMBIO_DISPLAY")
     garantia_dias: int = Field(default=0, ge=0, le=MAX_WARRANTY_DAYS, description="Tiempo de garantía en días (0 = sin garantía)")
     bloqueo_tipo: LockType = LockType.NINGUNO
     bloqueo_valor: Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=20)] = Field(
@@ -203,7 +212,7 @@ class WorkOrderListItem(Schema):
     modelo_id: int
     modelo: DeviceModelSummary
     estado: int
-    motivo_ingreso: EntryReason
+    motivo_ingreso: list[EntryReason]
     tipo_display: DisplayType | None
     garantia_dias: int
     color: str | None
@@ -222,7 +231,7 @@ class WorkOrderListItem(Schema):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def motivo_ingreso_label(self) -> str:
-        return ENTRY_REASON_LABELS[self.motivo_ingreso]
+        return entry_reasons_label(self.motivo_ingreso)
 
 
 class WorkOrderResponse(WorkOrderListItem):
@@ -253,7 +262,7 @@ class PublicWorkOrderResponse(Schema):
     marca: BrandSummary
     modelo: DeviceModelSummary
     color: str | None
-    motivo_ingreso: EntryReason
+    motivo_ingreso: list[EntryReason]
     tipo_display: DisplayType | None
     garantia_dias: int
     presupuesto: Decimal
@@ -270,4 +279,4 @@ class PublicWorkOrderResponse(Schema):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def motivo_ingreso_label(self) -> str:
-        return ENTRY_REASON_LABELS[self.motivo_ingreso]
+        return entry_reasons_label(self.motivo_ingreso)

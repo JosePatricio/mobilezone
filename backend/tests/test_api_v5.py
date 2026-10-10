@@ -73,7 +73,7 @@ class TestWorkOrdersV5:
         assert order["cliente"]["identificacion"] == payload["cliente"]["identificacion"]
         assert order["cliente"]["celular"] == "0991234567"
         assert (order["motivo_ingreso"], order["tipo_display"], order["motivo_ingreso_label"]) == (
-            "CAMBIO_DISPLAY",
+            ["CAMBIO_DISPLAY"],
             "OLED",
             "Cambio de display",
         )
@@ -102,6 +102,23 @@ class TestWorkOrdersV5:
             f"{API}/work-orders", json=self._payload(factory, motivo_ingreso="BATERIA"), headers=admin_headers
         ).json()
         assert other["tipo_display"] is None  # ignored for other reasons
+
+    def test_several_entry_reasons(self, client, admin_headers, factory):
+        payload = self._payload(factory, motivo_ingreso=["BATERIA", "CAMBIO_DISPLAY", "BATERIA"])
+        response = client.post(f"{API}/work-orders", json=payload, headers=admin_headers)
+        assert response.status_code == 201, response.text
+        order = response.json()
+        assert order["motivo_ingreso"] == ["BATERIA", "CAMBIO_DISPLAY"]  # duplicates removed, order kept
+        assert order["motivo_ingreso_label"] == "Batería, Cambio de display"
+        assert order["tipo_display"] == "OLED"  # required because CAMBIO_DISPLAY is among them
+        fetched = client.get(f"{API}/work-orders/{order['id']}", headers=admin_headers).json()
+        assert fetched["motivo_ingreso"] == ["BATERIA", "CAMBIO_DISPLAY"]
+        listed = client.get(f"{API}/work-orders", headers=admin_headers).json()["items"]
+        assert next(o for o in listed if o["id"] == order["id"])["motivo_ingreso_label"] == "Batería, Cambio de display"
+
+    def test_entry_reason_required(self, client, admin_headers, factory):
+        response = client.post(f"{API}/work-orders", json=self._payload(factory, motivo_ingreso=[]), headers=admin_headers)
+        assert response.status_code == 422
 
     def test_invalid_pin(self, client, admin_headers, factory):
         response = client.post(

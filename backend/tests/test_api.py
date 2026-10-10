@@ -119,6 +119,14 @@ class TestCatalog:
         assert [m["id"] for m in body["items"]] == [model.id]
         assert body["items"][0]["brand"]["nombre"] == brand.nombre
 
+    def test_brands_count_their_models(self, client, admin_headers, factory):
+        brand, _ = factory.brand_and_model()
+        client.post(f"{API}/models", json={"brand_id": brand.id, "nombre": "Otro"}, headers=admin_headers)
+        empty = client.post(f"{API}/brands", json={"nombre": "Sin modelos"}, headers=admin_headers).json()
+        items = client.get(f"{API}/brands", params={"size": 100}, headers=admin_headers).json()["items"]
+        counts = {b["id"]: b["modelos_count"] for b in items}
+        assert counts[brand.id] == 2 and counts[empty["id"]] == 0
+
     def test_spare_part_crud(self, client, admin_headers):
         created = client.post(
             f"{API}/spare-parts",

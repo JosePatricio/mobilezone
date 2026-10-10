@@ -38,7 +38,7 @@ const publicOrder: PublicWorkOrder = {
   marca: { id: 1, nombre: 'Samsung' },
   modelo: { id: 2, nombre: 'A10' },
   color: 'Azul',
-  motivo_ingreso: 'CAMBIO_DISPLAY',
+  motivo_ingreso: ['CAMBIO_DISPLAY'],
   motivo_ingreso_label: 'Cambio de display',
   tipo_display: 'OLED',
   garantia_dias: 30,
@@ -99,8 +99,8 @@ describe('WorkOrderForm', () => {
     expect(screen.getByLabelText(/Celular/)).toHaveValue('0991234567');
     // The client has no email: it can be entered here.
     expect(screen.getByLabelText(/^Email/)).not.toHaveAttribute('readonly');
-    // The logged user is the technician; there is no date field (today), only the delivery date.
-    expect(screen.getByText('Ana Pérez (usted)')).toBeInTheDocument();
+    // The logged user is the technician (not shown); there is no date field (today), only the delivery date.
+    expect(screen.queryByText('Ana Pérez (usted)')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^Fecha\s*\*?$/)).not.toBeInTheDocument();
     expect(screen.getByLabelText('Fecha de entrega')).toHaveAttribute('type', 'datetime-local');
     // Last field: reception date and time, prefilled with now.
@@ -159,9 +159,13 @@ describe('WorkOrderForm', () => {
     await userEvent.selectOptions(screen.getByLabelText(/Marca/), await screen.findByRole('option', { name: 'Samsung' }));
     await userEvent.selectOptions(screen.getByRole('combobox', { name: /^Modelo/ }), await screen.findByRole('option', { name: 'A10' }));
 
+    // Several entry reasons can be chosen: the list stays open.
     await userEvent.click(screen.getByRole('button', { name: /Motivo de ingreso/ }));
-    await userEvent.click(await screen.findByRole('option', { name: 'Cambio de display' }));
-    // The display type appears only for a display change.
+    await userEvent.click(await screen.findByRole('option', { name: 'Batería' }));
+    await userEvent.click(screen.getByRole('option', { name: /Cambio de display/ }));
+    expect(screen.getByRole('option', { name: /Batería/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: /Motivo de ingreso/ })).toHaveTextContent('Batería, Cambio de display');
+    // The display type appears only when a display change is among the reasons.
     await userEvent.selectOptions(screen.getByLabelText(/Tipo de display/), 'OLED');
 
     const warranty = screen.getByLabelText(/Tiempo de garantía/);
@@ -180,19 +184,19 @@ describe('WorkOrderForm', () => {
     await userEvent.type(advance, '20');
     expect(screen.getByTestId('form-saldo')).toHaveTextContent('60,00');
 
-    // The branch of the user is preselected; another one can be chosen.
-    await vi.waitFor(() => expect(screen.getByLabelText(/^Sucursal/)).toHaveValue('1'));
-    await userEvent.selectOptions(screen.getByLabelText(/^Sucursal/), 'Norte');
+    // Sucursal and Vendedor are not shown: the branch of the user is sent.
+    expect(screen.queryByLabelText(/^Sucursal/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Vendedor')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Crear orden' }));
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0]).toMatchObject({
-      branch_id: 3,
+      branch_id: 1,
       cliente: { identificacion: '0102030400', nombre: 'Ana', apellido: 'Mora', celular: null, email: 'ana@example.com' },
       modelo_tecnico: 'SM-A105M',
       marca_id: 1,
       modelo_id: 2,
-      motivo_ingreso: 'CAMBIO_DISPLAY',
+      motivo_ingreso: ['BATERIA', 'CAMBIO_DISPLAY'],
       tipo_display: 'OLED',
       color: 'Negro',
       garantia_dias: 90,

@@ -195,6 +195,11 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 }
 .page-actions, .row-actions, .quick-links, .form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .row-actions { justify-content: flex-end; }
+/* row actions in a dropdown (ActionsMenu) */
+.actions-menu { display: inline-block; }
+.actions-menu-list { z-index: 40; min-width: 160px; list-style: none; margin: 0; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.actions-menu-list button { display: block; width: 100%; padding: 7px 10px; border: 0; border-radius: 6px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.actions-menu-list button:hover, .actions-menu-list button:focus-visible { background: var(--primary-soft); outline: none; }
 .form-actions { justify-content: flex-end; margin-top: 16px; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; align-items: center; }
 .toolbar .field { margin: 0; min-width: 160px; }
@@ -710,6 +715,8 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .combobox-list li.active { background: var(--primary-soft); }
 .combobox-list li[aria-selected='true'] { font-weight: 600; }
 .combobox-empty { cursor: default; }
+.combobox-trigger > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combobox-check { display: inline-block; width: 1.2em; color: var(--primary); }
 
 .qr-box { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
 .qr-box img { width: 180px; height: 180px; image-rendering: pixelated; }

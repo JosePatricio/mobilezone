@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePermission } from '@/modules/auth/components/Can';
 import {
+  ActionsMenu,
   Button,
   DataList,
   PageHeader,
@@ -119,29 +120,21 @@ export function ProductsPage() {
       key: 'acciones',
       header: 'Acciones',
       align: 'right',
+      // One dropdown instead of a button per action, to save space.
       render: (r) => (
-        <div className="row-actions">
-          {canViewInventory && (
-            <Button size="sm" variant="ghost" onClick={() => setStockOf(r)}>
-              Stock
-            </Button>
-          )}
-          {canUpdate && (
-            <>
-              <Button size="sm" variant="secondary" onClick={() => setEditing(r)}>
-                Editar
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => toggleStatus(r.id, r.estado, r.nombre)}>
-                {r.estado ? 'Desactivar' : 'Activar'}
-              </Button>
-            </>
-          )}
-          {canDelete && (
-            <Button size="sm" variant="ghost" className="text-danger" onClick={() => onDelete(r)}>
-              Eliminar
-            </Button>
-          )}
-        </div>
+        <ActionsMenu
+          label={`Acciones de ${r.nombre}`}
+          actions={[
+            ...(canViewInventory ? [{ label: 'Stock', onClick: () => setStockOf(r) }] : []),
+            ...(canUpdate
+              ? [
+                  { label: 'Editar', onClick: () => setEditing(r) },
+                  { label: r.estado ? 'Desactivar' : 'Activar', onClick: () => toggleStatus(r.id, r.estado, r.nombre) },
+                ]
+              : []),
+            ...(canDelete ? [{ label: 'Eliminar', onClick: () => onDelete(r), danger: true }] : []),
+          ]}
+        />
       ),
     },
   ];
