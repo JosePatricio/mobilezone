@@ -17,6 +17,7 @@ import { useListParams } from '@/shared/hooks/useListParams';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatDateTime, formatOrderNumber, fullName, todayIso } from '@/shared/utils/format';
 import { formatMoney, toCents } from '@/shared/utils/money';
+import { CashOpeningModal } from '../components/CashOpeningModal';
 import { ReceiptViewer } from '../components/ReceiptViewer';
 import { useDeleteSale } from '../hooks/useDeleteSale';
 import { SALES_KEY, saleApi } from '../services/saleApi';
@@ -186,6 +187,7 @@ export function SalesPage() {
         <p className="muted">Puede registrar ventas desde “Nueva venta”.</p>
       )}
       <ReceiptViewer saleId={receiptId} onClose={() => showReceipt(null)} />
+      <CashOpeningModal />
     </>
   );
 }

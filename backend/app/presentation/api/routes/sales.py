@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from app.application.dto import ClientData, ConfirmSaleData, SaleItemData, UpdateSaleData
 from app.application.use_cases.sales import (
     CancelSaleUseCase,
+    CashOpeningUseCases,
     ConfirmSaleUseCase,
     GetSaleReceiptUseCase,
     SaleQueries,
@@ -27,7 +28,14 @@ from app.presentation.api.dependencies import (
     require_permissions,
 )
 from app.presentation.api.schemas.common import PageResponse
-from app.presentation.api.schemas.sales import CreateSaleRequest, SaleResponse, SalesSummaryResponse, UpdateSaleRequest
+from app.presentation.api.schemas.sales import (
+    CashOpeningRequest,
+    CashOpeningResponse,
+    CreateSaleRequest,
+    SaleResponse,
+    SalesSummaryResponse,
+    UpdateSaleRequest,
+)
 from app.presentation.api.schemas.users import ClientRequest, ClientResponse
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -68,6 +76,23 @@ def today_summary(
 ):
     """Sales of the authenticated user today (shown in the header)."""
     return SalesSummaryResponse.model_validate(SaleQueries(uow, _tz(request)).today_summary(actor))
+
+
+CanSell = Annotated[User, Depends(require_permissions(Perm.SALES_CREATE))]
+
+
+@router.get("/cash-opening/today", response_model=CashOpeningResponse | None)
+def today_cash_opening(request: Request, uow: UowDep, actor: CanSell):
+    """Cash opening of the authenticated user today; null = not opened yet (the Ventas screen asks for it)."""
+    opening = CashOpeningUseCases(uow, _tz(request)).today(actor)
+    return CashOpeningResponse.model_validate(opening) if opening else None
+
+
+@router.post("/cash-opening", response_model=CashOpeningResponse, status_code=status.HTTP_201_CREATED)
+def open_cash(body: CashOpeningRequest, request: Request, uow: UowDep, actor: CanSell):
+    """Opens the register for today: branch where the seller works and starting cash (USD) for change."""
+    opening = CashOpeningUseCases(uow, _tz(request)).open(body.branch_id, body.monto_inicial, actor)
+    return CashOpeningResponse.model_validate(opening)
 
 
 @router.get("/customers/lookup", response_model=ClientResponse)

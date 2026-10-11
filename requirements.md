@@ -1,3 +1,2 @@
-En el modulo Modelos
-
-Que salga el Text. Ingresar modelo de la marca (Que aparezca el nombre de la marca que se selecciono), entonces quitar el selector de marcas por que ya estamos dentro
+En el modulo Ventas
+Cuando el usuario entra al modulo de Ventas por primera vez cada dia, abrir un modal para preguntar la sucursal.  EN QUE SUCURSAL ESTAS, y se despliega las opciones, y cuanto tiene en caja, por que le vamos a dar algo en caja para el vuelto o cambio USD del dia.

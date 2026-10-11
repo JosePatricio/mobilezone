@@ -9,8 +9,8 @@ from app.application.dto import ConfirmSaleData, SaleItemData, UpdateSaleData
 from app.application.services.receipts import ReceiptRenderer
 from app.application.use_cases.base import UseCase
 from app.application.use_cases.branch_access import ensure_branch_access
-from app.domain.entities import Inventory, Sale, StockMovement, User
-from app.domain.exceptions import AuthenticationError, NotFoundError, ValidationError
+from app.domain.entities import CashOpening, Inventory, Sale, StockMovement, User
+from app.domain.exceptions import AuthenticationError, ConflictError, NotFoundError, ValidationError
 from app.domain.repositories import UnitOfWork
 from app.domain.value_objects.enums import SaleStatus, StockMovementType
 from app.domain.value_objects.pagination import Page, PageRequest
@@ -234,6 +234,37 @@ class SaleQueries(UseCase):
         desde, hasta = day_range(self.tz, today, today)
         cantidad, total = self.uow.sales.summary(user_id=actor.id, desde=desde, hasta=hasta)  # type: ignore[arg-type]
         return SalesSummary(fecha=today, cantidad=cantidad, total=total)
+
+
+class CashOpeningUseCases(UseCase):
+    """Apertura de caja: once per local day of the shop, each seller says in which branch they
+    are and how much cash (USD) the register starts with to give change."""
+
+    def __init__(self, uow: UnitOfWork, tz: tzinfo = timezone.utc) -> None:
+        super().__init__(uow)
+        self.tz = tz
+
+    def _today(self) -> date:
+        return datetime.now(self.tz).date()
+
+    def today(self, actor: User) -> CashOpening | None:
+        """None = the user has not opened the register today (the sales screen asks for it)."""
+        return self.uow.cash_openings.get_for_day(actor.id, self._today())  # type: ignore[arg-type]
+
+    def open(self, branch_id: int, monto_inicial: Decimal, actor: User) -> CashOpening:
+        with self.uow.transaction():
+            ensure_branch_access(self.uow, actor, branch_id)
+            today = self._today()
+            if self.uow.cash_openings.get_for_day(actor.id, today) is not None:  # type: ignore[arg-type]
+                raise ConflictError("La caja ya fue abierta hoy.", code="CASH_ALREADY_OPENED")
+            opening = CashOpening(
+                user_id=actor.id,  # type: ignore[arg-type]
+                branch_id=branch_id,
+                fecha=today,
+                monto_inicial=monto_inicial,
+            )
+            self.uow.cash_openings.add(opening)
+        return opening
 
 
 class GetSaleReceiptUseCase(UseCase):

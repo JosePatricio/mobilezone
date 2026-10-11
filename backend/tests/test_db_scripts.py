@@ -754,3 +754,48 @@ def test_upgrade_017_several_entry_reasons(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_018_cash_openings(mysql_engine: Engine):
+    """v17 database -> upgrade 018 creates cash_openings: one opening per user and day."""
+    from pathlib import Path
+
+    from sqlalchemy.exc import IntegrityError
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (
+        initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005, sql.UPGRADE_006, sql.UPGRADE_007,
+        sql.UPGRADE_008, sql.UPGRADE_009, sql.UPGRADE_010, sql.UPGRADE_011, sql.UPGRADE_012, sql.UPGRADE_013,
+        sql.UPGRADE_014, sql.UPGRADE_015, sql.UPGRADE_016, sql.UPGRADE_017,
+    )
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+            q = conn.exec_driver_sql
+            q("INSERT IGNORE INTO roles (nombre) VALUES ('ADMIN')")
+            q(
+                "INSERT INTO users (nombre, apellido, email, password, rol_id) VALUES "
+                "('A','A','a@x.com','h',(SELECT id FROM roles WHERE nombre='ADMIN'))"
+            )
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_018)
+            conn.exec_driver_sql(
+                "INSERT INTO cash_openings (user_id, branch_id, fecha, monto_inicial) VALUES "
+                "((SELECT id FROM users), (SELECT MIN(id) FROM branches), '2026-10-10', 20)"
+            )
+        with pytest.raises(IntegrityError), mysql_engine.begin() as conn:
+            conn.exec_driver_sql(
+                "INSERT INTO cash_openings (user_id, branch_id, fecha, monto_inicial) VALUES "
+                "((SELECT id FROM users), (SELECT MIN(id) FROM branches), '2026-10-10', 5)"
+            )
+        with mysql_engine.connect() as conn:
+            assert conn.exec_driver_sql("SELECT monto_inicial FROM cash_openings").scalar() == 20
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)
+

@@ -2,7 +2,14 @@ import type { Client, ClientRequest } from '@/modules/clients/types';
 import { http } from '@/shared/services/httpClient';
 import type { Id, Page, QueryParams } from '@/shared/types/api';
 import { cleanParams } from '@/shared/utils/format';
-import type { CreateSaleRequest, Sale, SalesSummary, UpdateSaleRequest } from '../types';
+import type {
+  CashOpening,
+  CashOpeningRequest,
+  CreateSaleRequest,
+  Sale,
+  SalesSummary,
+  UpdateSaleRequest,
+} from '../types';
 
 export const SALES_KEY = 'sales';
 
@@ -11,6 +18,10 @@ export const saleApi = {
   list: (params: QueryParams = {}) => http.get<Page<Sale>>('/sales', { params: cleanParams(params) }).then((r) => r.data),
   /** Confirmed sales of the logged user today (header). */
   todaySummary: () => http.get<SalesSummary>('/sales/summary/today').then((r) => r.data),
+  /** Cash opening of the logged user today; null = not opened yet (the Ventas module asks for it). */
+  todayCashOpening: () => http.get<CashOpening | null>('/sales/cash-opening/today').then((r) => r.data),
+  /** Opens the register for today: branch and starting cash (USD) for change. */
+  openCash: (body: CashOpeningRequest) => http.post<CashOpening>('/sales/cash-opening', body).then((r) => r.data),
   get: (id: Id) => http.get<Sale>(`/sales/${id}`).then((r) => r.data),
   /** Confirms the sale. The backend validates stock again inside a transaction. */
   confirm: (body: CreateSaleRequest) => http.post<Sale>('/sales', body).then((r) => r.data),

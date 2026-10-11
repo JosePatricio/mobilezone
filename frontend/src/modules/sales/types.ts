@@ -93,6 +93,23 @@ export function customerLabel(cliente: SaleCustomer | null): string {
   return [customerName(cliente), cliente.identificacion, cliente.celular].filter(Boolean).join(', ');
 }
 
+/** Apertura de caja: branch where the seller works today and the starting cash (USD) for change. */
+export interface CashOpening {
+  id: Id;
+  user_id: Id;
+  branch_id: Id;
+  branch: NamedRef;
+  /** local day of the shop */
+  fecha: string;
+  monto_inicial: Money;
+  created_at: string;
+}
+
+export interface CashOpeningRequest {
+  branch_id: Id;
+  monto_inicial: Money;
+}
+
 export interface SalesSummary {
   fecha: string;
   cantidad: number;

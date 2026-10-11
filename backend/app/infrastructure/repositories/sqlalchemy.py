@@ -14,6 +14,7 @@ from app.domain.entities import (
     AffiliatePart,
     Branch,
     Brand,
+    CashOpening,
     Category,
     DeviceModel,
     Inventory,
@@ -32,6 +33,7 @@ from app.infrastructure.database.tables import (
     affiliate_parts_table,
     branches_table,
     brands_table,
+    cash_openings_table,
     categories_table,
     inventory_table,
     models_table,
@@ -578,3 +580,11 @@ class SqlAlchemySettingsRepository(ports.SettingsRepository):
     def set_value(self, clave: str, valor: str) -> None:
         stmt = mysql_insert(settings_table).values(clave=clave, valor=valor)
         self.session.execute(stmt.on_duplicate_key_update(valor=valor))
+
+
+class SqlAlchemyCashOpeningRepository(SqlAlchemyRepository[CashOpening], ports.CashOpeningRepository):
+    entity = CashOpening
+
+    def get_for_day(self, user_id, fecha):
+        c = cash_openings_table.c
+        return self.session.scalars(select(CashOpening).where(c.user_id == user_id, c.fecha == fecha)).first()

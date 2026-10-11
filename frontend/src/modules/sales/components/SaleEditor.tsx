@@ -2,7 +2,6 @@ import { useEffect, useMemo, useReducer, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/app/store/AuthProvider';
-import { useBranchOptions } from '@/modules/branches/services/branchApi';
 import { INVENTORY_KEY } from '@/modules/inventory/services/inventoryApi';
 import { PRODUCTS_KEY } from '@/modules/products/services/productApi';
 import { Button, Card, EmptyState, PageHeader, Select, useConfirm, useToast } from '@/shared/components';
@@ -12,6 +11,7 @@ import type { NamedRef } from '@/shared/types/api';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatMoney, fromCents } from '@/shared/utils/money';
 import { canConfirm, cartReducer, cartTotal, lineExceedsStock, lineSubtotalCents, type CartLine } from '../hooks/saleCart';
+import { useSellableBranches, useTodayCashOpening } from '../hooks/useCashOpening';
 import { SALES_KEY, saleApi } from '../services/saleApi';
 import { customerLabel, documentLabel, type Sale, type SaleCustomer } from '../types';
 import { PaymentDialog, type PaymentResult } from './PaymentDialog';
@@ -31,15 +31,13 @@ interface Props {
  */
 export function SaleEditor({ sale, initialLines }: Props) {
   const editing = Boolean(sale);
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const anyBranch = hasPermission(P.BRANCHES_ANY);
-  const allBranches = useBranchOptions(anyBranch && !editing);
   // Sellers sell from their assigned branches; users with branches.any from any active branch.
-  const branches: NamedRef[] = editing
-    ? [sale!.branch]
-    : anyBranch
-      ? (allBranches.data ?? [])
-      : (user?.branches ?? []);
+  const sellable = useSellableBranches(!editing);
+  const branches: NamedRef[] = editing ? [sale!.branch] : sellable;
+  // New sales start in the branch chosen at today's cash opening (apertura de caja).
+  const openingBranchId = useTodayCashOpening().data?.branch_id;
   const [branchId, setBranchId] = useState<number | null>(sale?.branch_id ?? null);
   const [lines, dispatch] = useReducer(cartReducer, initialLines ?? []);
   const [error, setError] = useState<string | null>(null);
@@ -58,8 +56,15 @@ export function SaleEditor({ sale, initialLines }: Props) {
   );
 
   useEffect(() => {
-    if (branchId === null && branches.length > 0) setBranchId(branches[0].id);
-  }, [branchId, branches]);
+    if (branchId !== null || branches.length === 0) return;
+    setBranchId((branches.find((b) => b.id === openingBranchId) ?? branches[0]).id);
+  }, [branchId, branches, openingBranchId]);
+  // The register is usually opened with this screen already showing: move to that branch while the cart is empty.
+  useEffect(() => {
+    if (editing || openingBranchId === undefined || !branches.some((b) => b.id === openingBranchId)) return;
+    if (lines.length === 0) setBranchId(openingBranchId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openingBranchId]);
   const branchName = branches.find((b) => b.id === branchId)?.nombre;
 
   const mutation = useMutation({

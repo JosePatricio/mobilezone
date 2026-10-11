@@ -34,6 +34,7 @@ from app.domain.entities import (
     AffiliatePart,
     Branch,
     Brand,
+    CashOpening,
     Category,
     DeviceModel,
     Inventory,
@@ -439,6 +440,20 @@ settings_table = Table(
     ),
 )
 
+# Apertura de caja: branch and starting cash (USD, for change) of each seller, once per local day.
+cash_openings_table = Table(
+    "cash_openings",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+    Column("branch_id", ForeignKey("branches.id"), nullable=False, index=True),
+    Column("fecha", Date, nullable=False),  # local day of the shop
+    Column("monto_inicial", MONEY, nullable=False),
+    Column("created_at", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
+    UniqueConstraint("user_id", "fecha", name="uq_cash_openings_user_id_fecha"),
+    CheckConstraint("monto_inicial >= 0", name="monto_inicial_non_negative"),
+)
+
 Index("ix_users_nombre_apellido", users_table.c.nombre, users_table.c.apellido)
 
 # InnoDB (transactions, FKs, row locks for SELECT ... FOR UPDATE) and full Unicode.
@@ -478,6 +493,9 @@ def start_mappers() -> None:
                 Branch, secondary=user_branches_table, lazy="selectin", order_by=branches_table.c.nombre
             ),
         },
+    )
+    mapper_registry.map_imperatively(
+        CashOpening, cash_openings_table, properties={"branch": relationship(Branch, lazy="joined")}
     )
     mapper_registry.map_imperatively(Category, categories_table)
     stock_total = (

@@ -12,6 +12,7 @@ from app.domain.entities import (
     AffiliatePart,
     Branch,
     Brand,
+    CashOpening,
     Category,
     DeviceModel,
     Inventory,
@@ -307,6 +308,16 @@ class SettingsRepository(ABC):
     def set_value(self, clave: str, valor: str) -> None: ...
 
 
+class CashOpeningRepository(ABC):
+    """Daily cash openings (apertura de caja) of the sellers."""
+
+    @abstractmethod
+    def add(self, opening: CashOpening) -> CashOpening: ...
+
+    @abstractmethod
+    def get_for_day(self, user_id: int, fecha: date) -> CashOpening | None: ...
+
+
 class UnitOfWork(ABC):
     """Transaction boundary shared by all repositories of one operation."""
 
@@ -326,6 +337,7 @@ class UnitOfWork(ABC):
     affiliate_parts: AffiliatePartRepository
     page_visits: PageVisitRepository
     settings: SettingsRepository
+    cash_openings: CashOpeningRepository
 
     @abstractmethod
     def flush(self) -> None: ...

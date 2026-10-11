@@ -1,5 +1,6 @@
 from app.domain.entities.affiliate_part import AffiliatePart
 from app.domain.entities.branch import Branch
+from app.domain.entities.cash_opening import CashOpening
 from app.domain.entities.catalog import Brand, Category, DeviceModel
 from app.domain.entities.inventory import Inventory
 from app.domain.entities.product import Product, StockMovement
@@ -18,6 +19,7 @@ __all__ = [
     "AffiliatePart",
     "Branch",
     "Brand",
+    "CashOpening",
     "Category",
     "DeviceModel",
     "Inventory",

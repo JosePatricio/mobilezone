@@ -35,6 +35,9 @@ const listCalls: Record<string, unknown>[] = [];
 vi.mock('../services/saleApi', () => ({
   SALES_KEY: 'sales',
   saleApi: {
+    // The register is already open today (the cash opening modal is tested on its own).
+    todayCashOpening: () =>
+      Promise.resolve({ id: 1, user_id: 1, branch_id: 1, branch: { id: 1, nombre: 'Matriz' }, fecha: '2026-10-10', monto_inicial: '20.00', created_at: '2026-10-10T13:00:00Z' }),
     list: (params: Record<string, unknown>) => {
       listCalls.push(params);
       return Promise.resolve({ items: [sale(1, 'CONFIRMADA'), sale(2, 'ANULADA')], total: 2, page: 1, size: 20, pages: 1 });

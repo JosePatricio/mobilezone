@@ -263,6 +263,23 @@ CREATE TABLE page_visits (
     CONSTRAINT pk_page_visits PRIMARY KEY (pagina)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Apertura de caja: branch and starting cash of each seller, once per local day.
+CREATE TABLE cash_openings (
+    id            INTEGER       NOT NULL AUTO_INCREMENT,
+    user_id       INTEGER       NOT NULL,
+    branch_id     INTEGER       NOT NULL COMMENT 'branch (sucursal) where the seller works that day',
+    fecha         DATE          NOT NULL COMMENT 'local day of the shop',
+    monto_inicial DECIMAL(12,2) NOT NULL COMMENT 'cash (USD) in the register at the start of the day, for change',
+    created_at    DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_cash_openings PRIMARY KEY (id),
+    CONSTRAINT uq_cash_openings_user_id_fecha UNIQUE (user_id, fecha),
+    CONSTRAINT ck_cash_openings_monto_inicial_non_negative CHECK (monto_inicial >= 0),
+    CONSTRAINT fk_cash_openings_user_id_users FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_cash_openings_branch_id_branches FOREIGN KEY (branch_id) REFERENCES branches (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE INDEX ix_cash_openings_branch_id ON cash_openings (branch_id);
+
 -- -----------------------------------------------------------------------------
 -- Work orders
 -- -----------------------------------------------------------------------------

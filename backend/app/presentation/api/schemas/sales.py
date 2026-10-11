@@ -75,3 +75,18 @@ class SalesSummaryResponse(Schema):
     fecha: date
     cantidad: int
     total: Decimal = Field(description="Monto cobrado (total a pagar) de las ventas confirmadas")
+
+
+class CashOpeningRequest(RequestSchema):
+    branch_id: int = Field(description="Sucursal en la que trabaja hoy el vendedor")
+    monto_inicial: Money = Field(description="Efectivo en caja al iniciar el día (USD), para dar cambio")
+
+
+class CashOpeningResponse(Schema):
+    id: int
+    user_id: int
+    branch_id: int
+    branch: BranchRef
+    fecha: date
+    monto_inicial: Decimal
+    created_at: datetime

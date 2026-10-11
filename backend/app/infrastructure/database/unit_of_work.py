@@ -9,6 +9,7 @@ from app.infrastructure.repositories.sqlalchemy import (
     SqlAlchemyAffiliatePartRepository,
     SqlAlchemyBranchRepository,
     SqlAlchemyBrandRepository,
+    SqlAlchemyCashOpeningRepository,
     SqlAlchemyCategoryRepository,
     SqlAlchemyDeviceModelRepository,
     SqlAlchemyInventoryRepository,
@@ -46,6 +47,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.affiliate_parts = SqlAlchemyAffiliatePartRepository(session)
         self.page_visits = SqlAlchemyPageVisitRepository(session)
         self.settings = SqlAlchemySettingsRepository(session)
+        self.cash_openings = SqlAlchemyCashOpeningRepository(session)
 
     def _translate(self, exc: IntegrityError) -> ConflictError:
         return ConflictError(
