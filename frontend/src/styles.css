@@ -655,6 +655,9 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
   cursor: pointer;
 }
 .payment-method.selected { border-color: var(--primary); background: var(--primary-soft); }
+/* Sale lines: PVP or wholesale price (por mayor) */
+.wholesale-check { width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary); }
+.price-type { display: block; font-size: 0.72rem; }
 .payment-breakdown { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; margin: 0; font-variant-numeric: tabular-nums; }
 .payment-breakdown dt { color: var(--muted); }
 .payment-breakdown dd { margin: 0; text-align: right; }

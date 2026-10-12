@@ -8,7 +8,16 @@ export interface CartLine {
   sku: string;
   nombre: string;
   imagenUrl: string | null;
+  /** Unit price of the line: PVP, or the wholesale price when `porMayor` */
   precio: Money;
+  /** Current PVP (precio de venta al público) of the product */
+  precioVenta: Money;
+  /** Current wholesale price (precio al por mayor) of the product */
+  precioMayor: Money;
+  /** Sold at the wholesale price */
+  porMayor: boolean;
+  /** Line of a saved sale: its historical price, kept while the price type does not change (same rule as the backend). */
+  historico?: { precio: Money; porMayor: boolean };
   /** Stock available in the branch */
   stock: number;
   cantidad: number;
@@ -22,10 +31,22 @@ export type CartAction =
   | { type: 'decrement'; inventoryId: Id }
   | { type: 'setQuantity'; inventoryId: Id; cantidad: number }
   | { type: 'remove'; inventoryId: Id }
+  | { type: 'setWholesale'; inventoryId: Id; porMayor: boolean }
   | { type: 'updateStock'; productId: Id; stock: number }
   | { type: 'clear' };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+/** Price of the line for the chosen type: the historical one if the type did not change, else the current one. */
+function withWholesale(line: CartLine, porMayor: boolean): CartLine {
+  const precio =
+    line.historico && line.historico.porMayor === porMayor
+      ? line.historico.precio
+      : porMayor
+        ? line.precioMayor
+        : line.precioVenta;
+  return { ...line, porMayor, precio };
+}
 
 function withQuantity(line: CartLine, cantidad: number): CartLine {
   return { ...line, cantidad: clamp(Math.floor(cantidad) || 1, 1, Math.max(line.stock, 1)) };
@@ -56,6 +77,8 @@ export function cartReducer(lines: CartLine[], action: CartAction): CartLine[] {
       return lines.map((l) => (l.inventoryId === action.inventoryId ? withQuantity(l, action.cantidad) : l));
     case 'remove':
       return lines.filter((l) => l.inventoryId !== action.inventoryId);
+    case 'setWholesale':
+      return lines.map((l) => (l.inventoryId === action.inventoryId ? withWholesale(l, action.porMayor) : l));
     case 'updateStock':
       return lines.map((l) => (l.productId === action.productId ? { ...l, stock: action.stock } : l));
     case 'clear':

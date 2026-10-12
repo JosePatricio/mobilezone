@@ -42,7 +42,7 @@ router = APIRouter(prefix="/sales", tags=["sales"])
 
 
 def _items(body) -> list[SaleItemData]:
-    return [SaleItemData(inventory_id=i.inventory_id, cantidad=i.cantidad) for i in body.items]
+    return [SaleItemData(inventory_id=i.inventory_id, cantidad=i.cantidad, por_mayor=i.por_mayor) for i in body.items]
 
 CanView = Annotated[User, Depends(require_permissions(Perm.SALES_VIEW))]
 

@@ -44,6 +44,7 @@ class InventoryProduct(_WithImage):
     sku: str
     nombre: str
     precio_venta: Decimal
+    precio_mayor: Decimal
     estado: bool
 
 

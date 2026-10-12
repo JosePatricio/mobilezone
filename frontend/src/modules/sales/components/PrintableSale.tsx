@@ -56,6 +56,7 @@ export function SaleReceipt({ sale }: { sale: Sale }) {
         <div key={d.id} className="receipt-item">
           <p>
             {d.product.nombre} <small>({d.product.sku})</small>
+            {d.por_mayor && <small> · Precio por mayor</small>}
           </p>
           <Row label={`${d.cantidad} x ${formatMoney(d.precio_unitario)}`}>{formatMoney(d.subtotal)}</Row>
         </div>

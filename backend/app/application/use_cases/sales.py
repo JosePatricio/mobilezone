@@ -28,6 +28,16 @@ def _merge_quantities(items: list[SaleItemData]) -> OrderedDict[int, int]:
     return quantities
 
 
+def _wholesale_flags(items: list[SaleItemData]) -> dict[int, bool]:
+    """Inventory id -> sold at the wholesale price (repeated lines: the last one wins)."""
+    return {item.inventory_id: item.por_mayor for item in items}
+
+
+def _unit_price(product, por_mayor: bool) -> Decimal:
+    """PVP (precio de venta) or, for wholesale lines, the precio al por mayor."""
+    return product.precio_mayor if por_mayor else product.precio_venta
+
+
 def _get_sale(uow: UnitOfWork, sale_id: int) -> Sale:
     sale = uow.sales.get(sale_id)
     if sale is None:
@@ -96,6 +106,7 @@ class ConfirmSaleUseCase(_SaleValidation):
         if not actor.estado:
             raise AuthenticationError("El usuario se encuentra inactivo.", code="USER_INACTIVE")
         quantities = _merge_quantities(data.items)
+        wholesale = _wholesale_flags(data.items)
 
         with self.uow.transaction():
             ensure_branch_access(self.uow, actor, data.branch_id)
@@ -114,7 +125,8 @@ class ConfirmSaleUseCase(_SaleValidation):
                 self._ensure_active(inventory)
                 inventory.decrease_stock(cantidad)  # raises INSUFFICIENT_STOCK
                 product = inventory.product
-                sale.add_line(product.id, cantidad, product.precio_venta, inventory_id)  # type: ignore[arg-type]  # PVP
+                por_mayor = wholesale[inventory_id]
+                sale.add_line(product.id, cantidad, _unit_price(product, por_mayor), inventory_id, por_mayor)  # type: ignore[arg-type]
                 locked.append((inventory, cantidad))
             sale.apply_discount(data.descuento)
             sale.apply_payment(data.metodo_pago, data.monto_recibido)
@@ -130,12 +142,14 @@ class UpdateSaleUseCase(_SaleValidation):
 
     Stock is reconciled per inventory row: units added are discounted (validating the
     available stock) and units returned go back to the branch (``DEVOLUCION``).
-    Existing lines keep their historical price; new lines take the current PVP.
+    Existing lines keep their historical price; new lines take the current PVP (or the current
+    wholesale price). A line switched between PVP and wholesale takes the current price of that type.
     The payment (method, card surcharge, change) is recalculated.
     """
 
     def execute(self, sale_id: int, data: UpdateSaleData, actor: User) -> Sale:
         new_quantities = _merge_quantities(data.items)
+        wholesale = _wholesale_flags(data.items)
         with self.uow.transaction():
             sale = _get_sale(self.uow, sale_id)
             sale.ensure_editable()
@@ -147,6 +161,9 @@ class UpdateSaleUseCase(_SaleValidation):
                 old_qty = lines[inventory_id].cantidad if inventory_id in lines else 0
                 new_qty = new_quantities.get(inventory_id, 0)
                 if new_qty == old_qty:
+                    line = lines.get(inventory_id)
+                    if line is not None and line.por_mayor != wholesale[inventory_id]:
+                        line.change_price(_unit_price(line.product, wholesale[inventory_id]), wholesale[inventory_id])
                     continue
                 inventory = self._lock_inventory(inventory_id, sale.branch_id)  # type: ignore[arg-type]
                 if new_qty > old_qty:
@@ -160,11 +177,15 @@ class UpdateSaleUseCase(_SaleValidation):
 
                 if old_qty == 0:
                     product = inventory.product
-                    sale.add_line(product.id, new_qty, product.precio_venta, inventory_id)  # type: ignore[arg-type]
+                    por_mayor = wholesale[inventory_id]
+                    sale.add_line(product.id, new_qty, _unit_price(product, por_mayor), inventory_id, por_mayor)  # type: ignore[arg-type]
                 elif new_qty == 0:
                     sale.details.remove(lines[inventory_id])
                 else:
-                    lines[inventory_id].change_quantity(new_qty)
+                    line = lines[inventory_id]
+                    line.change_quantity(new_qty)
+                    if line.por_mayor != wholesale[inventory_id]:
+                        line.change_price(_unit_price(inventory.product, wholesale[inventory_id]), wholesale[inventory_id])
 
             sale.factura = data.factura
             sale.cliente_id = data.cliente_id

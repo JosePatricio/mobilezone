@@ -73,6 +73,7 @@ class InventoryData:
 class SaleItemData:
     inventory_id: int  # inventory (product + branch) the units are taken from
     cantidad: int
+    por_mayor: bool = False  # True = wholesale price (precio al por mayor) instead of the PVP
 
 
 @dataclass(frozen=True)

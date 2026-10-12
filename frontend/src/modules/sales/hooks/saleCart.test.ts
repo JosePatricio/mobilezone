@@ -7,6 +7,9 @@ const item = (inventoryId: number, precio: string, stock: number): CartProduct =
   nombre: `Producto ${inventoryId}`,
   imagenUrl: null,
   precio,
+  precioVenta: precio,
+  precioMayor: (Number(precio) * 0.8).toFixed(2),
+  porMayor: false,
   stock,
 });
 const productA = item(1, '10.00', 15);
@@ -58,5 +61,23 @@ describe('sale cart', () => {
     cart = cartReducer(cart, { type: 'remove', inventoryId: 1 });
     expect(cart).toEqual([]);
     expect(canConfirm(cart)).toBe(false);
+  });
+
+  it('switches a line to the wholesale price with its checkbox', () => {
+    let cart = cartReducer([], { type: 'add', product: productA }); // PVP 10.00, por mayor 8.00
+    cart = cartReducer(cart, { type: 'increment', inventoryId: 1 });
+    cart = cartReducer(cart, { type: 'setWholesale', inventoryId: 1, porMayor: true });
+    expect(cart[0]).toMatchObject({ porMayor: true, precio: '8.00' });
+    expect(cartTotal(cart)).toBe('16.00');
+    cart = cartReducer(cart, { type: 'setWholesale', inventoryId: 1, porMayor: false });
+    expect(cartTotal(cart)).toBe('20.00');
+  });
+
+  it('a saved line keeps its historical price while the price type does not change', () => {
+    const saved: CartLine = { ...productA, precio: '9.00', historico: { precio: '9.00', porMayor: false }, cantidad: 1 };
+    let cart = cartReducer([saved], { type: 'setWholesale', inventoryId: 1, porMayor: true });
+    expect(cart[0].precio).toBe('8.00');
+    cart = cartReducer(cart, { type: 'setWholesale', inventoryId: 1, porMayor: false });
+    expect(cart[0].precio).toBe('9.00');
   });
 });

@@ -14,6 +14,7 @@ from app.presentation.api.schemas.users import BranchRef, ClientSummary, UserSum
 class SaleItemRequest(RequestSchema):
     inventory_id: int = Field(description="Inventario (producto + sucursal) del que se descuenta el stock")
     cantidad: int = Field(gt=0)
+    por_mayor: bool = Field(default=False, description="true = precio al por mayor en lugar del PVP")
 
 
 class SaleDataRequest(RequestSchema):
@@ -40,6 +41,7 @@ class SaleDetailResponse(Schema):
     inventory_id: int
     cantidad: int
     precio_unitario: Decimal
+    por_mayor: bool = Field(description="Vendido al precio al por mayor")
     subtotal: Decimal
 
 

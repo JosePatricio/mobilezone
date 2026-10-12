@@ -21,6 +21,8 @@ export function ProductSearch({ branchId, branchName, canSearchInventory, onSele
   const id = useId();
   const [term, setTerm] = useState('');
   const [results, setResults] = useState<InventoryItem[] | null>(null);
+  /** Matches in the branch whose product (or branch) is inactive: they cannot be sold. */
+  const [inactive, setInactive] = useState<InventoryItem[]>([]);
   const [searched, setSearched] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -42,6 +44,12 @@ export function ProductSearch({ branchId, branchName, canSearchInventory, onSele
       const exact = page.items.filter((i) => i.product.sku.toLowerCase() === value.toLowerCase());
       const matches = exact.length === 1 ? exact : page.items;
       setSearched(value);
+      // Nothing to sell: tell apart a product that is registered here but deactivated.
+      setInactive(
+        matches.length === 0
+          ? (await inventoryApi.list({ branch_id: branchId, search: value, size: 10 })).items
+          : [],
+      );
       if (matches.length === 1 && matches[0].stock > 0) select(matches[0]);
       else setResults(matches);
     } catch (err) {
@@ -80,7 +88,29 @@ export function ProductSearch({ branchId, branchName, canSearchInventory, onSele
         </p>
       )}
 
-      {results && results.length === 0 && (
+      {results && results.length === 0 && inactive.length > 0 && (
+        <div className="alert alert-warning" role="status">
+          {inactive.every((i) => i.product.estado) ? (
+            <>
+              “{searched}” está registrado en la sucursal {branchName ?? ''}, pero la sucursal está{' '}
+              <strong>inactiva</strong>. Actívela en Configuración › Sucursales.
+            </>
+          ) : inactive.length === 1 ? (
+            <>
+              “{inactive[0].product.nombre}” ({inactive[0].product.sku}) está registrado en la sucursal{' '}
+              {branchName ?? ''} pero el producto está <strong>inactivo</strong>, por eso no se puede vender. Actívelo
+              en el módulo Productos.
+            </>
+          ) : (
+            <>
+              Hay {inactive.length} productos que coinciden con “{searched}” en la sucursal {branchName ?? ''}, pero
+              están <strong>inactivos</strong> y no se pueden vender. Actívelos en el módulo Productos.
+            </>
+          )}
+        </div>
+      )}
+
+      {results && results.length === 0 && inactive.length === 0 && (
         <div className="alert alert-info" role="status">
           No se encontró “{searched}” en la sucursal {branchName ?? ''}.{' '}
           {canSearchInventory && (
@@ -98,7 +128,8 @@ export function ProductSearch({ branchId, branchName, canSearchInventory, onSele
                 <span>
                   <strong>{item.product.nombre}</strong>
                   <small className={item.stock <= 0 ? 'text-danger' : 'muted'}>
-                    {item.product.sku} · {formatMoney(item.product.precio_venta)} · Stock: {item.stock}
+                    {item.product.sku} · PVP {formatMoney(item.product.precio_venta)} · Por mayor{' '}
+                    {formatMoney(item.product.precio_mayor)} · Stock: {item.stock}
                   </small>
                 </span>
               </button>

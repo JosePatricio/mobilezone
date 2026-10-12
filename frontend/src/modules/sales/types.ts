@@ -10,6 +10,8 @@ export interface SaleDetail {
   inventory_id: Id;
   cantidad: number;
   precio_unitario: Money;
+  /** sold at the wholesale price (precio al por mayor) instead of the PVP */
+  por_mayor: boolean;
   subtotal: Money;
 }
 
@@ -70,6 +72,8 @@ export interface Sale extends Timestamps {
 export interface SaleItemRequest {
   inventory_id: Id;
   cantidad: number;
+  /** true = wholesale price (precio al por mayor) instead of the PVP */
+  por_mayor: boolean;
 }
 
 export interface UpdateSaleRequest {

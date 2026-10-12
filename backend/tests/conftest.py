@@ -171,11 +171,9 @@ class Factory:
             product = Product(
                 category_id=category.id,
                 sku=f"SKU-{n}",
-                nombre=f"Producto {n}",
                 precio_venta=Decimal(precio),
                 precio_costo=Decimal(precio) / 2,
-                precio_mayor=Decimal(precio) * Decimal("0.9"),
-                **kw,
+                **{"nombre": f"Producto {n}", "precio_mayor": Decimal(precio) * Decimal("0.9"), **kw},
             )
             self.uow.products.add(product)
         if stock is not None:

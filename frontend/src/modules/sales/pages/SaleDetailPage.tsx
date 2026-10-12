@@ -118,6 +118,7 @@ export function SaleDetailPage() {
                   </td>
                   <td data-label="Precio" className="text-right">
                     {formatMoney(d.precio_unitario)}
+                    <small className="muted price-type">{d.por_mayor ? 'Por mayor' : 'PVP'}</small>
                   </td>
                   <td data-label="Subtotal" className="text-right">
                     {formatMoney(d.subtotal)}

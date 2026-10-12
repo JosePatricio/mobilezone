@@ -23,12 +23,14 @@ if TYPE_CHECKING:
 @dataclass(eq=False)
 class SaleDetail:
     """A sale line. ``precio_unitario`` is the historical price at sale time and
-    ``inventory_id`` the branch inventory the units were taken from."""
+    ``inventory_id`` the branch inventory the units were taken from. ``por_mayor`` = the line
+    was sold at the wholesale price (precio al por mayor) instead of the PVP."""
 
     product_id: int
     cantidad: int
     precio_unitario: Decimal
     inventory_id: int | None = None
+    por_mayor: bool = False
     subtotal: Decimal = ZERO
     sale_id: int | None = None
     id: int | None = None
@@ -40,6 +42,13 @@ class SaleDetail:
         if not isinstance(self.cantidad, int) or self.cantidad <= 0:
             raise ValidationError("La cantidad debe ser un entero mayor que cero.", code="INVALID_QUANTITY")
         self.precio_unitario = non_negative_money(self.precio_unitario, "precio_unitario")
+        self.por_mayor = bool(self.por_mayor)
+        self.subtotal = self.precio_unitario * self.cantidad
+
+    def change_price(self, precio_unitario: Decimal, por_mayor: bool) -> None:
+        """Switches the line between PVP and wholesale price."""
+        self.precio_unitario = non_negative_money(precio_unitario, "precio_unitario")
+        self.por_mayor = bool(por_mayor)
         self.subtotal = self.precio_unitario * self.cantidad
 
     def change_quantity(self, cantidad: int) -> None:
@@ -95,12 +104,21 @@ class Sale:
             self.fecha = utcnow()
 
     def add_line(
-        self, product_id: int, cantidad: int, precio_unitario: Decimal, inventory_id: int | None = None
+        self,
+        product_id: int,
+        cantidad: int,
+        precio_unitario: Decimal,
+        inventory_id: int | None = None,
+        por_mayor: bool = False,
     ) -> SaleDetail:
         if self.estado != SaleStatus.CONFIRMADA:
             raise ConflictError("No se pueden agregar productos a una venta anulada.", code="SALE_NOT_EDITABLE")
         detail = SaleDetail(
-            product_id=product_id, cantidad=cantidad, precio_unitario=precio_unitario, inventory_id=inventory_id
+            product_id=product_id,
+            cantidad=cantidad,
+            precio_unitario=precio_unitario,
+            inventory_id=inventory_id,
+            por_mayor=por_mayor,
         )
         self.details.append(detail)
         self.recalculate_total()

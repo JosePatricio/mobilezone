@@ -444,6 +444,7 @@ CREATE TABLE sale_details (
     inventory_id    INTEGER       NOT NULL COMMENT 'inventory the units were taken from',
     cantidad        INTEGER       NOT NULL,
     precio_unitario DECIMAL(12,2) NOT NULL COMMENT 'historical price at sale time',
+    por_mayor       BOOL          NOT NULL DEFAULT 0 COMMENT '1 = wholesale price (precio al por mayor), 0 = PVP',
     subtotal        DECIMAL(12,2) NOT NULL,
     CONSTRAINT pk_sale_details PRIMARY KEY (id),
     CONSTRAINT ck_sale_details_cantidad_positive CHECK (cantidad > 0),

@@ -9,6 +9,8 @@ export interface InventoryItem {
     sku: string;
     nombre: string;
     precio_venta: Money;
+    /** wholesale price (precio al por mayor) */
+    precio_mayor: Money;
     imagen_url: string | null;
     estado: boolean;
   };

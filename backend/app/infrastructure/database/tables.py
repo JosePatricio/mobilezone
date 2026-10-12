@@ -302,6 +302,7 @@ sale_details_table = Table(
     Column("inventory_id", ForeignKey("inventory.id"), nullable=False, index=True),  # stock taken from
     Column("cantidad", Integer, nullable=False),
     Column("precio_unitario", MONEY, nullable=False),
+    Column("por_mayor", Boolean, nullable=False, default=False, server_default=FALSE),  # wholesale price
     Column("subtotal", MONEY, nullable=False),
     CheckConstraint("cantidad > 0", name="cantidad_positive"),
 )

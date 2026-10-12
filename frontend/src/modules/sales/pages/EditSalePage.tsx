@@ -18,6 +18,10 @@ async function loadSale(id: number): Promise<{ sale: Sale; lines: CartLine[] }> 
     nombre: d.product.nombre,
     imagenUrl: d.product.imagen_url,
     precio: d.precio_unitario, // historical price of the sale
+    precioVenta: inventories[i].product.precio_venta,
+    precioMayor: inventories[i].product.precio_mayor,
+    porMayor: d.por_mayor,
+    historico: { precio: d.precio_unitario, porMayor: d.por_mayor },
     stock: inventories[i].stock + d.cantidad, // branch stock + units already sold in this sale
     cantidad: d.cantidad,
   }));

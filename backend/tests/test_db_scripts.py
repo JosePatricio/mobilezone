@@ -840,3 +840,33 @@ def test_upgrade_019_suppliers_and_sale_discount(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_020_wholesale_sale_lines(mysql_engine: Engine):
+    """v19 database -> upgrade 020 adds sale_details.por_mayor (existing lines: PVP)."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (
+        initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005, sql.UPGRADE_006, sql.UPGRADE_007,
+        sql.UPGRADE_008, sql.UPGRADE_009, sql.UPGRADE_010, sql.UPGRADE_011, sql.UPGRADE_012, sql.UPGRADE_013,
+        sql.UPGRADE_014, sql.UPGRADE_015, sql.UPGRADE_016, sql.UPGRADE_017, sql.UPGRADE_018, sql.UPGRADE_019,
+    )
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_020)
+            column = conn.exec_driver_sql(
+                "SELECT column_default, is_nullable FROM information_schema.columns WHERE table_schema = DATABASE() "
+                "AND table_name = 'sale_details' AND column_name = 'por_mayor'"
+            ).one()
+            assert column[1] == "NO" and str(column[0]) == "0"
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

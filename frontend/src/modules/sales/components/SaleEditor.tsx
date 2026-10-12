@@ -70,7 +70,7 @@ export function SaleEditor({ sale, initialLines }: Props) {
   const mutation = useMutation({
     mutationFn: (payment: PaymentResult) => {
       const body = {
-        items: lines.map((l) => ({ inventory_id: l.inventoryId, cantidad: l.cantidad })),
+        items: lines.map((l) => ({ inventory_id: l.inventoryId, cantidad: l.cantidad, por_mayor: l.porMayor })),
         factura,
         cliente_id: customer?.id ?? null,
         ...payment,
@@ -164,7 +164,7 @@ export function SaleEditor({ sale, initialLines }: Props) {
           canSearchInventory={hasPermission(P.INVENTORY_VIEW)}
           onSelect={(item) => {
             setError(null);
-            // New lines use the current PVP (precio de venta).
+            // New lines use the current PVP (precio de venta); the "Por mayor" checkbox switches to the wholesale price.
             dispatch({
               type: 'add',
               product: {
@@ -174,6 +174,9 @@ export function SaleEditor({ sale, initialLines }: Props) {
                 nombre: item.product.nombre,
                 imagenUrl: item.product.imagen_url,
                 precio: item.product.precio_venta,
+                precioVenta: item.product.precio_venta,
+                precioMayor: item.product.precio_mayor,
+                porMayor: false,
                 stock: item.stock + (originalQty.get(item.product_id) ?? 0),
               },
             });
@@ -194,6 +197,9 @@ export function SaleEditor({ sale, initialLines }: Props) {
             <table className="table sale-table">
               <thead>
                 <tr>
+                  <th className="text-center" title="Vender al precio al por mayor">
+                    Por mayor
+                  </th>
                   <th>Imagen</th>
                   <th>SKU</th>
                   <th>Nombre</th>
@@ -207,6 +213,18 @@ export function SaleEditor({ sale, initialLines }: Props) {
               <tbody>
                 {lines.map((line) => (
                   <tr key={line.inventoryId} className={lineExceedsStock(line) ? 'row-invalid' : undefined}>
+                    <td data-label="Por mayor" className="text-center">
+                      <input
+                        type="checkbox"
+                        className="wholesale-check"
+                        checked={line.porMayor}
+                        aria-label={`Precio al por mayor para ${line.nombre}`}
+                        title={`Por mayor: ${formatMoney(line.precioMayor)} · PVP: ${formatMoney(line.precioVenta)}`}
+                        onChange={(e) =>
+                          dispatch({ type: 'setWholesale', inventoryId: line.inventoryId, porMayor: e.target.checked })
+                        }
+                      />
+                    </td>
                     <td data-label="Imagen">
                       <ProductImagePreview src={line.imagenUrl} alt={line.nombre} />
                     </td>
@@ -253,6 +271,7 @@ export function SaleEditor({ sale, initialLines }: Props) {
                     </td>
                     <td data-label="Precio" className="text-right">
                       {formatMoney(line.precio)}
+                      <small className="muted price-type">{line.porMayor ? 'Por mayor' : 'PVP'}</small>
                     </td>
                     <td data-label="Subtotal" className="text-right">
                       {formatMoney(fromCents(lineSubtotalCents(line)))}
@@ -273,7 +292,7 @@ export function SaleEditor({ sale, initialLines }: Props) {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={6} className="text-right">
+                  <td colSpan={7} className="text-right">
                     <strong>TOTAL</strong>
                   </td>
                   <td className="text-right total-cell" data-testid="sale-total">

@@ -116,7 +116,7 @@ class ReportLabReceiptRenderer(ReceiptRenderer):
             rows.append(
                 [
                     Paragraph(d.product.sku, small),
-                    Paragraph(d.product.nombre, small),
+                    Paragraph(d.product.nombre + (" (precio por mayor)" if d.por_mayor else ""), small),
                     Paragraph(str(d.cantidad), right),
                     Paragraph(_money(d.precio_unitario), right),
                     Paragraph(_money(d.subtotal), right),

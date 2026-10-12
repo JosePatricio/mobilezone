@@ -12,13 +12,19 @@ import { NewSalePage } from './NewSalePage';
 const inventory = (id: number, nombre: string, precio_venta: string, stock: number, sku = `SKU-${id}`): InventoryItem => ({
   id,
   product_id: id * 10,
-  product: { id: id * 10, sku, nombre, precio_venta, imagen_url: null, estado: true },
+  product: { id: id * 10, sku, nombre, precio_venta, precio_mayor: (Number(precio_venta) * 0.8).toFixed(2), imagen_url: null, estado: true },
   branch_id: 1,
   branch: { id: 1, nombre: 'Matriz' },
   stock,
   updated_at: '2026-01-01T00:00:00Z',
 });
-const stockMatriz = [inventory(1, 'Pantalla A', '10.00', 15, 'PAN-A'), inventory(2, 'Pantalla B', '25.00', 3, 'PAN-B')];
+const inactiveFunda = inventory(3, 'Funda Silicona', '5.00', 4, 'FUN-1');
+inactiveFunda.product.estado = false;
+const stockMatriz = [
+  inventory(1, 'Pantalla A', '10.00', 15, 'PAN-A'),
+  inventory(2, 'Pantalla B', '25.00', 3, 'PAN-B'),
+  inactiveFunda,
+];
 
 const customer = {
   id: 7,
@@ -39,9 +45,12 @@ vi.mock('@/modules/inventory/services/inventoryApi', () => ({
   inventoryApi: {
     list: (params: Record<string, unknown>) => {
       inventoryCalls.push(params);
-      const term = String(params.search ?? '').toLowerCase();
+      // Same rule as the backend: every word in the SKU or the name; `active` hides inactive products.
+      const words = String(params.search ?? '').toLowerCase().split(/\s+/).filter(Boolean);
       const items = stockMatriz.filter(
-        (i) => i.product.sku.toLowerCase().includes(term) || i.product.nombre.toLowerCase().includes(term),
+        (i) =>
+          (!params.active || i.product.estado) &&
+          words.every((w) => i.product.sku.toLowerCase().includes(w) || i.product.nombre.toLowerCase().includes(w)),
       );
       return Promise.resolve({ items, total: items.length, page: 1, size: 10, pages: 1 });
     },
@@ -151,6 +160,22 @@ describe('NewSalePage', () => {
     );
   });
 
+  it('explains that a product registered in the branch is inactive instead of "not found"', async () => {
+    renderPage();
+    await searchProduct('funda silicona');
+    expect(await screen.findByText(/el producto está/)).toHaveTextContent(
+      '“Funda Silicona” (FUN-1) está registrado en la sucursal Matriz pero el producto está inactivo',
+    );
+    expect(screen.queryByText(/No se encontró/)).not.toBeInTheDocument();
+    expect(inventoryCalls.slice(-2).map((c) => c.active)).toEqual([true, undefined]);
+  });
+
+  it('finds the product with the words in any order and extra spaces', async () => {
+    renderPage();
+    await searchProduct('  b   pantalla ');
+    expect(await screen.findByTestId('sale-total')).toHaveTextContent('25,00');
+  });
+
   it('shows a clear message on INSUFFICIENT_STOCK from the backend', async () => {
     confirmImpl = () =>
       Promise.reject(
@@ -168,7 +193,7 @@ describe('NewSalePage', () => {
     expect(saleCalls).toEqual([
       {
         branch_id: 1,
-        items: [{ inventory_id: 2, cantidad: 1 }],
+        items: [{ inventory_id: 2, cantidad: 1, por_mayor: false }],
         factura: false,
         cliente_id: null,
         metodo_pago: 'EFECTIVO',
@@ -204,7 +229,7 @@ describe('NewSalePage', () => {
     expect(saleCalls).toEqual([
       {
         branch_id: 1,
-        items: [{ inventory_id: 1, cantidad: 1 }],
+        items: [{ inventory_id: 1, cantidad: 1, por_mayor: false }],
         factura: true,
         cliente_id: 7,
         metodo_pago: 'EFECTIVO',
@@ -260,6 +285,24 @@ describe('NewSalePage', () => {
       auth: fakeAuth({ permissionCodes: ['sales.create'], user: { ...seller.user!, branches: [] } }),
     });
     expect(screen.getByText('Sin sucursal asignada')).toBeInTheDocument();
+  });
+
+  it('the "Por mayor" checkbox (first column) sells the line at the wholesale price', async () => {
+    renderPage();
+    await searchProduct('pan-b'); // PVP 25.00, por mayor 20.00
+    const table = await screen.findByRole('table');
+    expect(within(table).getAllByRole('columnheader')[0]).toHaveTextContent('Por mayor');
+    const check = within(table).getByRole('checkbox', { name: 'Precio al por mayor para Pantalla B' });
+    expect(check).not.toBeChecked();
+    expect(screen.getByTestId('sale-total')).toHaveTextContent('25,00');
+
+    await userEvent.click(check);
+    expect(screen.getByTestId('sale-total')).toHaveTextContent('20,00');
+    await userEvent.click(within(table).getByRole('button', { name: 'Agregar una unidad de Pantalla B' }));
+    expect(screen.getByTestId('sale-total')).toHaveTextContent('40,00');
+
+    await confirmSale();
+    expect(saleCalls[0]).toMatchObject({ items: [{ inventory_id: 2, cantidad: 2, por_mayor: true }] });
   });
 
   it('card payment adds 6 % and cash shows the change', async () => {

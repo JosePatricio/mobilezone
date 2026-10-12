@@ -61,6 +61,15 @@ def _like(value: str) -> str:
     return f"%{escaped}%"
 
 
+def _all_words_match(search: str, *columns):
+    """Every word of ``search`` must appear (case insensitive) in at least one of ``columns``,
+    in any order: "cable lightning a c" finds "Cable Lightning a tipo C" and extra spaces do not matter."""
+    words = search.split()
+    return and_(
+        *(or_(*(func.lower(func.coalesce(col, "")).like(_like(w), escape="\\") for col in columns)) for w in words)
+    )
+
+
 def _utc_naive(value: datetime) -> datetime:
     """Datetimes are stored as naive UTC."""
     return value.astimezone(timezone.utc).replace(tzinfo=None) if value.tzinfo else value
@@ -253,15 +262,8 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository[Product], ports.ProductRe
     def list(self, page, *, search=None, category_id=None, estado=None):
         c = products_table.c
         stmt = select(Product)
-        if search:
-            pattern = _like(search)
-            stmt = stmt.where(
-                or_(
-                    func.lower(c.nombre).like(pattern, escape="\\"),
-                    func.lower(c.sku).like(pattern, escape="\\"),
-                    func.lower(func.coalesce(c.descripcion, "")).like(pattern, escape="\\"),
-                )
-            )
+        if search and search.split():
+            stmt = stmt.where(_all_words_match(search, c.nombre, c.sku, c.descripcion))
         if category_id is not None:
             stmt = stmt.where(c.category_id == category_id)
         if estado is not None:
@@ -334,11 +336,8 @@ class SqlAlchemyInventoryRepository(SqlAlchemyRepository[Inventory], ports.Inven
         p = products_table.alias("inventory_product")
         b = branches_table.alias("inventory_branch")
         stmt = select(Inventory).join(p, p.c.id == c.product_id).join(b, b.c.id == c.branch_id)
-        if search:
-            pattern = _like(search)
-            stmt = stmt.where(
-                or_(func.lower(p.c.sku).like(pattern, escape="\\"), func.lower(p.c.nombre).like(pattern, escape="\\"))
-            )
+        if search and search.split():
+            stmt = stmt.where(_all_words_match(search, p.c.sku, p.c.nombre))
         if branch_id is not None:
             stmt = stmt.where(c.branch_id == branch_id)
         if product_id is not None:
