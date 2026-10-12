@@ -21,6 +21,13 @@ export interface SaleCustomer {
   celular: string | null;
 }
 
+/** Branch of the sale with the contact data printed on the receipt. */
+export interface SaleBranch extends NamedRef {
+  ubicacion: string;
+  direccion: string | null;
+  telefono: string | null;
+}
+
 export type PaymentMethod = 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
@@ -34,17 +41,20 @@ export interface Sale extends Timestamps {
   user_id: Id;
   user: UserRef & { foto_url: string | null };
   branch_id: Id;
-  branch: NamedRef;
+  branch: SaleBranch;
   fecha: string;
+  /** sum of the lines (before the discount) */
   total: Money;
   estado: SaleStatus;
   /** true = factura, false = comprobante de venta */
   factura: boolean;
   /** null only for sales registered before payments were recorded */
   metodo_pago: PaymentMethod | null;
-  /** credit card surcharge (6 %) */
+  /** discount (USD) on the total of the lines */
+  descuento: Money;
+  /** credit card surcharge (6 %, on the total after the discount) */
   recargo: Money;
-  /** total + recargo */
+  /** total - descuento + recargo */
   total_pagar: Money;
   monto_recibido: Money | null;
   cambio: Money | null;
@@ -70,6 +80,8 @@ export interface UpdateSaleRequest {
   factura: boolean;
   /** null = consumidor final */
   cliente_id: Id | null;
+  /** discount (USD) on the total of the lines */
+  descuento: Money;
 }
 
 export interface CreateSaleRequest extends UpdateSaleRequest {

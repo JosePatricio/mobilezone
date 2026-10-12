@@ -1,2 +1,9 @@
 En el modulo Ventas
-Cuando el usuario entra al modulo de Ventas por primera vez cada dia, abrir un modal para preguntar la sucursal.  EN QUE SUCURSAL ESTAS, y se despliega las opciones, y cuanto tiene en caja, por que le vamos a dar algo en caja para el vuelto o cambio USD del dia.
+En el modal Apertura de caja, la sucursal que aparezca por defecto Matriz
+En la opcion imprimir, Usa la misma logica que en modulo de ordenes, el tamaño, etc..
+En el modal Confirmar Vental, agregar un campo Descuento, que se vea al final el total calculado (Este dato si hay descuento que vaya tambien en la factura)
+
+En el Modulo Productos
+Agregar un campo selector (con filtro en texto para buscar), que se llame Proveedor . Esto form para agregar nuevo producto
+Agregar un submodulo en que se llame Proveedores que permita ingresar los proveedores que se usará en productos
+

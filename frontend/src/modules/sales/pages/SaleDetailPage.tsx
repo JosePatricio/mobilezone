@@ -35,7 +35,7 @@ export function SaleDetailPage() {
               Volver
             </Link>
             <Button variant="secondary" onClick={() => setViewing(true)}>
-              Comprobante PDF
+              Imprimir comprobante
             </Button>
             {canUpdate && editable && (
               <Link to={`/sales/${sale.id}/edit`} className="btn btn-primary btn-md">
@@ -132,6 +132,14 @@ export function SaleDetailPage() {
                 </td>
                 <td className="text-right">{formatMoney(sale.total)}</td>
               </tr>
+              {Number(sale.descuento) > 0 && (
+                <tr>
+                  <td colSpan={3} className="text-right">
+                    Descuento
+                  </td>
+                  <td className="text-right">- {formatMoney(sale.descuento)}</td>
+                </tr>
+              )}
               {Number(sale.recargo) > 0 && (
                 <tr>
                   <td colSpan={3} className="text-right">

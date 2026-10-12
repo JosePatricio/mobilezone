@@ -6,7 +6,7 @@ from typing import Annotated
 
 from pydantic import Field, StringConstraints, computed_field
 
-from app.presentation.api.schemas.catalog import CategorySummary
+from app.presentation.api.schemas.catalog import CategorySummary, SupplierSummary
 from app.presentation.api.schemas.common import Description, LongName, Money, RequestSchema, Schema, media_url
 
 
@@ -18,6 +18,7 @@ class ProductRequest(RequestSchema):
     ``/inventory``. The image is uploaded with ``PUT /products/{id}/image``."""
 
     category_id: int
+    supplier_id: int | None = Field(default=None, description="Proveedor (opcional)")
     sku: Sku
     nombre: LongName
     descripcion: Description = None
@@ -46,6 +47,8 @@ class ProductResponse(_WithImage):
     id: int
     category_id: int
     category: CategorySummary
+    supplier_id: int | None
+    supplier: SupplierSummary | None
     sku: str
     nombre: str
     descripcion: str | None

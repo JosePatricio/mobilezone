@@ -173,6 +173,7 @@ describe('NewSalePage', () => {
         cliente_id: null,
         metodo_pago: 'EFECTIVO',
         monto_recibido: null,
+        descuento: '0.00',
       },
     ]);
     expect(screen.getByText('Supera el stock disponible')).toBeInTheDocument();
@@ -208,6 +209,7 @@ describe('NewSalePage', () => {
         cliente_id: 7,
         metodo_pago: 'EFECTIVO',
         monto_recibido: null,
+        descuento: '0.00',
       },
     ]);
 
@@ -269,21 +271,31 @@ describe('NewSalePage', () => {
 
     await userEvent.click(within(dialog).getByRole('radio', { name: /Tarjeta de crédito/ }));
     expect(within(dialog).getByTestId('payment-total')).toHaveTextContent('26,50');
-    expect(within(dialog).getByText(/recargo tarjeta 6 %/)).toBeInTheDocument();
+    expect(within(dialog).getByTestId('payment-breakdown')).toHaveTextContent('Recargo tarjeta 6 %$ 1,50');
+
+    // Discount: subtracted before the card surcharge; the computed total is shown after the field.
+    const descuento = within(dialog).getByLabelText('Descuento (USD)');
+    await userEvent.type(descuento, '30');
+    expect(within(dialog).getByText('El descuento no puede ser mayor que el subtotal')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Confirmar venta' })).toBeDisabled();
+    await userEvent.clear(descuento);
+    await userEvent.type(descuento, '5');
+    expect(within(dialog).getByTestId('payment-breakdown')).toHaveTextContent('Descuento- $ 5,00');
+    expect(within(dialog).getByTestId('payment-total')).toHaveTextContent('21,20');
 
     await userEvent.click(within(dialog).getByRole('radio', { name: 'Efectivo' }));
     const recibido = within(dialog).getByLabelText('Monto recibido');
-    await userEvent.type(recibido, '20');
+    await userEvent.type(recibido, '19');
     expect(within(dialog).getByText('El monto recibido no cubre el total')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Confirmar venta' })).toBeDisabled();
     await userEvent.clear(recibido);
     await userEvent.type(recibido, '30');
-    expect(within(dialog).getByTestId('payment-change')).toHaveTextContent('5,00');
+    expect(within(dialog).getByTestId('payment-change')).toHaveTextContent('10,00');
     // The previous summary is now a small footer.
     expect(within(dialog).getByText(/Consumidor final en la sucursal Matriz/)).toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Confirmar venta' }));
-    expect(saleCalls[0]).toMatchObject({ metodo_pago: 'EFECTIVO', monto_recibido: '30.00' });
+    expect(saleCalls[0]).toMatchObject({ metodo_pago: 'EFECTIVO', monto_recibido: '30.00', descuento: '5.00' });
   });
 
   it('opens the receipt in the sales list after confirming, without downloading a file', async () => {

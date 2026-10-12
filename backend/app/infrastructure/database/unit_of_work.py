@@ -21,6 +21,7 @@ from app.infrastructure.repositories.sqlalchemy import (
     SqlAlchemySettingsRepository,
     SqlAlchemySparePartRepository,
     SqlAlchemyStockMovementRepository,
+    SqlAlchemySupplierRepository,
     SqlAlchemyUserRepository,
     SqlAlchemyWorkOrderRepository,
 )
@@ -36,6 +37,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.permissions = SqlAlchemyPermissionRepository(session)
         self.categories = SqlAlchemyCategoryRepository(session)
         self.products = SqlAlchemyProductRepository(session)
+        self.suppliers = SqlAlchemySupplierRepository(session)
         self.branches = SqlAlchemyBranchRepository(session)
         self.inventory = SqlAlchemyInventoryRepository(session)
         self.stock_movements = SqlAlchemyStockMovementRepository(session)

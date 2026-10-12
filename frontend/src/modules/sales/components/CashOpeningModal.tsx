@@ -9,6 +9,8 @@ import type { CashOpeningRequest } from '../types';
 
 // Stable: Modal refocuses its panel whenever onClose changes. The modal cannot be closed.
 const keepOpen = () => undefined;
+/** Name of the main branch, preselected in the modal. */
+const DEFAULT_BRANCH = 'matriz';
 
 /**
  * Apertura de caja: the first time each day a seller enters Ventas, asks in which branch they
@@ -25,8 +27,11 @@ export function CashOpeningModal() {
   const toast = useToast();
   const queryClient = useQueryClient();
 
+  // Default branch: Matriz (or the only one the user has).
   useEffect(() => {
-    if (branchId === '' && branches.length === 1) setBranchId(String(branches[0].id));
+    if (branchId !== '') return;
+    const preferred = branches.find((b) => b.nombre.trim().toLowerCase() === DEFAULT_BRANCH) ?? (branches.length === 1 ? branches[0] : undefined);
+    if (preferred) setBranchId(String(preferred.id));
   }, [branchId, branches]);
 
   const mutation = useMutation({

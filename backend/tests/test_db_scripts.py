@@ -799,3 +799,44 @@ def test_upgrade_018_cash_openings(mysql_engine: Engine):
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
 
+
+
+def test_upgrade_019_suppliers_and_sale_discount(mysql_engine: Engine):
+    """v18 database -> upgrade 019: suppliers, products.supplier_id, sales.descuento and suppliers.* for ADMIN."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (
+        initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005, sql.UPGRADE_006, sql.UPGRADE_007,
+        sql.UPGRADE_008, sql.UPGRADE_009, sql.UPGRADE_010, sql.UPGRADE_011, sql.UPGRADE_012, sql.UPGRADE_013,
+        sql.UPGRADE_014, sql.UPGRADE_015, sql.UPGRADE_016, sql.UPGRADE_017, sql.UPGRADE_018,
+    )
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+            conn.exec_driver_sql("INSERT IGNORE INTO roles (nombre) VALUES ('ADMIN')")
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_019)
+            q = conn.exec_driver_sql
+            q("INSERT INTO suppliers (nombre) VALUES ('Proveedor 1')")
+            q("INSERT INTO categories (nombre) VALUES ('C')")
+            q(
+                "INSERT INTO products (category_id, supplier_id, sku, nombre, precio_venta, precio_costo, precio_mayor) "
+                "VALUES ((SELECT id FROM categories), (SELECT id FROM suppliers), 'S1', 'P', 1, 1, 1)"
+            )
+            assert q("SELECT COUNT(*) FROM products WHERE supplier_id IS NOT NULL").scalar() == 1
+            assert q("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() "
+                     "AND table_name = 'sales' AND column_name = 'descuento'").scalar() == 1
+            admin = q(
+                "SELECT COUNT(*) FROM role_permissions rp JOIN roles r ON r.id = rp.role_id "
+                "JOIN permissions p ON p.id = rp.permission_id WHERE r.nombre = 'ADMIN' AND p.codigo LIKE 'suppliers.%'"
+            ).scalar()
+            assert admin == 4
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

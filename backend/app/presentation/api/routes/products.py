@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response, UploadFile, status
 
 from app.application.dto import ProductData
-from app.application.use_cases.catalog import CategoryUseCases
+from app.application.use_cases.catalog import CategoryUseCases, SupplierUseCases
 from app.application.use_cases.products import ProductUseCases
 from app.domain.value_objects.pagination import MAX_PAGE_SIZE, PageRequest
 from app.domain.entities import User
@@ -18,7 +18,7 @@ from app.presentation.api.dependencies import (
     require_any_permission,
     require_permissions,
 )
-from app.presentation.api.schemas.catalog import CategorySummary
+from app.presentation.api.schemas.catalog import CategorySummary, SupplierSummary
 from app.presentation.api.schemas.common import PageResponse, StatusUpdateRequest
 from app.presentation.api.schemas.products import (
     ProductRequest,
@@ -38,6 +38,13 @@ def category_options(uow: UowDep, _: CanView):
     """Active categories for the product form (does not require access to the Categorías module)."""
     result = CategoryUseCases(uow).list(PageRequest(1, MAX_PAGE_SIZE), estado=True)
     return [CategorySummary.model_validate(c) for c in result.items]
+
+
+@router.get("/supplier-options", response_model=list[SupplierSummary])
+def supplier_options(uow: UowDep, _: CanView):
+    """Active suppliers for the product form (does not require access to the Proveedores module)."""
+    result = SupplierUseCases(uow).list(PageRequest(1, MAX_PAGE_SIZE), estado=True)
+    return [SupplierSummary.model_validate(s) for s in result.items]
 
 
 @router.get("", response_model=PageResponse[ProductResponse])

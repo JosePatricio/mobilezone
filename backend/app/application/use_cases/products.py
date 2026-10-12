@@ -40,9 +40,19 @@ class ProductUseCases(CrudUseCases[Product]):
         if not category.estado and not allow_inactive:
             raise ValidationError("La categoría seleccionada está inactiva.", code="CATEGORY_INACTIVE")
 
+    def _validate_supplier(self, supplier_id: int | None, current_id: int | None = None) -> None:
+        if supplier_id is None:
+            return
+        supplier = self.uow.suppliers.get(supplier_id)
+        if supplier is None:
+            raise NotFoundError("Proveedor no encontrado.", code="SUPPLIER_NOT_FOUND")
+        if not supplier.estado and supplier_id != current_id:
+            raise ValidationError("El proveedor seleccionado está inactivo.", code="SUPPLIER_INACTIVE")
+
     def _build(self, data: ProductData) -> Product:
         return Product(
             category_id=data.category_id,
+            supplier_id=data.supplier_id,
             sku=data.sku,
             nombre=data.nombre,
             precio_venta=data.precio_venta,
@@ -61,6 +71,7 @@ class ProductUseCases(CrudUseCases[Product]):
         """New products start with stock 0 (stock is loaded with audited adjustments)."""
         with self.uow.transaction():
             self._validate_category(data.category_id)
+            self._validate_supplier(data.supplier_id)
             product = self._build(data)
             self._ensure_unique_sku(product.sku)
             self.uow.products.add(product)
@@ -70,9 +81,11 @@ class ProductUseCases(CrudUseCases[Product]):
         with self.uow.transaction():
             product = self.get(product_id)
             self._validate_category(data.category_id, allow_inactive=data.category_id == product.category_id)
+            self._validate_supplier(data.supplier_id, current_id=product.supplier_id)
             changes = self._build(data)
             self._ensure_unique_sku(changes.sku, current_id=product.id)
             product.category_id, product.sku = changes.category_id, changes.sku
+            product.supplier_id = changes.supplier_id
             product.nombre, product.descripcion = changes.nombre, changes.descripcion
             product.change_prices(changes.precio_venta, changes.precio_costo, changes.precio_mayor)
             product.estado = data.estado

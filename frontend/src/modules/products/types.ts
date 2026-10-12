@@ -4,6 +4,9 @@ export interface Product extends Timestamps {
   id: Id;
   category_id: Id;
   category: NamedRef;
+  /** Proveedor; null = not assigned */
+  supplier_id: Id | null;
+  supplier: NamedRef | null;
   /** Product code */
   sku: string;
   nombre: string;
@@ -24,6 +27,8 @@ export interface Product extends Timestamps {
 /** Create / update. Stock is not part of the product: it is kept per branch (Inventario). */
 export interface ProductRequest {
   category_id: Id;
+  /** Proveedor (optional) */
+  supplier_id: Id | null;
   sku: string;
   nombre: string;
   descripcion: string | null;

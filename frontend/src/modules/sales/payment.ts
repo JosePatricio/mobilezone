@@ -6,9 +6,9 @@ import type { PaymentMethod } from './types';
 export const CARD_SURCHARGE_PERCENT = 6;
 
 export interface PaymentSummary {
-  /** credit card surcharge */
+  /** credit card surcharge (on the total after the discount) */
   recargo: Money;
-  /** amount to pay = total + recargo */
+  /** amount to pay = total - descuento + recargo */
   totalPagar: Money;
   /** cash: change to give back; null when not applicable or not enough money */
   cambio: Money | null;
@@ -17,8 +17,13 @@ export interface PaymentSummary {
 }
 
 /** Visual calculation of the payment. The backend recalculates and validates it. */
-export function calculatePayment(total: Money, metodo: PaymentMethod, recibido?: string): PaymentSummary {
-  const totalCents = toCents(total);
+export function calculatePayment(
+  total: Money,
+  metodo: PaymentMethod,
+  recibido?: string,
+  descuento: Money = '0',
+): PaymentSummary {
+  const totalCents = Math.max(toCents(total) - toCents(descuento), 0);
   const recargoCents = metodo === 'TARJETA' ? Math.round((totalCents * CARD_SURCHARGE_PERCENT) / 100) : 0;
   const pagarCents = totalCents + recargoCents;
   let cambio: Money | null = null;

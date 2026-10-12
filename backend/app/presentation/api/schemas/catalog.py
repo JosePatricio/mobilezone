@@ -6,7 +6,7 @@ from typing import Annotated
 
 from pydantic import Field, StringConstraints
 
-from app.presentation.api.schemas.common import Description, Money, Name, RequestSchema, Schema
+from app.presentation.api.schemas.common import Description, LongName, Money, Name, RequestSchema, Schema
 
 
 class CatalogRequest(RequestSchema):
@@ -53,6 +53,35 @@ class DeviceModelResponse(Schema):
     brand: BrandSummary
     nombre: str
     descripcion: str | None
+    estado: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+OptionalText = Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=255)]
+
+
+class SupplierRequest(RequestSchema):
+    nombre: LongName
+    ruc: Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=20)] = None
+    telefono: Annotated[str | None, StringConstraints(strip_whitespace=True, max_length=20)] = None
+    email: OptionalText = None
+    direccion: OptionalText = None
+    estado: bool = True
+
+
+class SupplierSummary(Schema):
+    id: int
+    nombre: str
+
+
+class SupplierResponse(Schema):
+    id: int
+    nombre: str
+    ruc: str | None
+    telefono: str | None
+    email: str | None
+    direccion: str | None
     estado: bool
     created_at: datetime
     updated_at: datetime

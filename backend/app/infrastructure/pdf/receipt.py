@@ -135,6 +135,8 @@ class ReportLabReceiptRenderer(ReceiptRenderer):
         story += [items, Spacer(1, 3 * mm)]
 
         totals = [["Subtotal", _money(sale.total)]]
+        if sale.descuento:
+            totals.append(["Descuento", f"- {_money(sale.descuento)}"])
         if sale.recargo:
             totals.append(["Recargo tarjeta de crédito (6 %)", _money(sale.recargo)])
         totals.append(["<b>TOTAL A PAGAR</b>", f"<b>{_money(sale.total_pagar or sale.total)}</b>"])
@@ -151,7 +153,7 @@ class ReportLabReceiptRenderer(ReceiptRenderer):
             [[Paragraph(label, right), Paragraph(value, right)] for label, value in totals],
             colWidths=[None, 30 * mm],
         )
-        bold_row = 1 + (1 if sale.recargo else 0)
+        bold_row = 1 + (1 if sale.descuento else 0) + (1 if sale.recargo else 0)
         totals_table.setStyle(TableStyle([("LINEABOVE", (0, bold_row), (-1, bold_row), 0.6, colors.black)]))
         story += [totals_table, Spacer(1, 6 * mm)]
         story.append(

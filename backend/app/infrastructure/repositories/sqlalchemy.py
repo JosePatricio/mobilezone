@@ -24,6 +24,7 @@ from app.domain.entities import (
     Sale,
     SparePart,
     StockMovement,
+    Supplier,
     User,
     WorkOrder,
 )
@@ -45,6 +46,7 @@ from app.infrastructure.database.tables import (
     settings_table,
     spare_parts_table,
     stock_movements_table,
+    suppliers_table,
     users_table,
     work_order_spare_parts_table,
     work_order_status_changes_table,
@@ -265,6 +267,29 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository[Product], ports.ProductRe
         if estado is not None:
             stmt = stmt.where(c.estado == estado)
         return self._paginate(stmt.order_by(c.nombre, c.id), page)
+
+
+class SqlAlchemySupplierRepository(SqlAlchemyRepository[Supplier], ports.SupplierRepository):
+    entity = Supplier
+
+    def get_by_nombre(self, nombre: str) -> Supplier | None:
+        c = suppliers_table.c
+        return self.session.scalars(select(Supplier).where(func.lower(c.nombre) == nombre.strip().lower())).first()
+
+    def list(self, page, *, search=None, estado=None):
+        c = suppliers_table.c
+        stmt = select(Supplier)
+        if search:
+            pattern = _like(search)
+            stmt = stmt.where(
+                or_(
+                    func.lower(c.nombre).like(pattern, escape="\\"),
+                    func.lower(func.coalesce(c.ruc, "")).like(pattern, escape="\\"),
+                )
+            )
+        if estado is not None:
+            stmt = stmt.where(c.estado == estado)
+        return self._paginate(stmt.order_by(c.nombre), page)
 
 
 class SqlAlchemyBranchRepository(SqlAlchemyRepository[Branch], ports.BranchRepository):

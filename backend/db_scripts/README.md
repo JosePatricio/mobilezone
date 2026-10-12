@@ -26,6 +26,7 @@ constraints), InnoDB and `utf8mb4`. The scripts avoid MySQL-only syntax so they 
 | `upgrades/016_fecha_hora_orden.sql` | Upgrades a version 15 database: reception date and time of work orders (`work_orders.fecha_hora`) (run once) |
 | `upgrades/017_motivos_ingreso.sql` | Upgrades a version 16 database: several entry reasons per work order (`work_orders.motivo_ingreso` widened to a comma separated list) (run once) |
 | `upgrades/018_apertura_caja.sql` | Upgrades a version 17 database: daily cash opening of the sellers (`cash_openings`: branch and starting cash) (run once) |
+| `upgrades/019_proveedores_descuento.sql` | Upgrades a version 18 database: suppliers (`suppliers`, `products.supplier_id`, permissions `suppliers.*` for ADMIN) and sale discount (`sales.descuento`) (run once) |
 
 ## Option A — Alembic + Python seed (recommended)
 
@@ -51,7 +52,7 @@ The SQL seed creates `admin@example.com` / `Admin12345`: change that password af
 `02_create_tables.sql` always holds the **current** full schema (new installations). Databases created with an older
 version are upgraded with the scripts in `upgrades/`, in order (Alembic runs them too: revision 0002 executes
 `upgrades/002_productos_usuarios_ventas.sql`, revision 0003 `upgrades/003_sucursales_inventario.sql`, revision 0004
-`upgrades/004_pagos_permisos.sql`, revision 0005 `upgrades/005_ordenes_trabajo.sql`, revision 0006 `upgrades/006_ordenes_vendedor.sql`, revision 0007 `upgrades/007_modelo_tecnico.sql`, revision 0008 `upgrades/008_estados_venta_orden.sql`, revision 0009 `upgrades/009_repuestos_afiliados.sql`, revision 0010 `upgrades/010_sucursal_orden.sql`, revision 0011 `upgrades/011_eliminar_ordenes.sql`, revision 0012 `upgrades/012_tecnico_afiliado.sql`, revision 0013 `upgrades/013_imagen_repuesto_afiliado.sql`, revision 0014 `upgrades/014_eliminar_usuarios.sql`, revision 0015 `upgrades/015_metas_venta.sql`, revision 0016 `upgrades/016_fecha_hora_orden.sql`, revision 0017 `upgrades/017_motivos_ingreso.sql`, revision 0018 `upgrades/018_apertura_caja.sql`; revision 0001
+`upgrades/004_pagos_permisos.sql`, revision 0005 `upgrades/005_ordenes_trabajo.sql`, revision 0006 `upgrades/006_ordenes_vendedor.sql`, revision 0007 `upgrades/007_modelo_tecnico.sql`, revision 0008 `upgrades/008_estados_venta_orden.sql`, revision 0009 `upgrades/009_repuestos_afiliados.sql`, revision 0010 `upgrades/010_sucursal_orden.sql`, revision 0011 `upgrades/011_eliminar_ordenes.sql`, revision 0012 `upgrades/012_tecnico_afiliado.sql`, revision 0013 `upgrades/013_imagen_repuesto_afiliado.sql`, revision 0014 `upgrades/014_eliminar_usuarios.sql`, revision 0015 `upgrades/015_metas_venta.sql`, revision 0016 `upgrades/016_fecha_hora_orden.sql`, revision 0017 `upgrades/017_motivos_ingreso.sql`, revision 0018 `upgrades/018_apertura_caja.sql`, revision 0019 `upgrades/019_proveedores_descuento.sql`; revision 0001
 runs the frozen copy in `migrations/sql/`).
 
 Upgrade 002: role replaces `users.tipo_usuario` (USUARIO → VENDEDOR, new CLIENTE role), new user fields

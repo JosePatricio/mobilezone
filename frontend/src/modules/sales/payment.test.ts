@@ -15,4 +15,9 @@ describe('payment', () => {
   it('transfer has no surcharge', () => {
     expect(calculatePayment('10.00', 'TRANSFERENCIA')).toMatchObject({ recargo: '0.00', totalPagar: '10.00' });
   });
+
+  it('subtracts the discount before the card surcharge', () => {
+    expect(calculatePayment('100.00', 'TARJETA', undefined, '10')).toMatchObject({ recargo: '5.40', totalPagar: '95.40' });
+    expect(calculatePayment('50.00', 'EFECTIVO', '50', '5.00')).toMatchObject({ totalPagar: '45.00', cambio: '5.00' });
+  });
 });

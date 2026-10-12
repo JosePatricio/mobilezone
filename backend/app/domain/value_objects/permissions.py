@@ -26,6 +26,11 @@ class Perm:
     PRODUCTS_UPDATE = "products.update"
     PRODUCTS_DELETE = "products.delete"
 
+    SUPPLIERS_VIEW = "suppliers.view"
+    SUPPLIERS_CREATE = "suppliers.create"
+    SUPPLIERS_UPDATE = "suppliers.update"
+    SUPPLIERS_DELETE = "suppliers.delete"
+
     BRANCHES_VIEW = "branches.view"
     BRANCHES_CREATE = "branches.create"
     BRANCHES_UPDATE = "branches.update"
@@ -88,6 +93,10 @@ PERMISSION_CATALOG: dict[str, str] = {
     Perm.PRODUCTS_CREATE: "Crear productos",
     Perm.PRODUCTS_UPDATE: "Editar y activar/desactivar productos",
     Perm.PRODUCTS_DELETE: "Eliminar productos",
+    Perm.SUPPLIERS_VIEW: "Ver proveedores",
+    Perm.SUPPLIERS_CREATE: "Crear proveedores",
+    Perm.SUPPLIERS_UPDATE: "Editar y activar/desactivar proveedores",
+    Perm.SUPPLIERS_DELETE: "Eliminar proveedores",
     Perm.BRANCHES_VIEW: "Ver sucursales",
     Perm.BRANCHES_CREATE: "Crear sucursales",
     Perm.BRANCHES_UPDATE: "Editar y activar/desactivar sucursales",

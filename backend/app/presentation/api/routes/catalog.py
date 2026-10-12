@@ -1,12 +1,18 @@
-"""Routes for categories, brands, models and spare parts."""
+"""Routes for categories, brands, models, spare parts and suppliers."""
 from __future__ import annotations
 
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
 
-from app.application.dto import CatalogData, DeviceModelData, SparePartData
-from app.application.use_cases.catalog import BrandUseCases, CategoryUseCases, DeviceModelUseCases, SparePartUseCases
+from app.application.dto import CatalogData, DeviceModelData, SparePartData, SupplierData
+from app.application.use_cases.catalog import (
+    BrandUseCases,
+    CategoryUseCases,
+    DeviceModelUseCases,
+    SparePartUseCases,
+    SupplierUseCases,
+)
 from app.domain.entities import User
 from app.domain.value_objects.permissions import Perm
 from app.presentation.api.dependencies import PageDep, UowDep, require_permissions
@@ -18,6 +24,8 @@ from app.presentation.api.schemas.catalog import (
     DeviceModelResponse,
     SparePartRequest,
     SparePartResponse,
+    SupplierRequest,
+    SupplierResponse,
 )
 from app.presentation.api.schemas.common import PageResponse, StatusUpdateRequest
 
@@ -42,6 +50,10 @@ P_SPARE_PARTS_VIEW = _perm(Perm.SPARE_PARTS_VIEW)
 P_SPARE_PARTS_CREATE = _perm(Perm.SPARE_PARTS_CREATE)
 P_SPARE_PARTS_UPDATE = _perm(Perm.SPARE_PARTS_UPDATE)
 P_SPARE_PARTS_DELETE = _perm(Perm.SPARE_PARTS_DELETE)
+P_SUPPLIERS_VIEW = _perm(Perm.SUPPLIERS_VIEW)
+P_SUPPLIERS_CREATE = _perm(Perm.SUPPLIERS_CREATE)
+P_SUPPLIERS_UPDATE = _perm(Perm.SUPPLIERS_UPDATE)
+P_SUPPLIERS_DELETE = _perm(Perm.SUPPLIERS_DELETE)
 
 # ------------------------------------------------------------ categories
 categories = APIRouter(prefix="/categories", tags=["categories"])
@@ -197,4 +209,42 @@ def set_spare_part_status(item_id: int, body: StatusUpdateRequest, uow: UowDep, 
 @spare_parts.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_spare_part(item_id: int, uow: UowDep, _: P_SPARE_PARTS_DELETE) -> Response:
     SparePartUseCases(uow).delete(item_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ------------------------------------------------------------- suppliers
+suppliers = APIRouter(prefix="/suppliers", tags=["suppliers"])
+
+
+@suppliers.get("", response_model=PageResponse[SupplierResponse])
+def list_suppliers(
+    uow: UowDep, page: PageDep, _: P_SUPPLIERS_VIEW, search: str | None = None, estado: bool | None = None
+):
+    """``search`` matches the name or the RUC."""
+    return PageResponse[SupplierResponse].from_page(SupplierUseCases(uow).list(page, search, estado), SupplierResponse)
+
+
+@suppliers.get("/{item_id}", response_model=SupplierResponse)
+def get_supplier(item_id: int, uow: UowDep, _: P_SUPPLIERS_VIEW):
+    return SupplierResponse.model_validate(SupplierUseCases(uow).get(item_id))
+
+
+@suppliers.post("", response_model=SupplierResponse, status_code=status.HTTP_201_CREATED)
+def create_supplier(body: SupplierRequest, uow: UowDep, _: P_SUPPLIERS_CREATE):
+    return SupplierResponse.model_validate(SupplierUseCases(uow).create(SupplierData(**body.model_dump())))
+
+
+@suppliers.put("/{item_id}", response_model=SupplierResponse)
+def update_supplier(item_id: int, body: SupplierRequest, uow: UowDep, _: P_SUPPLIERS_UPDATE):
+    return SupplierResponse.model_validate(SupplierUseCases(uow).update(item_id, SupplierData(**body.model_dump())))
+
+
+@suppliers.patch("/{item_id}/status", response_model=SupplierResponse)
+def set_supplier_status(item_id: int, body: StatusUpdateRequest, uow: UowDep, _: P_SUPPLIERS_UPDATE):
+    return SupplierResponse.model_validate(SupplierUseCases(uow).set_status(item_id, body.estado))
+
+
+@suppliers.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_supplier(item_id: int, uow: UowDep, _: P_SUPPLIERS_DELETE) -> Response:
+    SupplierUseCases(uow).delete(item_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -32,8 +32,10 @@ describe('CashOpeningModal', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Apertura de caja' });
     expect(screen.queryByRole('button', { name: 'Cerrar' })).not.toBeInTheDocument();
 
+    // Matriz comes selected by default.
+    expect(screen.getByLabelText(/¿En qué sucursal estás\?/)).toHaveValue('1');
     await userEvent.click(screen.getByRole('button', { name: 'Abrir caja' }));
-    expect(dialog).toHaveTextContent('Seleccione la sucursal.');
+    expect(dialog).toHaveTextContent('Ingrese el efectivo en caja');
     expect(api.openCash).not.toHaveBeenCalled();
 
     await userEvent.selectOptions(screen.getByLabelText(/¿En qué sucursal estás\?/), 'Norte');
@@ -46,8 +48,22 @@ describe('CashOpeningModal', () => {
   });
 
   it('preselects the only assigned branch', async () => {
-    renderWithProviders(<CashOpeningModal />, { auth: seller([{ id: 1, nombre: 'Matriz' }]) });
-    expect(await screen.findByLabelText(/¿En qué sucursal estás\?/)).toHaveValue('1');
+    renderWithProviders(<CashOpeningModal />, { auth: seller([{ id: 2, nombre: 'Norte' }]) });
+    expect(await screen.findByLabelText(/¿En qué sucursal estás\?/)).toHaveValue('2');
+  });
+
+  it('asks for the branch when the user does not work in Matriz', async () => {
+    renderWithProviders(<CashOpeningModal />, {
+      auth: seller([
+        { id: 2, nombre: 'Norte' },
+        { id: 3, nombre: 'Sur' },
+      ]),
+    });
+    const dialog = await screen.findByRole('dialog', { name: 'Apertura de caja' });
+    expect(screen.getByLabelText(/¿En qué sucursal estás\?/)).toHaveValue('');
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir caja' }));
+    expect(dialog).toHaveTextContent('Seleccione la sucursal.');
+    expect(api.openCash).not.toHaveBeenCalled();
   });
 
   it('is not shown when the register was already opened today', async () => {

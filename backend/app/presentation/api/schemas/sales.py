@@ -22,6 +22,7 @@ class SaleDataRequest(RequestSchema):
     monto_recibido: Money | None = Field(default=None, description="Solo efectivo: monto recibido para calcular el cambio")
     factura: bool = Field(default=False, description="true = factura, false = comprobante de venta")
     cliente_id: int | None = Field(default=None, description="null = consumidor final")
+    descuento: Money = Field(default=Decimal("0"), description="Descuento (USD) sobre el total de los productos")
 
 
 class CreateSaleRequest(SaleDataRequest):
@@ -42,6 +43,14 @@ class SaleDetailResponse(Schema):
     subtotal: Decimal
 
 
+class SaleBranch(BranchRef):
+    """Branch of the sale with the contact data printed on the receipt."""
+
+    ubicacion: str
+    direccion: str | None
+    telefono: str | None
+
+
 class SaleWorkOrderRef(Schema):
     id: int
     num_orden: int
@@ -52,14 +61,15 @@ class SaleResponse(Schema):
     user_id: int
     user: UserSummary
     branch_id: int
-    branch: BranchRef
+    branch: SaleBranch
     fecha: datetime
-    total: Decimal
+    total: Decimal = Field(description="Suma de los productos (antes del descuento)")
     estado: SaleStatus
     factura: bool
     metodo_pago: PaymentMethod | None = Field(description="null en ventas anteriores al registro de pagos")
+    descuento: Decimal
     recargo: Decimal
-    total_pagar: Decimal
+    total_pagar: Decimal = Field(description="total - descuento + recargo")
     monto_recibido: Decimal | None
     cambio: Decimal | None
     cliente_id: int | None

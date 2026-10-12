@@ -41,6 +41,7 @@ class ProductData:
     precio_costo: Decimal
     precio_mayor: Decimal
     descripcion: str | None = None
+    supplier_id: int | None = None  # proveedor
     estado: bool = True
 
 
@@ -82,6 +83,7 @@ class ConfirmSaleData:
     monto_recibido: Decimal | None = None  # cash only: amount received from the customer
     factura: bool = False  # True = factura, False = comprobante de venta
     cliente_id: int | None = None  # None = consumidor final
+    descuento: Decimal = Decimal("0")  # discount (USD) on the total of the lines
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,17 @@ class UpdateSaleData:
     monto_recibido: Decimal | None = None
     factura: bool = False
     cliente_id: int | None = None
+    descuento: Decimal = Decimal("0")
+
+
+@dataclass(frozen=True)
+class SupplierData:
+    nombre: str
+    ruc: str | None = None
+    telefono: str | None = None
+    email: str | None = None
+    direccion: str | None = None
+    estado: bool = True
 
 
 @dataclass(frozen=True)

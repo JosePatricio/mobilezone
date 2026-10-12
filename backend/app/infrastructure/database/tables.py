@@ -45,6 +45,7 @@ from app.domain.entities import (
     SaleDetail,
     SparePart,
     StockMovement,
+    Supplier,
     User,
     WorkOrder,
     WorkOrderPhoto,
@@ -192,11 +193,26 @@ categories_table = Table(
     *_timestamps(),
 )
 
+# Proveedores of the products.
+suppliers_table = Table(
+    "suppliers",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("nombre", String(150), nullable=False, unique=True),
+    Column("ruc", String(20)),
+    Column("telefono", String(20)),
+    Column("email", String(255)),
+    Column("direccion", String(255)),
+    Column("estado", Boolean, nullable=False, default=True, server_default=TRUE),
+    *_timestamps(),
+)
+
 products_table = Table(
     "products",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("category_id", ForeignKey("categories.id"), nullable=False, index=True),
+    Column("supplier_id", ForeignKey("suppliers.id"), index=True),  # proveedor (optional)
     Column("sku", String(50), nullable=False, unique=True),
     Column("nombre", String(150), nullable=False, index=True),
     Column("descripcion", Text),
@@ -267,8 +283,9 @@ sales_table = Table(
     Column("factura", Boolean, nullable=False, default=False, server_default=FALSE),  # 1 factura / 0 comprobante
     Column("cliente_id", ForeignKey("users.id"), index=True),  # NULL = consumidor final
     Column("metodo_pago", _str_enum(PaymentMethod)),  # NULL only for sales before payments were recorded
+    Column("descuento", MONEY, nullable=False, default=0, server_default=FALSE),  # discount on the total
     Column("recargo", MONEY, nullable=False, default=0, server_default=FALSE),  # credit card surcharge
-    Column("total_pagar", MONEY, nullable=False, default=0, server_default=FALSE),  # total + recargo
+    Column("total_pagar", MONEY, nullable=False, default=0, server_default=FALSE),  # total - descuento + recargo
     Column("monto_recibido", MONEY),  # cash received
     Column("cambio", MONEY),  # change given back (cash)
     # Sale of a finalized work order (no product lines); one sale per order.
@@ -498,6 +515,7 @@ def start_mappers() -> None:
         CashOpening, cash_openings_table, properties={"branch": relationship(Branch, lazy="joined")}
     )
     mapper_registry.map_imperatively(Category, categories_table)
+    mapper_registry.map_imperatively(Supplier, suppliers_table)
     stock_total = (
         select(func.coalesce(func.sum(inventory_table.c.stock), 0))
         .where(inventory_table.c.product_id == products_table.c.id)
@@ -509,6 +527,7 @@ def start_mappers() -> None:
         products_table,
         properties={
             "category": relationship(Category, lazy="joined"),
+            "supplier": relationship(Supplier, lazy="joined"),
             "stock_total": column_property(stock_total),  # read-only: stock of every branch
         },
     )

@@ -11,12 +11,13 @@ const sale = (id: number, estado: Sale['estado']): Sale => ({
   user_id: 3,
   user: { id: 3, nombre: 'Vera', apellido: 'Vendedora', email: 'vera@example.com', foto_url: '/media/users/v.png' },
   branch_id: 1,
-  branch: { id: 1, nombre: 'Matriz' },
+  branch: { id: 1, nombre: 'Matriz', ubicacion: 'Quito', direccion: 'Av. Amazonas N24-10', telefono: '0991234567' },
   fecha: '2026-09-30T15:00:00Z',
   total: '100.00',
   estado,
   factura: false,
   metodo_pago: 'TARJETA',
+  descuento: '0.00',
   recargo: '6.00',
   total_pagar: '106.00',
   monto_recibido: null,
@@ -42,7 +43,24 @@ vi.mock('../services/saleApi', () => ({
       listCalls.push(params);
       return Promise.resolve({ items: [sale(1, 'CONFIRMADA'), sale(2, 'ANULADA')], total: 2, page: 1, size: 20, pages: 1 });
     },
-    receipt: () => Promise.resolve(new Blob(['%PDF-1.4'], { type: 'application/pdf' })),
+    get: (id: number) =>
+      Promise.resolve({
+        ...sale(id, 'CONFIRMADA'),
+        descuento: '10.00',
+        recargo: '5.40',
+        total_pagar: '95.40',
+        details: [
+          {
+            id: 7,
+            product_id: 5,
+            product: { id: 5, sku: 'CARG-01', nombre: 'Cargador USB-C', imagen_url: null },
+            inventory_id: 9,
+            cantidad: 2,
+            precio_unitario: '50.00',
+            subtotal: '100.00',
+          },
+        ],
+      }),
     cancel: (id: number) => {
       cancelled.push(id);
       return Promise.resolve(sale(id, 'ANULADA'));
@@ -92,14 +110,24 @@ describe('SalesPage', () => {
     await vi.waitFor(() => expect(listCalls[listCalls.length - 1]).toMatchObject({ identificacion: '1712' }));
   });
 
-  it('opens the PDF receipt from its column inside the app', async () => {
-    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:receipt'), revokeObjectURL: vi.fn() });
+  it('prints the 80 mm receipt (same format as the work orders) with the discount', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
     renderWithProviders(<SalesPage />, { auth: fakeAuth({ permissionCodes: ['sales.view'] }) });
     const table = await screen.findByRole('table');
     expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toContain('Comprobante');
-    await userEvent.click(within(table).getByRole('button', { name: 'Ver comprobante de la venta #1' }));
+    await userEvent.click(within(table).getByRole('button', { name: 'Imprimir comprobante de la venta #1' }));
     const dialog = await screen.findByRole('dialog', { name: 'Comprobante · Venta #1' });
-    const frame = await within(dialog).findByTitle('Comprobante PDF');
-    expect(frame).toHaveAttribute('src', 'blob:receipt');
+    const preview = await within(dialog).findByTestId('receipt-preview');
+    expect(preview).toHaveTextContent('Av. Amazonas N24-10');
+    expect(preview).toHaveTextContent('Cargador USB-C');
+    expect(preview).toHaveTextContent('2 x $ 50,00');
+    expect(preview).toHaveTextContent('Descuento- $ 10,00');
+    expect(preview).toHaveTextContent('TOTAL A PAGAR$ 95,40');
+    // The thermal sheet printed by window.print (hidden on screen).
+    expect(document.querySelector('body > .print-sheet')).toHaveTextContent('Descuento- $ 10,00');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Imprimir' }));
+    expect(print).toHaveBeenCalledTimes(1);
+    print.mockRestore();
   });
 });

@@ -116,9 +116,25 @@ CREATE TABLE categories (
     CONSTRAINT uq_categories_nombre UNIQUE (nombre)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Proveedores of the products.
+CREATE TABLE suppliers (
+    id         INTEGER      NOT NULL AUTO_INCREMENT,
+    nombre     VARCHAR(150) NOT NULL,
+    ruc        VARCHAR(20),
+    telefono   VARCHAR(20),
+    email      VARCHAR(255),
+    direccion  VARCHAR(255),
+    estado     BOOL         NOT NULL DEFAULT 1,
+    created_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT pk_suppliers PRIMARY KEY (id),
+    CONSTRAINT uq_suppliers_nombre UNIQUE (nombre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE products (
     id           INTEGER       NOT NULL AUTO_INCREMENT,
     category_id  INTEGER       NOT NULL,
+    supplier_id  INTEGER                COMMENT 'proveedor (optional)',
     sku          VARCHAR(50)   NOT NULL COMMENT 'product code (uppercase, no spaces)',
     nombre       VARCHAR(150)  NOT NULL,
     descripcion  TEXT,
@@ -132,10 +148,12 @@ CREATE TABLE products (
     CONSTRAINT pk_products PRIMARY KEY (id),
     CONSTRAINT uq_products_sku UNIQUE (sku),
     CONSTRAINT ck_products_precios_non_negative CHECK (precio_venta >= 0 AND precio_costo >= 0 AND precio_mayor >= 0),
-    CONSTRAINT fk_products_category_id_categories FOREIGN KEY (category_id) REFERENCES categories (id)
+    CONSTRAINT fk_products_category_id_categories FOREIGN KEY (category_id) REFERENCES categories (id),
+    CONSTRAINT fk_products_supplier_id_suppliers FOREIGN KEY (supplier_id) REFERENCES suppliers (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE INDEX ix_products_category_id ON products (category_id);
+CREATE INDEX ix_products_supplier_id ON products (supplier_id);
 CREATE INDEX ix_products_nombre ON products (nombre);
 
 -- Inventory: stock of each product in each branch.
@@ -398,8 +416,9 @@ CREATE TABLE sales (
     factura    BOOL          NOT NULL DEFAULT 0 COMMENT '1 = factura, 0 = comprobante de venta',
     cliente_id INTEGER                COMMENT 'client (role CLIENTE); NULL = consumidor final',
     metodo_pago    VARCHAR(30)        COMMENT 'EFECTIVO | TRANSFERENCIA | TARJETA; NULL = sale registered before payments were recorded',
+    descuento      DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'discount (USD) on the total of the lines',
     recargo        DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'credit card surcharge (6 %)',
-    total_pagar    DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'total + recargo',
+    total_pagar    DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'total - descuento + recargo',
     monto_recibido DECIMAL(12,2)      COMMENT 'cash received',
     cambio         DECIMAL(12,2)      COMMENT 'change given back (cash)',
     work_order_id  INTEGER            COMMENT 'sale of a finalized work order (no product lines)',

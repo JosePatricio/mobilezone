@@ -21,6 +21,7 @@ from app.domain.entities import (
     Role,
     Sale,
     SparePart,
+    Supplier,
     StockMovement,
     User,
     WorkOrder,
@@ -147,6 +148,14 @@ class ProductRepository(Repository[Product]):
         category_id: int | None = None,
         estado: bool | None = None,
     ) -> Page[Product]: ...
+
+
+class SupplierRepository(Repository[Supplier]):
+    @abstractmethod
+    def get_by_nombre(self, nombre: str) -> Supplier | None: ...
+
+    @abstractmethod
+    def list(self, page: PageRequest, *, search: str | None = None, estado: bool | None = None) -> Page[Supplier]: ...
 
 
 class BranchRepository(Repository[Branch]):
@@ -326,6 +335,7 @@ class UnitOfWork(ABC):
     permissions: PermissionRepository
     categories: CategoryRepository
     products: ProductRepository
+    suppliers: SupplierRepository
     branches: BranchRepository
     inventory: InventoryRepository
     stock_movements: StockMovementRepository

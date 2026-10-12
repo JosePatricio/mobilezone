@@ -12,6 +12,7 @@ from app.domain.value_objects.money import ZERO, non_negative_money
 
 if TYPE_CHECKING:
     from app.domain.entities.catalog import Category
+    from app.domain.entities.supplier import Supplier
 
 
 def normalize_sku(value: str | None) -> str:
@@ -27,7 +28,7 @@ class Product(Activatable):
 
     Prices: ``precio_venta`` (PVP, used in sales), ``precio_costo`` (acquisition
     cost) and ``precio_mayor`` (wholesale). ``imagen`` is the relative path of
-    the uploaded image (None = default image).
+    the uploaded image (None = default image). ``supplier_id`` is the proveedor (optional).
     """
 
     category_id: int
@@ -38,6 +39,7 @@ class Product(Activatable):
     precio_mayor: Decimal = ZERO
     descripcion: str | None = None
     imagen: str | None = None
+    supplier_id: int | None = None
     estado: bool = True
     id: int | None = None
     created_at: datetime | None = None
@@ -45,6 +47,7 @@ class Product(Activatable):
 
     if TYPE_CHECKING:
         category: Category
+        supplier: Supplier | None
         stock_total: int  # read-only: sum of the stock in every branch
 
     def __post_init__(self) -> None:

@@ -55,7 +55,7 @@ class Sale:
     """A sale. ``factura`` = True issues an invoice, False a sales receipt (comprobante).
 
     ``cliente_id`` None means "Consumidor final". ``total`` is the sum of the lines;
-    ``total_pagar`` adds the credit card surcharge (``recargo``). For cash payments
+    ``total_pagar`` subtracts the discount (``descuento``) and adds the credit card surcharge (``recargo``). For cash payments
     ``monto_recibido`` and ``cambio`` (change to give back) are recorded.
     ``metodo_pago`` is None only for sales registered before payments were recorded.
     """
@@ -68,6 +68,7 @@ class Sale:
     factura: bool = False
     cliente_id: int | None = None
     metodo_pago: PaymentMethod | None = None
+    descuento: Decimal = ZERO
     recargo: Decimal = ZERO
     total_pagar: Decimal = ZERO
     monto_recibido: Decimal | None = None
@@ -89,6 +90,7 @@ class Sale:
         self.factura = bool(self.factura)
         if self.metodo_pago is not None:
             self.metodo_pago = PaymentMethod(self.metodo_pago)
+        self.descuento = non_negative_money(self.descuento, "descuento")
         if self.fecha is None:
             self.fecha = utcnow()
 
@@ -116,7 +118,20 @@ class Sale:
 
     def recalculate_total(self) -> None:
         self.total = sum((d.subtotal for d in self.details), ZERO)
-        self.total_pagar = self.total + self.recargo
+        self.total_pagar = self.total - self.descuento + self.recargo
+
+    def apply_discount(self, descuento: Decimal) -> None:
+        """Discount (USD) on the total of the lines; it cannot exceed that total.
+        Call ``apply_payment`` afterwards: the card surcharge is computed on the discounted amount."""
+        descuento = non_negative_money(descuento, "descuento")
+        if descuento > self.total:
+            raise ValidationError(
+                "El descuento no puede ser mayor que el total de la venta.",
+                code="INVALID_DISCOUNT",
+                details={"field": "descuento", "total": str(self.total)},
+            )
+        self.descuento = descuento
+        self.total_pagar = self.total - descuento + self.recargo
 
     def ensure_editable(self) -> None:
         if self.estado != SaleStatus.CONFIRMADA:
@@ -138,15 +153,15 @@ class Sale:
         ``pagado_previo`` is what the client already paid (the anticipo of a work order):
         only the rest is charged now.
 
-        * TARJETA: ``recargo`` = 6 % of the amount charged now (rounded to cents).
+        * TARJETA: ``recargo`` = 6 % of the amount charged now, after the discount (rounded to cents).
         * EFECTIVO: the received amount is optional; when given it must cover the amount due.
         """
         self.metodo_pago = PaymentMethod(metodo_pago)
-        pendiente = max(self.total - pagado_previo, ZERO)
+        pendiente = max(self.total - self.descuento - pagado_previo, ZERO)
         self.recargo = (
             to_money(pendiente * CARD_SURCHARGE_RATE, "recargo") if self.metodo_pago == PaymentMethod.TARJETA else ZERO
         )
-        self.total_pagar = self.total + self.recargo
+        self.total_pagar = self.total - self.descuento + self.recargo
         a_cobrar = pendiente + self.recargo
         self.monto_recibido = None
         self.cambio = None

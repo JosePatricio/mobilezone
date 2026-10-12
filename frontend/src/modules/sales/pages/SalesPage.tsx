@@ -101,8 +101,8 @@ export function SalesPage() {
       header: 'Comprobante',
       render: (r) => (
         <span onClick={(e) => e.stopPropagation()}>
-          <Button size="sm" variant="secondary" aria-label={`Ver comprobante de la venta #${r.id}`} onClick={() => showReceipt(r.id)}>
-            PDF
+          <Button size="sm" variant="secondary" aria-label={`Imprimir comprobante de la venta #${r.id}`} onClick={() => showReceipt(r.id)}>
+            Imprimir
           </Button>
         </span>
       ),

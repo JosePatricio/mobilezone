@@ -41,6 +41,11 @@ export function ProductsPage() {
     queryFn: productApi.categoryOptions,
     staleTime: 60_000,
   });
+  const suppliers = useQuery({
+    queryKey: [PRODUCTS_KEY, 'supplier-options'],
+    queryFn: productApi.supplierOptions,
+    staleTime: 60_000,
+  });
   const mutations = useCrudMutations(PRODUCTS_KEY, productApi);
   const toggleStatus = useStatusToggle(mutations.setStatus, 'el producto');
   const confirm = useConfirm();
@@ -49,6 +54,7 @@ export function ProductsPage() {
   const [editing, setEditing] = useState<Product | null | undefined>(undefined);
   const [stockOf, setStockOf] = useState<Product | null>(null);
   const categoryOptions = (categories.data ?? []).map((c) => ({ value: c.id, label: c.nombre }));
+  const supplierOptions = (suppliers.data ?? []).map((s) => ({ value: s.id, label: s.nombre }));
 
   const onDelete = async (p: Product) => {
     const ok = await confirm({
@@ -83,6 +89,12 @@ export function ProductsPage() {
     },
     { key: 'sku', header: 'SKU', render: (r) => <code>{r.sku}</code>, sortValue: (r) => r.sku },
     { key: 'categoria', header: 'Categoría', render: (r) => r.category.nombre, sortValue: (r) => r.category.nombre },
+    {
+      key: 'proveedor',
+      header: 'Proveedor',
+      render: (r) => r.supplier?.nombre ?? '—',
+      sortValue: (r) => r.supplier?.nombre.toLowerCase() ?? '',
+    },
     {
       key: 'pvp',
       header: 'PVP',
@@ -168,6 +180,7 @@ export function ProductsPage() {
         <ProductFormModal
           product={editing}
           categoryOptions={categoryOptions}
+          supplierOptions={supplierOptions}
           onClose={() => setEditing(undefined)}
           onSubmit={async (body, image) => {
             const saved = editing

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import {
   Button,
@@ -14,8 +14,18 @@ import {
   type ImageSelection,
   type SelectOption,
 } from '@/shared/components';
+import { Combobox } from '@/shared/components/Combobox';
 import { getErrorMessage } from '@/shared/services/apiError';
-import { type FormShape, zodForm, applyServerErrors, zMoney, zOptionalText, zRequiredId, zText } from '@/shared/utils/validation';
+import {
+  type FormShape,
+  zodForm,
+  applyServerErrors,
+  zMoney,
+  zOptionalId,
+  zOptionalText,
+  zRequiredId,
+  zText,
+} from '@/shared/utils/validation';
 import type { Product, ProductRequest } from '../types';
 
 export const productSchema = z.object({
@@ -24,6 +34,7 @@ export const productSchema = z.object({
     .transform((v) => v.toUpperCase()),
   nombre: zText(150),
   category_id: zRequiredId('Seleccione una categoría'),
+  supplier_id: zOptionalId,
   descripcion: zOptionalText(2000),
   precio_venta: zMoney,
   precio_costo: zMoney,
@@ -36,20 +47,30 @@ type FormOutput = z.output<typeof productSchema>;
 interface Props {
   product: Product | null;
   categoryOptions: SelectOption[];
+  /** Active suppliers (proveedores). */
+  supplierOptions: SelectOption[];
   onClose: () => void;
   onSubmit: (body: ProductRequest, image: ImageSelection) => Promise<void>;
 }
 
 /** Stock is not part of the product: it is registered per branch in the Inventario module. */
-export function ProductFormModal({ product, categoryOptions, onClose, onSubmit }: Props) {
+export function ProductFormModal({ product, categoryOptions, supplierOptions, onClose, onSubmit }: Props) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [image, setImage] = useState<ImageSelection>(NO_IMAGE_CHANGE);
   const options =
     product && !categoryOptions.some((c) => c.value === product.category_id)
       ? [...categoryOptions, { value: product.category_id, label: product.category.nombre }]
       : categoryOptions;
+  // An inactive supplier stays selectable for the products that already have it.
+  const supplier = product?.supplier;
+  const suppliers: SelectOption[] = [
+    { value: '', label: 'Sin proveedor' },
+    ...supplierOptions,
+    ...(supplier && !supplierOptions.some((s) => s.value === supplier.id) ? [{ value: supplier.id, label: supplier.nombre }] : []),
+  ];
   const {
     register,
+    control,
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
@@ -59,6 +80,7 @@ export function ProductFormModal({ product, categoryOptions, onClose, onSubmit }
       sku: product?.sku ?? '',
       nombre: product?.nombre ?? '',
       category_id: product?.category_id ?? '',
+      supplier_id: product?.supplier_id ?? '',
       descripcion: product?.descripcion ?? '',
       precio_venta: product?.precio_venta ?? '',
       precio_costo: product?.precio_costo ?? '',
@@ -119,6 +141,20 @@ export function ProductFormModal({ product, categoryOptions, onClose, onSubmit }
           placeholder="Seleccione…"
           error={errors.category_id?.message}
           {...register('category_id')}
+        />
+        <Controller
+          control={control}
+          name="supplier_id"
+          render={({ field }) => (
+            <Combobox
+              label="Proveedor"
+              options={suppliers}
+              placeholder="Seleccione el proveedor…"
+              value={field.value as string | number | null}
+              onChange={field.onChange}
+              error={errors.supplier_id?.message}
+            />
+          )}
         />
         <MoneyInput label="Precio de venta (PVP)" required error={errors.precio_venta?.message} {...register('precio_venta')} />
         <MoneyInput

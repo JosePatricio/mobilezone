@@ -35,6 +35,7 @@ export const NAVIGATION: NavGroup[] = [
     collapsible: true,
     items: [
       { to: '/products', label: 'Productos', permissions: [P.PRODUCTS_VIEW] },
+      { to: '/suppliers', label: 'Proveedores', permissions: [P.SUPPLIERS_VIEW] },
       { to: '/inventory', label: 'Inventario', permissions: [P.INVENTORY_VIEW] },
       { to: '/categories', label: 'Categorías', permissions: [P.CATEGORIES_VIEW] },
       { to: '/brands', label: 'Marcas', permissions: [P.BRANDS_VIEW] },

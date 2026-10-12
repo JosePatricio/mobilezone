@@ -116,6 +116,7 @@ class ConfirmSaleUseCase(_SaleValidation):
                 product = inventory.product
                 sale.add_line(product.id, cantidad, product.precio_venta, inventory_id)  # type: ignore[arg-type]  # PVP
                 locked.append((inventory, cantidad))
+            sale.apply_discount(data.descuento)
             sale.apply_payment(data.metodo_pago, data.monto_recibido)
             self.uow.sales.add(sale)
             self.uow.flush()
@@ -168,6 +169,7 @@ class UpdateSaleUseCase(_SaleValidation):
             sale.factura = data.factura
             sale.cliente_id = data.cliente_id
             sale.recalculate_total()
+            sale.apply_discount(data.descuento)
             sale.apply_payment(data.metodo_pago, data.monto_recibido)
         return sale
 

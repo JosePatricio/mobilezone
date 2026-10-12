@@ -62,6 +62,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         roles.permissions_router,
         catalog.categories,
         products.router,
+        catalog.suppliers,
         inventory.branches,
         inventory.inventory,
         inventory.locations,

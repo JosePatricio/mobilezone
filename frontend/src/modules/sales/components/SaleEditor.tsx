@@ -74,6 +74,7 @@ export function SaleEditor({ sale, initialLines }: Props) {
         factura,
         cliente_id: customer?.id ?? null,
         ...payment,
+        descuento: payment.descuento ?? '0.00',
       };
       return sale ? saleApi.update(sale.id, body) : saleApi.confirm({ ...body, branch_id: branchId as number });
     },
@@ -304,13 +305,15 @@ export function SaleEditor({ sale, initialLines }: Props) {
           title={editing ? 'Guardar cambios' : 'Confirmar venta'}
           confirmLabel={editing ? 'Guardar cambios' : 'Confirmar venta'}
           initialMethod={sale?.metodo_pago}
+          allowDiscount
+          initialDiscount={sale?.descuento}
           loading={mutation.isPending}
           onCancel={() => setPaying(false)}
           onConfirm={(payment) => void onPay(payment)}
         >
           Se {editing ? 'guardará' : 'registrará'} una {documentLabel(factura).toLowerCase()} a nombre de{' '}
           {customerLabel(customer)} en la sucursal {branchName} con {lines.length} producto(s) por{' '}
-          {formatMoney(total)}. Al confirmar se descargará el comprobante en PDF.
+          {formatMoney(total)}. Al confirmar se mostrará el comprobante para imprimir.
         </PaymentDialog>
       )}
     </>

@@ -21,6 +21,7 @@ import { NewSalePage } from '@/modules/sales/pages/NewSalePage';
 import { SaleDetailPage } from '@/modules/sales/pages/SaleDetailPage';
 import { SalesPage } from '@/modules/sales/pages/SalesPage';
 import { SettingsPage } from '@/modules/settings/pages/SettingsPage';
+import { SuppliersPage } from '@/modules/suppliers/pages/SuppliersPage';
 import { UsersPage } from '@/modules/users/pages/UsersPage';
 import { WorkOrderDetailPage } from '@/modules/work-orders/pages/WorkOrderDetailPage';
 import { WorkOrderFormPage } from '@/modules/work-orders/pages/WorkOrderFormPage';
@@ -48,6 +49,9 @@ export function AppRouter() {
 
           <Route element={<PermissionRoute permission={P.PRODUCTS_VIEW} />}>
             <Route path="products" element={<ProductsPage />} />
+          </Route>
+          <Route element={<PermissionRoute permission={P.SUPPLIERS_VIEW} />}>
+            <Route path="suppliers" element={<SuppliersPage />} />
           </Route>
           <Route element={<PermissionRoute permission={P.INVENTORY_VIEW} />}>
             <Route path="inventory" element={<InventoryPage />} />

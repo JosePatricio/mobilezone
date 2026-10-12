@@ -13,4 +13,6 @@ export const productApi = {
   removeImage: (id: Id) => deleteImage<Product>(`/products/${id}/image`),
   /** Active categories for the product form and filters (no access to Categorías needed). */
   categoryOptions: () => http.get<NamedRef[]>('/products/category-options').then((r) => r.data),
+  /** Active suppliers for the product form (no access to Proveedores needed). */
+  supplierOptions: () => http.get<NamedRef[]>('/products/supplier-options').then((r) => r.data),
 };

@@ -1,9 +1,9 @@
-"""Use cases for simple catalogs: categories, brands, device models and spare parts."""
+"""Use cases for simple catalogs: categories, brands, device models, spare parts and suppliers."""
 from __future__ import annotations
 
-from app.application.dto import CatalogData, DeviceModelData, SparePartData
+from app.application.dto import CatalogData, DeviceModelData, SparePartData, SupplierData
 from app.application.use_cases.base import CrudUseCases
-from app.domain.entities import Brand, Category, DeviceModel, SparePart
+from app.domain.entities import Brand, Category, DeviceModel, SparePart, Supplier
 from app.domain.exceptions import ConflictError, NotFoundError, ValidationError
 from app.domain.repositories import Repository
 from app.domain.value_objects.pagination import Page, PageRequest
@@ -148,3 +148,48 @@ class SparePartUseCases(CrudUseCases[SparePart]):
             part.ubicacion, part.garantia = normalized.ubicacion, normalized.garantia
             part.estado = data.estado
         return part
+
+
+class SupplierUseCases(CrudUseCases[Supplier]):
+    """Proveedores of the products."""
+
+    entity_label = "Proveedor"
+    not_found_code = "SUPPLIER_NOT_FOUND"
+
+    def _repo(self) -> Repository[Supplier]:
+        return self.uow.suppliers
+
+    def list(self, page: PageRequest, search: str | None = None, estado: bool | None = None) -> Page[Supplier]:
+        return self.uow.suppliers.list(page, search=search, estado=estado)
+
+    def _ensure_unique(self, nombre: str, current_id: int | None = None) -> None:
+        existing = self.uow.suppliers.get_by_nombre(nombre)
+        if existing is not None and existing.id != current_id:
+            raise ConflictError("Ya existe un proveedor con ese nombre.", code="SUPPLIER_ALREADY_EXISTS")
+
+    @staticmethod
+    def _build(data: SupplierData) -> Supplier:
+        return Supplier(
+            nombre=data.nombre,
+            ruc=data.ruc,
+            telefono=data.telefono,
+            email=data.email,
+            direccion=data.direccion,
+            estado=data.estado,
+        )
+
+    def create(self, data: SupplierData) -> Supplier:
+        with self.uow.transaction():
+            supplier = self._build(data)
+            self._ensure_unique(supplier.nombre)
+            self.uow.suppliers.add(supplier)
+        return supplier
+
+    def update(self, supplier_id: int, data: SupplierData) -> Supplier:
+        with self.uow.transaction():
+            supplier = self.get(supplier_id)
+            changes = self._build(data)
+            self._ensure_unique(changes.nombre, current_id=supplier.id)
+            supplier.nombre, supplier.ruc, supplier.telefono = changes.nombre, changes.ruc, changes.telefono
+            supplier.email, supplier.direccion, supplier.estado = changes.email, changes.direccion, changes.estado
+        return supplier

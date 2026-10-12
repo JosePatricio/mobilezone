@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button, ErrorState, Loading, Modal } from '@/shared/components';
 import type { Id } from '@/shared/types/api';
 import { SALES_KEY, saleApi } from '../services/saleApi';
+import { PrintableSale, SaleReceipt } from './PrintableSale';
 
 interface ReceiptViewerProps {
   /** Sale whose receipt is shown; null = closed. */
@@ -11,42 +11,28 @@ interface ReceiptViewerProps {
 }
 
 /**
- * Shows the PDF receipt (comprobante) inside the app with the browser PDF viewer.
- * Nothing is downloaded, so no "save as" dialog is opened.
+ * Shows the receipt (comprobante / factura) of the sale as it will be printed: 80 mm thermal
+ * receipt printed with window.print, the same format as the work orders.
  */
 export function ReceiptViewer({ saleId, onClose }: ReceiptViewerProps) {
-  const frameRef = useRef<HTMLIFrameElement>(null);
-  const [url, setUrl] = useState<string | null>(null);
   const query = useQuery({
-    queryKey: [SALES_KEY, 'receipt', saleId],
-    queryFn: () => saleApi.receipt(saleId as Id),
+    queryKey: [SALES_KEY, 'detail', saleId],
+    queryFn: () => saleApi.get(saleId as Id),
     enabled: saleId != null,
-    gcTime: 0,
-    staleTime: 0,
   });
-
-  useEffect(() => {
-    if (!query.data) {
-      setUrl(null);
-      return;
-    }
-    const objectUrl = URL.createObjectURL(new Blob([query.data], { type: 'application/pdf' }));
-    setUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [query.data]);
+  const sale = saleId != null ? query.data : undefined;
 
   return (
     <Modal
       open={saleId != null}
       title={`Comprobante · Venta #${saleId ?? ''}`}
       onClose={onClose}
-      size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             Cerrar
           </Button>
-          <Button onClick={() => frameRef.current?.contentWindow?.print()} disabled={!url}>
+          <Button onClick={() => window.print()} disabled={!sale}>
             Imprimir
           </Button>
         </>
@@ -54,8 +40,13 @@ export function ReceiptViewer({ saleId, onClose }: ReceiptViewerProps) {
     >
       {query.isError ? (
         <ErrorState error={query.error} onRetry={() => query.refetch()} />
-      ) : url ? (
-        <iframe ref={frameRef} className="receipt-frame" src={url} title="Comprobante PDF" />
+      ) : sale ? (
+        <>
+          <div className="receipt-preview" data-testid="receipt-preview">
+            <SaleReceipt sale={sale} />
+          </div>
+          <PrintableSale sale={sale} />
+        </>
       ) : (
         <Loading />
       )}

@@ -29,8 +29,6 @@ export const saleApi = {
   update: (id: Id, body: UpdateSaleRequest) => http.put<Sale>(`/sales/${id}`, body).then((r) => r.data),
   /** "Eliminar": the sale is cancelled (kept as ANULADA) and the stock goes back to the branch. */
   cancel: (id: Id) => http.post<Sale>(`/sales/${id}/cancel`).then((r) => r.data),
-  /** PDF receipt (comprobante). */
-  receipt: (id: Id) => http.get<Blob>(`/sales/${id}/receipt`, { responseType: 'blob' }).then((r) => r.data),
   /** Finds an active client by cédula / RUC (available to sellers). */
   lookupCustomer: (identificacion: string) =>
     http.get<Client>('/sales/customers/lookup', { params: { identificacion } }).then((r) => r.data),
