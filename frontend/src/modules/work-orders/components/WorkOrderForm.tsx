@@ -297,7 +297,7 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           {serverError}
         </div>
       )}
-      {/* Two columns: phone data | client; below, the lock (its right column stays empty). */}
+      {/* Two columns: phone data | client; below, lock and work on the left. */}
       <div className="form-columns">
         <Card title="Datos del celular">
           <div className="form-grid">
@@ -440,85 +440,81 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           </div>
         </Card>
 
-        <Card title="Desbloqueo del equipo">
-          <div className="lock-types" role="radiogroup" aria-label="Tipo de bloqueo">
-            {catalogs.tipos_bloqueo.map((option) => (
-              <label key={option.value} className="radio">
-                <input type="radio" value={option.value} {...register('bloqueo_tipo')} />
-                {option.label}
-              </label>
-            ))}
-          </div>
-          {bloqueo === 'PATRON' && (
-            <Controller
-              control={control}
-              name="patron"
-              render={({ field, fieldState }) => (
-                <div className="field">
-                  <p className="field-hint">
-                    Dibuje el patrón con el mouse o el dedo (también punto por punto), uniendo al menos {MIN_PATTERN_DOTS} puntos.
-                  </p>
-                  <PatternLock value={(field.value as string) || null} onChange={field.onChange} />
-                  <div className="pattern-actions">
-                    <span className="muted">{field.value ? `Secuencia: ${field.value}` : 'Sin patrón'}</span>
-                    {Boolean(field.value) && (
-                      <Button size="sm" variant="ghost" onClick={() => field.onChange('')}>
-                        Borrar
-                      </Button>
+        {/* Left column: lock and work; the right column stays empty (page background). */}
+        <div className="form-columns-first">
+          <Card title="Desbloqueo del equipo">
+            <div className="lock-types" role="radiogroup" aria-label="Tipo de bloqueo">
+              {catalogs.tipos_bloqueo.map((option) => (
+                <label key={option.value} className="radio">
+                  <input type="radio" value={option.value} {...register('bloqueo_tipo')} />
+                  {option.label}
+                </label>
+              ))}
+            </div>
+            {bloqueo === 'PATRON' && (
+              <Controller
+                control={control}
+                name="patron"
+                render={({ field, fieldState }) => (
+                  <div className="field">
+                    <p className="field-hint">
+                      Dibuje el patrón con el mouse o el dedo (también punto por punto), uniendo al menos {MIN_PATTERN_DOTS} puntos.
+                    </p>
+                    <PatternLock value={(field.value as string) || null} onChange={field.onChange} />
+                    <div className="pattern-actions">
+                      <span className="muted">{field.value ? `Secuencia: ${field.value}` : 'Sin patrón'}</span>
+                      {Boolean(field.value) && (
+                        <Button size="sm" variant="ghost" onClick={() => field.onChange('')}>
+                          Borrar
+                        </Button>
+                      )}
+                    </div>
+                    {fieldState.error && (
+                      <p className="field-error" role="alert">
+                        {fieldState.error.message}
+                      </p>
                     )}
                   </div>
-                  {fieldState.error && (
-                    <p className="field-error" role="alert">
-                      {fieldState.error.message}
-                    </p>
-                  )}
-                </div>
-              )}
-            />
-          )}
-          {bloqueo === 'PIN' && (
-            <div className="form-grid">
-              <Input
-                label="PIN"
-                required
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={12}
-                error={errors.pin?.message}
-                {...register('pin', {
-                  onChange: (e) => setValue('pin', String(e.target.value).replace(/\D/g, '')),
-                })}
+                )}
               />
-            </div>
-          )}
-        </Card>
-      </div>
-
-      <Card title="Trabajo">
-        <div className="form-grid">
-          <div className="full">
+            )}
+            {bloqueo === 'PIN' && (
+              <div className="form-grid">
+                <Input
+                  label="PIN"
+                  required
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={12}
+                  error={errors.pin?.message}
+                  {...register('pin', {
+                    onChange: (e) => setValue('pin', String(e.target.value).replace(/\D/g, '')),
+                  })}
+                />
+              </div>
+            )}
+          </Card>
+          <Card title="Trabajo">
             <PhotoSlots value={photos} onChange={setPhotos} />
-          </div>
-          <Textarea label="Observaciones" rows={4} className="col-first" error={errors.observacion?.message} {...register('observacion')} />
-          <Input
-            label="Fecha y hora de ingreso"
-            type="datetime-local"
-            required
-            className="col-first"
-            hint="Por defecto, la fecha y hora actuales"
-            error={errors.fecha_hora?.message}
-            {...register('fecha_hora')}
-          />
-          <Input
-            label="Fecha de entrega"
-            type="datetime-local"
-            className="col-first"
-            min={order ? undefined : toDateTimeLocal(new Date().toISOString())}
-            error={errors.fecha_entrega?.message}
-            {...register('fecha_entrega')}
-          />
+            <Textarea label="Observaciones" rows={4} error={errors.observacion?.message} {...register('observacion')} />
+            <Input
+              label="Fecha y hora de ingreso"
+              type="datetime-local"
+              required
+              hint="Por defecto, la fecha y hora actuales"
+              error={errors.fecha_hora?.message}
+              {...register('fecha_hora')}
+            />
+            <Input
+              label="Fecha de entrega"
+              type="datetime-local"
+              min={order ? undefined : toDateTimeLocal(new Date().toISOString())}
+              error={errors.fecha_entrega?.message}
+              {...register('fecha_entrega')}
+            />
+          </Card>
         </div>
-      </Card>
+      </div>
 
       <Card title="Valores">
         <div className="form-grid">

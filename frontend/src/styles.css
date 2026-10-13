@@ -867,4 +867,4 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 /* Form split in two columns of cards (e.g. work order: phone data | client). */
 .form-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; align-items: start; }
 @media (max-width: 1100px) { .form-columns { grid-template-columns: 1fr; } }
-.form-grid .col-first { grid-column: 1; }
+.form-columns-first { grid-column: 1; }

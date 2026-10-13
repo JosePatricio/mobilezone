@@ -97,7 +97,7 @@ describe('WorkOrderForm', () => {
     const onSubmit = renderForm();
     const titles = screen.getAllByRole('heading').map((h) => h.textContent);
     expect(titles).toEqual(['Datos del celular', 'Cliente', 'Desbloqueo del equipo', 'Trabajo', 'Valores']);
-    // First row: phone data | client; below them, the lock (left column).
+    // First row: phone data | client; below them, lock and work in the left column (the right one is empty).
     const columns = screen.getByRole('heading', { name: 'Datos del celular' }).closest('.form-columns')!;
     expect(columns).toContainElement(screen.getByRole('heading', { name: 'Cliente' }));
     expect(columns).toContainElement(screen.getByRole('heading', { name: 'Desbloqueo del equipo' }));
@@ -105,7 +105,8 @@ describe('WorkOrderForm', () => {
     const work = screen.getByRole('heading', { name: 'Trabajo' }).closest('section')!;
     const labels = within(work).getAllByText(/^(Observaciones|Fecha y hora de ingreso|Fecha de entrega)/).map((l) => l.textContent);
     expect(labels).toEqual(['Observaciones', 'Fecha y hora de ingreso *', 'Fecha de entrega']);
-    expect(within(work).getByLabelText('Observaciones').closest('.field')).toHaveClass('col-first');
+    const left = screen.getByRole('heading', { name: 'Desbloqueo del equipo' }).closest('.form-columns-first')!;
+    expect(left).toContainElement(work);
     // Valores: cost | advance, and the balance on its own row.
     expect(screen.getByTestId('form-saldo').closest('.field')).toHaveClass('full');
     expect(screen.getByRole('button', { name: /Proveedor/ })).toHaveTextContent('Sin proveedor');
