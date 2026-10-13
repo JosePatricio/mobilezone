@@ -107,6 +107,7 @@ describe('WorkOrderForm', () => {
     expect(labels).toEqual(['Observaciones', 'Fecha y hora de ingreso *', 'Fecha de entrega']);
     const left = screen.getByRole('heading', { name: 'Desbloqueo del equipo' }).closest('.form-columns-first')!;
     expect(left).toContainElement(work);
+    expect(left).toContainElement(screen.getByRole('heading', { name: 'Valores' }));
     // Valores: cost | advance, and the balance on its own row.
     expect(screen.getByTestId('form-saldo').closest('.field')).toHaveClass('full');
     expect(screen.getByRole('button', { name: /Proveedor/ })).toHaveTextContent('Sin proveedor');

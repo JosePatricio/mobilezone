@@ -440,7 +440,7 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           </div>
         </Card>
 
-        {/* Left column: lock and work; the right column stays empty (page background). */}
+        {/* Left column: lock, work and amounts; the right column stays empty (page background). */}
         <div className="form-columns-first">
           <Card title="Desbloqueo del equipo">
             <div className="lock-types" role="radiogroup" aria-label="Tipo de bloqueo">
@@ -513,22 +513,22 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
               {...register('fecha_entrega')}
             />
           </Card>
+
+          <Card title="Valores">
+            <div className="form-grid">
+              <MoneyInput label="Costo de reparación $" required error={errors.presupuesto?.message} {...register('presupuesto')} />
+              <MoneyInput label="Anticipo $" required error={errors.anticipo?.message} {...register('anticipo')} />
+              <div className="field full">
+                <span className="field-label">Saldo $</span>
+                <p className={`readonly-value ${toCents(saldo) < 0 ? 'text-danger' : ''}`} data-testid="form-saldo">
+                  {formatMoney(saldo)}
+                </p>
+              </div>
+            </div>
+            <p className="field-hint">El saldo definitivo es calculado por el sistema al guardar.</p>
+          </Card>
         </div>
       </div>
-
-      <Card title="Valores">
-        <div className="form-grid">
-          <MoneyInput label="Costo de reparación $" required error={errors.presupuesto?.message} {...register('presupuesto')} />
-          <MoneyInput label="Anticipo $" required error={errors.anticipo?.message} {...register('anticipo')} />
-          <div className="field full">
-            <span className="field-label">Saldo $</span>
-            <p className={`readonly-value ${toCents(saldo) < 0 ? 'text-danger' : ''}`} data-testid="form-saldo">
-              {formatMoney(saldo)}
-            </p>
-          </div>
-        </div>
-        <p className="field-hint">El saldo definitivo es calculado por el sistema al guardar.</p>
-      </Card>
 
       <div className="form-actions">
         <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/shared/components';
 import { IMAGE_ACCEPT, MAX_IMAGE_BYTES } from '@/shared/components/Images';
 import type { WorkOrderPhoto } from '../types';
+import { CameraCapture, cameraSupported } from './CameraCapture';
 
 export const MAX_PHOTOS = 3;
 
@@ -19,14 +20,23 @@ interface Props {
   onChange: (value: PhotoChanges) => void;
 }
 
-/** Up to 3 photos of the device (JPG, PNG or WEBP, max 2 MB). On phones the camera can be used. */
+/** Up to 3 photos of the device (JPG, PNG or WEBP, max 2 MB). "Agregar" opens the camera and each photo
+ * taken appears in the next slot; without a camera (or permission) an image file is chosen instead. */
 export function PhotoSlots({ value, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [camera, setCamera] = useState(false);
   const kept = value.existing.filter((p) => !value.removed.includes(p.id));
   const previews = useMemo(() => value.added.map((file) => URL.createObjectURL(file)), [value.added]);
   useEffect(() => () => previews.forEach((url) => URL.revokeObjectURL(url)), [previews]);
   const free = MAX_PHOTOS - kept.length - value.added.length;
+
+  const chooseFile = () => inputRef.current?.click();
+  const add = () => {
+    setError(null);
+    if (cameraSupported()) setCamera(true);
+    else chooseFile();
+  };
 
   const onFile = (file: File | undefined) => {
     setError(null);
@@ -67,11 +77,27 @@ export function PhotoSlots({ value, onChange }: Props) {
           </figure>
         ))}
         {Array.from({ length: Math.max(free, 0) }, (_, i) => (
-          <button key={`empty-${i}`} type="button" className="photo-slot photo-slot-empty" onClick={() => inputRef.current?.click()}>
+          <button key={`empty-${i}`} type="button" className="photo-slot photo-slot-empty" onClick={add}>
             + Agregar foto
           </button>
         ))}
       </div>
+      {camera && free > 0 && (
+        <CameraCapture
+          remaining={free}
+          onCapture={onFile}
+          onClose={() => setCamera(false)}
+          onUnavailable={(message) => {
+            setCamera(false);
+            setError(message);
+          }}
+        />
+      )}
+      {free > 0 && !camera && (
+        <button type="button" className="link-button photo-file-link" onClick={chooseFile}>
+          o elegir una imagen
+        </button>
+      )}
       <input
         ref={inputRef}
         type="file"
