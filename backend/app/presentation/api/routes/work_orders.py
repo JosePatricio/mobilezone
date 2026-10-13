@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Request, Response, UploadFile, status
 
 from app.application.dto import ClientData, FinalizeWorkOrderData, WorkOrderClientData, WorkOrderStatusData, WorkOrderData, WorkOrderFilters, WorkOrderSparePartData
+from app.application.use_cases.catalog import SupplierUseCases
 from app.application.use_cases.inventory import BranchUseCases
 from app.application.use_cases.users import ClientUseCases
 from app.application.use_cases.work_orders import (
@@ -37,6 +38,7 @@ from app.presentation.api.dependencies import (
     require_any_permission,
     require_permissions,
 )
+from app.presentation.api.schemas.catalog import SupplierSummary
 from app.presentation.api.schemas.common import PageResponse
 from app.presentation.api.schemas.users import ClientRequest, ClientResponse, ClientSummary
 from app.presentation.api.schemas.work_orders import (
@@ -91,6 +93,13 @@ def list_order_branches(uow: UowDep, _: CanEdit):
     """Active branches (locales) for the order form (does not require ``inventory.view``)."""
     result = BranchUseCases(uow).list(PageRequest(1, MAX_PAGE_SIZE), estado=True)
     return [BranchContact.model_validate(b) for b in result.items]
+
+
+@router.get("/suppliers", response_model=list[SupplierSummary])
+def list_order_suppliers(uow: UowDep, _: CanUpdate):
+    """Active suppliers (proveedores) for finalizing an order (does not require ``suppliers.view``)."""
+    result = SupplierUseCases(uow).list(PageRequest(1, MAX_PAGE_SIZE), estado=True)
+    return [SupplierSummary.model_validate(s) for s in result.items]
 
 
 @router.get("/customers/lookup", response_model=ClientSummary)

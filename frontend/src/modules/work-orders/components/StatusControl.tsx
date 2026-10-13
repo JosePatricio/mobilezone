@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/app/store/AuthProvider';
 import { useBranchOptions } from '@/modules/branches/services/branchApi';
 import { PaymentDialog, type PaymentResult } from '@/modules/sales/components/PaymentDialog';
 import { SALES_KEY } from '@/modules/sales/services/saleApi';
 import { Button, Input, Modal, Select, StatusBadge, Textarea, useToast } from '@/shared/components';
+import { Combobox } from '@/shared/components/Combobox';
 import { getErrorMessage } from '@/shared/services/apiError';
 import type { NamedRef } from '@/shared/types/api';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
@@ -28,7 +29,7 @@ interface Props {
 /**
  * Status selector of an order (Recibido / En proceso / Finalizado):
  * - En proceso asks for the approximate delivery time and a note.
- * - Finalizado asks for confirmation (the order is closed) and the payment: it registers a sale.
+ * - Finalizado asks for confirmation (the order is closed), the supplier and the payment: it registers a sale.
  */
 export function StatusControl({ order, canUpdate }: Props) {
   const { statuses } = useWorkOrderStatuses();
@@ -167,14 +168,25 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
   const branches: NamedRef[] = anyBranch ? (allBranches.data ?? []) : (user?.branches ?? []);
   const [branchId, setBranchId] = useState<number | null>(null);
   const selectedBranch = branchId ?? branches[0]?.id ?? null;
+  // Read from the database every time the dialog opens: suppliers added in another tab show up without reloading.
+  const suppliers = useQuery({
+    queryKey: [WORK_ORDERS_KEY, 'suppliers'],
+    queryFn: workOrderApi.suppliers,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+  });
+  const [supplierId, setSupplierId] = useState<number | null>(null);
+  const [supplierError, setSupplierError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const finalize = useMutation({
     mutationFn: (payment: PaymentResult) =>
-      workOrderApi.finalize(order.id, { ...payment, branch_id: selectedBranch as number }),
+      workOrderApi.finalize(order.id, { ...payment, branch_id: selectedBranch as number, supplier_id: supplierId }),
   });
 
   const confirm = async (payment: PaymentResult) => {
     setError(null);
+    if (supplierId === null) return setSupplierError('Seleccione el proveedor.');
     try {
       const saved = await finalize.mutateAsync(payment);
       onDone();
@@ -194,7 +206,7 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
       confirmLabel="Finalizar y registrar venta"
       totalLabel="Saldo a cobrar"
       loading={finalize.isPending}
-      confirmDisabled={selectedBranch === null}
+      confirmDisabled={selectedBranch === null || suppliers.isPending || suppliers.data?.length === 0}
       onCancel={onClose}
       onConfirm={(payment) => void confirm(payment)}
       header={
@@ -219,6 +231,29 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
               onChange={(e) => setBranchId(Number(e.target.value))}
               options={branches.map((b) => ({ value: b.id, label: b.nombre }))}
               disabled={branches.length <= 1}
+            />
+          )}
+          {suppliers.isError ? (
+            <div className="alert alert-error" role="alert">
+              {getErrorMessage(suppliers.error)}
+            </div>
+          ) : suppliers.data?.length === 0 ? (
+            <div className="alert alert-error" role="alert">
+              No hay proveedores activos. Agréguelos en Proveedores.
+            </div>
+          ) : (
+            <Combobox
+              label="Proveedor"
+              required
+              placeholder={suppliers.isPending ? 'Cargando…' : 'Seleccione el proveedor…'}
+              disabled={suppliers.isPending}
+              options={(suppliers.data ?? []).map((s) => ({ value: s.id, label: s.nombre }))}
+              value={supplierId}
+              onChange={(value) => {
+                setSupplierId(Number(value));
+                setSupplierError(null);
+              }}
+              error={supplierError ?? undefined}
             />
           )}
         </>

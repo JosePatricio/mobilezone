@@ -351,6 +351,7 @@ work_orders_table = Table(
     Column("cliente_id", ForeignKey("users.id"), nullable=False, index=True),
     Column("tecnico_id", ForeignKey("users.id"), index=True),
     Column("branch_id", ForeignKey("branches.id"), index=True),  # sucursal (local) that receives the device
+    Column("supplier_id", ForeignKey("suppliers.id"), index=True),  # proveedor chosen when the order is finalized
     Column("marca_id", ForeignKey("brands.id"), nullable=False),
     Column("modelo_id", ForeignKey("models.id"), nullable=False),
     Column("observacion", Text),
@@ -597,6 +598,7 @@ def start_mappers() -> None:
             "cliente": relationship(User, foreign_keys=[wo.cliente_id], lazy="joined"),
             "tecnico": relationship(User, foreign_keys=[wo.tecnico_id], lazy="joined"),
             "branch": relationship(Branch, lazy="joined"),
+            "supplier": relationship(Supplier, lazy="joined"),
             "marca": relationship(Brand, lazy="joined"),
             "modelo": relationship(DeviceModel, lazy="joined"),
             "spare_parts": relationship(

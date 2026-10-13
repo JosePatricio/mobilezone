@@ -308,6 +308,7 @@ CREATE TABLE work_orders (
     cliente_id  INTEGER       NOT NULL COMMENT 'client (users.tipo_usuario = CLIENTE)',
     tecnico_id  INTEGER                COMMENT 'technician: the user who registered the order',
     branch_id   INTEGER                COMMENT 'sucursal (local) that receives the device',
+    supplier_id INTEGER                COMMENT 'proveedor chosen when the order is finalized',
     marca_id    INTEGER       NOT NULL,
     modelo_id   INTEGER       NOT NULL,
     observacion TEXT,
@@ -338,6 +339,7 @@ CREATE TABLE work_orders (
     CONSTRAINT fk_work_orders_cliente_id_users FOREIGN KEY (cliente_id) REFERENCES users (id),
     CONSTRAINT fk_work_orders_tecnico_id_users FOREIGN KEY (tecnico_id) REFERENCES users (id),
     CONSTRAINT fk_work_orders_branch_id_branches FOREIGN KEY (branch_id) REFERENCES branches (id),
+    CONSTRAINT fk_work_orders_supplier_id_suppliers FOREIGN KEY (supplier_id) REFERENCES suppliers (id),
     CONSTRAINT fk_work_orders_marca_id_brands FOREIGN KEY (marca_id) REFERENCES brands (id),
     CONSTRAINT fk_work_orders_modelo_id_models FOREIGN KEY (modelo_id) REFERENCES models (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -346,6 +348,7 @@ CREATE INDEX ix_work_orders_branch_id ON work_orders (branch_id);
 CREATE INDEX ix_work_orders_cliente_id ON work_orders (cliente_id);
 CREATE INDEX ix_work_orders_estado ON work_orders (estado);
 CREATE INDEX ix_work_orders_fecha ON work_orders (fecha);
+CREATE INDEX ix_work_orders_supplier_id ON work_orders (supplier_id);
 CREATE INDEX ix_work_orders_tecnico_id ON work_orders (tecnico_id);
 CREATE INDEX ix_work_orders_user_id ON work_orders (user_id);
 

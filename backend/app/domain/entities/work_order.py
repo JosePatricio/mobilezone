@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from app.domain.entities.branch import Branch
     from app.domain.entities.catalog import Brand, DeviceModel
     from app.domain.entities.spare_part import SparePart
+    from app.domain.entities.supplier import Supplier
     from app.domain.entities.user import User
 
 
@@ -128,6 +129,7 @@ class WorkOrder:
     fecha_entrega: datetime | None = None  # promised delivery date and time
     tecnico_id: int | None = None  # technician: the user who registered the order
     branch_id: int | None = None  # sucursal (local) that receives the device
+    supplier_id: int | None = None  # proveedor chosen when the order is finalized
     observacion: str | None = None
     estado: int = WorkOrderStatus.RECIBIDO
     color: str | None = None
@@ -149,6 +151,7 @@ class WorkOrder:
         cliente: User
         tecnico: User | None
         branch: Branch | None
+        supplier: Supplier | None
         marca: Brand
         modelo: DeviceModel
 
@@ -225,9 +228,12 @@ class WorkOrder:
         self.estado = int(status)
         return self.record_status(user_id, observacion, fecha_entrega)
 
-    def finalize(self, user_id: int, observacion: str | None = None) -> WorkOrderStatusChange:
+    def finalize(
+        self, user_id: int, observacion: str | None = None, supplier_id: int | None = None
+    ) -> WorkOrderStatusChange:
         self.ensure_editable()
         self.estado = int(WorkOrderStatus.FINALIZADO)
+        self.supplier_id = supplier_id
         return self.record_status(user_id, observacion)
 
     def record_status(

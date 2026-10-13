@@ -17,7 +17,7 @@ from app.domain.value_objects.work_orders import (
     MAX_WARRANTY_DAYS,
     entry_reasons_label,
 )
-from app.presentation.api.schemas.catalog import BrandSummary, DeviceModelSummary, SparePartSummary
+from app.presentation.api.schemas.catalog import BrandSummary, DeviceModelSummary, SparePartSummary, SupplierSummary
 from app.presentation.api.schemas.common import Money, Name, RequestSchema, Schema, media_url
 from app.presentation.api.schemas.users import Celular, ClientSummary, Identificacion, OptionalEmail, UserSummary
 
@@ -133,6 +133,7 @@ class FinalizeWorkOrderRequest(RequestSchema):
     metodo_pago: PaymentMethod = Field(description="Pago del saldo: EFECTIVO, TRANSFERENCIA o TARJETA (+6 % del saldo)")
     monto_recibido: Money | None = Field(default=None, description="Solo efectivo: monto recibido para el cambio")
     observacion: Note = None
+    supplier_id: int | None = Field(default=None, description="Proveedor de la reparación (activo)")
 
 
 class StatusChangeResponse(Schema):
@@ -238,6 +239,8 @@ class WorkOrderResponse(WorkOrderListItem):
     user: UserSummary = Field(description="Usuario que registró la orden")
     branch_id: int | None
     branch: BranchContact | None = Field(description="Sucursal (local): dirección y teléfono para la orden impresa")
+    supplier_id: int | None
+    supplier: SupplierSummary | None = Field(description="Proveedor elegido al finalizar")
     observacion: str | None
     modelo_tecnico: str | None
     bloqueo_tipo: LockType

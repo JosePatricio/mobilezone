@@ -1,4 +1,2 @@
-En el modulo Ventas
-Estoy en la sucursal Matriz, estoy buscando este producto CABLE LIGHTNING A C.  pero me sale esto No se encontró “CABLE LIGHTNING A C” en la sucursal Matriz. Buscar en otras sucursales (Inventario) →
-
-En el modulo inventario este producto si existe, y si tiene stock. y si esta en sucursal Matrix
+En el modulo Ordenes
+En la columna Estado, cuando se ponga Finalizado, Abrir un modal, para seleccionar el proveedor (un selector con filtro texto de busqueda), este proveedor es el mismo de la tabla de proveedores, Cada que se cargue e selector, haz una consulta a base de datos, porque desde otra pesta;as puedo agregar mas proveedores y no quiero recargar la pagina cada vez que agregue

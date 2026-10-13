@@ -1,6 +1,6 @@
 import type { Client, ClientRequest } from '@/modules/clients/types';
 import { http } from '@/shared/services/httpClient';
-import type { Id, Page, QueryParams } from '@/shared/types/api';
+import type { Id, NamedRef, Page, QueryParams } from '@/shared/types/api';
 import { cleanParams } from '@/shared/utils/format';
 import type {
   AddSparePartRequest,
@@ -41,6 +41,8 @@ export const workOrderApi = {
   catalogs: () => http.get<WorkOrderCatalogs>(`${BASE}/catalogs`).then((r) => r.data),
   /** Active branches (locales) for the order form. */
   branches: () => http.get<WorkOrderBranch[]>(`${BASE}/branches`).then((r) => r.data),
+  /** Active suppliers (proveedores) to choose when finalizing an order. */
+  suppliers: () => http.get<NamedRef[]>(`${BASE}/suppliers`).then((r) => r.data),
   /** Client by cédula / RUC (404 = new client). */
   lookupCustomer: (identificacion: string) =>
     http.get<WorkOrderClient>(`${BASE}/customers/lookup`, { params: { identificacion } }).then((r) => r.data),

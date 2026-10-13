@@ -118,6 +118,9 @@ export interface WorkOrder extends WorkOrderListItem, Timestamps {
   user: UserRef;
   branch_id: Id | null;
   branch: WorkOrderBranch | null;
+  /** Supplier (proveedor) chosen when the order was finalized. */
+  supplier_id: Id | null;
+  supplier: NamedRef | null;
   observacion: string | null;
   /** Technical model code of the phone, e.g. SM-A105M. */
   modelo_tecnico: string | null;
@@ -199,6 +202,7 @@ export interface FinalizeWorkOrderRequest {
   metodo_pago: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA';
   monto_recibido: Money | null;
   observacion?: string | null;
+  supplier_id?: Id | null;
 }
 
 export interface AddSparePartRequest {

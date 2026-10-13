@@ -870,3 +870,38 @@ def test_upgrade_020_wholesale_sale_lines(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_021_work_order_supplier(mysql_engine: Engine):
+    """v20 database -> upgrade 021 adds work_orders.supplier_id (optional, FK to suppliers)."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (
+        initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005, sql.UPGRADE_006, sql.UPGRADE_007,
+        sql.UPGRADE_008, sql.UPGRADE_009, sql.UPGRADE_010, sql.UPGRADE_011, sql.UPGRADE_012, sql.UPGRADE_013,
+        sql.UPGRADE_014, sql.UPGRADE_015, sql.UPGRADE_016, sql.UPGRADE_017, sql.UPGRADE_018, sql.UPGRADE_019,
+        sql.UPGRADE_020,
+    )
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_021)
+            q = conn.exec_driver_sql
+            assert q(
+                "SELECT is_nullable FROM information_schema.columns WHERE table_schema = DATABASE() "
+                "AND table_name = 'work_orders' AND column_name = 'supplier_id'"
+            ).scalar() == "YES"
+            assert q(
+                "SELECT referenced_table_name FROM information_schema.key_column_usage WHERE table_schema = DATABASE() "
+                "AND table_name = 'work_orders' AND column_name = 'supplier_id' AND referenced_table_name IS NOT NULL"
+            ).scalar() == "suppliers"
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

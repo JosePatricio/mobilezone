@@ -239,6 +239,12 @@ class FinalizeWorkOrderUseCase(UseCase):
             order = _get_order(self.uow, work_order_id)
             order.ensure_editable()
             ensure_branch_access(self.uow, actor, data.branch_id)
+            if data.supplier_id is not None:
+                supplier = self.uow.suppliers.get(data.supplier_id)
+                if supplier is None:
+                    raise NotFoundError("Proveedor no encontrado.", code="SUPPLIER_NOT_FOUND")
+                if not supplier.estado:
+                    raise ValidationError("El proveedor seleccionado está inactivo.", code="SUPPLIER_INACTIVE")
             sale = Sale.for_work_order(
                 user_id=actor.id,  # type: ignore[arg-type]
                 branch_id=data.branch_id,
@@ -248,7 +254,7 @@ class FinalizeWorkOrderUseCase(UseCase):
             )
             sale.apply_payment(data.metodo_pago, data.monto_recibido, pagado_previo=order.anticipo)
             self.uow.sales.add(sale)
-            order.finalize(actor.id, data.observacion)  # type: ignore[arg-type]
+            order.finalize(actor.id, data.observacion, data.supplier_id)  # type: ignore[arg-type]
             self.uow.flush()
         return order, sale
 

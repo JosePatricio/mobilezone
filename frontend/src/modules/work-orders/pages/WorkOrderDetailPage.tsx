@@ -177,6 +177,12 @@ export function WorkOrderDetailPage() {
             <dd>
               <StatusControl order={order} canUpdate={canUpdate} />
             </dd>
+            {order.supplier && (
+              <>
+                <dt>Proveedor</dt>
+                <dd>{order.supplier.nombre}</dd>
+              </>
+            )}
             <dt>Vendedor</dt>
             <dd>{order.tecnico ? fullName(order.tecnico) : 'Sin asignar'}</dd>
             <dt>Fecha de entrega</dt>

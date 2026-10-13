@@ -239,6 +239,7 @@ class FinalizeWorkOrderData:
     metodo_pago: PaymentMethod
     monto_recibido: Decimal | None = None
     observacion: str | None = None
+    supplier_id: int | None = None  # proveedor of the repair
 
 
 @dataclass(frozen=True)
