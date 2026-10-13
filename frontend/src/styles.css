@@ -874,3 +874,14 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .camera-status { margin: 0; }
 .camera-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .photo-file-link { margin-top: 8px; font-size: 0.875rem; }
+
+/* Work order form: Cédula / RUC across the whole row, centered. */
+.lookup-row-wide .field { flex: 1 1 auto; }
+.lookup-row-wide .field-label,
+.lookup-row-wide .field-hint,
+.lookup-row-wide .field-error { text-align: center; }
+.lookup-row-wide .input { text-align: center; }
+
+/* Saldo: white bold text on a dark background (stays dark in both themes). */
+.saldo-value { padding: 10px 14px; border-radius: var(--radius); background: #111827; color: #fff; font-weight: 700; font-size: 1.125rem; }
+.saldo-value.saldo-negative { color: #fca5a5; }

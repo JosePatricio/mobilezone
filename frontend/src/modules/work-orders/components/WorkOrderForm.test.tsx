@@ -110,6 +110,12 @@ describe('WorkOrderForm', () => {
     expect(left).toContainElement(screen.getByRole('heading', { name: 'Valores' }));
     // Valores: cost | advance, and the balance on its own row.
     expect(screen.getByTestId('form-saldo').closest('.field')).toHaveClass('full');
+    expect(screen.getByTestId('form-saldo')).toHaveClass('saldo-value'); // white bold on dark
+    // Reception and delivery dates on the same row.
+    const dates = screen.getByLabelText(/Fecha y hora de ingreso/).closest('.form-grid')!;
+    expect(dates).toContainElement(screen.getByLabelText('Fecha de entrega'));
+    // Cédula / RUC across the whole row of the client box.
+    expect(screen.getByLabelText(/Cédula \/ RUC/).closest('.lookup-row')).toHaveClass('lookup-row-wide', 'full');
     expect(screen.getByRole('button', { name: /Proveedor/ })).toHaveTextContent('Sin proveedor');
     expect(screen.getByText('Proveedor').querySelector('.field-required')).toBeNull(); // not required
     expect(onSubmit).not.toHaveBeenCalled();

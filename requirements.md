@@ -1,6 +1,5 @@
-en la seccion de Valores
-Costo de reparación $ * y  Anticipo $ * , que ocupen solo ocupen la primera columna, la columna de a lado que se quede vacia, y obviamente el color del background
+Fecha y hora de ingreso * y Fecha de entrega, que esten en una sola fila
 
-En la seccion de Trabajo
-En Fotos del equipo (máx. 3).
-Cuando se presione el boton agregar, Que se abra la camara y cuando se tome cada foto se quede ahi en cada espacion como preview
+El campo Saldo $ , que de fondo sea obscuro o negro y letras balncas en negrilla/bold
+
+En la seccion de Cliente Cédula / RUC * , que ocupe toda la fila del box, centrado

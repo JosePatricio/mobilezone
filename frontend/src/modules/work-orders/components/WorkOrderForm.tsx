@@ -396,7 +396,8 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
 
         <Card title="Cliente">
           <div className="form-grid">
-            <div className="lookup-row full">
+            {/* Cédula / RUC takes the whole row, centered. */}
+            <div className="lookup-row lookup-row-wide full">
               <Input
                 label="Cédula / RUC"
                 required
@@ -497,21 +498,24 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           <Card title="Trabajo">
             <PhotoSlots value={photos} onChange={setPhotos} />
             <Textarea label="Observaciones" rows={4} error={errors.observacion?.message} {...register('observacion')} />
-            <Input
-              label="Fecha y hora de ingreso"
-              type="datetime-local"
-              required
-              hint="Por defecto, la fecha y hora actuales"
-              error={errors.fecha_hora?.message}
-              {...register('fecha_hora')}
-            />
-            <Input
-              label="Fecha de entrega"
-              type="datetime-local"
-              min={order ? undefined : toDateTimeLocal(new Date().toISOString())}
-              error={errors.fecha_entrega?.message}
-              {...register('fecha_entrega')}
-            />
+            {/* Reception and delivery on the same row. */}
+            <div className="form-grid">
+              <Input
+                label="Fecha y hora de ingreso"
+                type="datetime-local"
+                required
+                hint="Por defecto, la fecha y hora actuales"
+                error={errors.fecha_hora?.message}
+                {...register('fecha_hora')}
+              />
+              <Input
+                label="Fecha de entrega"
+                type="datetime-local"
+                min={order ? undefined : toDateTimeLocal(new Date().toISOString())}
+                error={errors.fecha_entrega?.message}
+                {...register('fecha_entrega')}
+              />
+            </div>
           </Card>
 
           <Card title="Valores">
@@ -520,7 +524,7 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
               <MoneyInput label="Anticipo $" required error={errors.anticipo?.message} {...register('anticipo')} />
               <div className="field full">
                 <span className="field-label">Saldo $</span>
-                <p className={`readonly-value ${toCents(saldo) < 0 ? 'text-danger' : ''}`} data-testid="form-saldo">
+                <p className={`readonly-value saldo-value ${toCents(saldo) < 0 ? 'saldo-negative' : ''}`} data-testid="form-saldo">
                   {formatMoney(saldo)}
                 </p>
               </div>
