@@ -905,3 +905,33 @@ def test_upgrade_021_work_order_supplier(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_022_sale_spare_part_cost(mysql_engine: Engine):
+    """v21 database -> upgrade 022 adds sales.costo_repuesto (optional)."""
+    from pathlib import Path
+
+    from app.infrastructure.database import sql_scripts as sql
+
+    initial = Path(__file__).resolve().parents[1] / "migrations" / "sql" / "0001_initial_schema.sql"
+    scripts = (
+        initial, sql.UPGRADE_002, sql.UPGRADE_003, sql.UPGRADE_004, sql.UPGRADE_005, sql.UPGRADE_006, sql.UPGRADE_007,
+        sql.UPGRADE_008, sql.UPGRADE_009, sql.UPGRADE_010, sql.UPGRADE_011, sql.UPGRADE_012, sql.UPGRADE_013,
+        sql.UPGRADE_014, sql.UPGRADE_015, sql.UPGRADE_016, sql.UPGRADE_017, sql.UPGRADE_018, sql.UPGRADE_019,
+        sql.UPGRADE_020, sql.UPGRADE_021,
+    )
+    try:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            for script in scripts:
+                run_script(conn, script)
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_022)
+            assert conn.exec_driver_sql(
+                "SELECT is_nullable, numeric_scale FROM information_schema.columns WHERE table_schema = DATABASE() "
+                "AND table_name = 'sales' AND column_name = 'costo_repuesto'"
+            ).one() == ("YES", 2)
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

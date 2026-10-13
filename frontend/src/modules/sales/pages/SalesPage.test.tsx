@@ -26,6 +26,8 @@ const sale = (id: number, estado: Sale['estado']): Sale => ({
   cliente: null,
   work_order_id: null,
   work_order: null,
+  costo_repuesto: null,
+  ganancia: null,
   details: [],
   created_at: '2026-09-30T15:00:00Z',
   updated_at: '2026-09-30T15:00:00Z',

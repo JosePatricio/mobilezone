@@ -263,3 +263,12 @@ def test_to_money_rejects_garbage():
         to_money("abc")
     with pytest.raises(ValidationError):
         to_money(float("nan"))
+
+
+def test_work_order_sale_profit_is_total_minus_spare_part_cost():
+    kwargs = dict(user_id=1, branch_id=1, cliente_id=2, work_order_id=3, total=Decimal("50"))
+    sale = Sale.for_work_order(**kwargs, costo_repuesto=Decimal("18.50"))
+    assert (sale.total, sale.costo_repuesto, sale.ganancia) == (Decimal("50.00"), Decimal("18.50"), Decimal("31.50"))
+    assert Sale.for_work_order(**kwargs).ganancia is None  # no spare part cost: no profit shown
+    with pytest.raises(ValidationError):
+        Sale.for_work_order(**kwargs, costo_repuesto=Decimal("-1"))

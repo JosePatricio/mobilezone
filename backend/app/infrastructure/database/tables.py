@@ -290,6 +290,7 @@ sales_table = Table(
     Column("cambio", MONEY),  # change given back (cash)
     # Sale of a finalized work order (no product lines); one sale per order.
     Column("work_order_id", ForeignKey("work_orders.id"), unique=True),
+    Column("costo_repuesto", MONEY),  # work order sale: cost of the spare part (profit = total - costo)
     *_timestamps(),
 )
 

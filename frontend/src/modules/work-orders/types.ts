@@ -105,6 +105,9 @@ export interface WorkOrderSale {
   total: Money;
   total_pagar: Money;
   metodo_pago: string | null;
+  costo_repuesto: Money | null;
+  /** total - costo de repuesto (null without a spare part cost). */
+  ganancia: Money | null;
 }
 
 /** Shop (sucursal) of the order: its contact data is printed on the receipt. */
@@ -205,6 +208,8 @@ export interface FinalizeWorkOrderRequest {
   monto_recibido: Money | null;
   observacion?: string | null;
   supplier_id?: Id | null;
+  /** Cost of the spare part: the profit of the sale is the repair cost minus it. */
+  costo_repuesto?: Money | null;
 }
 
 export interface AddSparePartRequest {

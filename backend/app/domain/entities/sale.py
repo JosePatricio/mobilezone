@@ -83,6 +83,7 @@ class Sale:
     monto_recibido: Decimal | None = None
     cambio: Decimal | None = None
     work_order_id: int | None = None  # sale registered when a work order is finalized (no product lines)
+    costo_repuesto: Decimal | None = None  # work order sale: cost of the spare part used in the repair
     details: list[SaleDetail] = field(default_factory=list)
     id: int | None = None
     created_at: datetime | None = None
@@ -126,13 +127,30 @@ class Sale:
 
     @classmethod
     def for_work_order(
-        cls, *, user_id: int, branch_id: int, cliente_id: int, work_order_id: int, total: Decimal
+        cls,
+        *,
+        user_id: int,
+        branch_id: int,
+        cliente_id: int,
+        work_order_id: int,
+        total: Decimal,
+        costo_repuesto: Decimal | None = None,
     ) -> "Sale":
-        """Sale of a repair: its total is the repair cost (no product lines)."""
+        """Sale of a repair: its total is the repair cost (no product lines). ``costo_repuesto``
+        (optional) is what the spare part cost; the profit of the sale is the total minus that cost."""
         sale = cls(user_id=user_id, branch_id=branch_id, cliente_id=cliente_id, work_order_id=work_order_id)
         sale.total = non_negative_money(total, "total")
         sale.total_pagar = sale.total
+        if costo_repuesto is not None:
+            sale.costo_repuesto = non_negative_money(costo_repuesto, "costo_repuesto")
         return sale
+
+    @property
+    def ganancia(self) -> Decimal | None:
+        """Work order sale with a spare part cost: total (repair cost) - costo de repuesto."""
+        if self.costo_repuesto is None:
+            return None
+        return to_money(self.total - self.descuento - self.costo_repuesto)
 
     def recalculate_total(self) -> None:
         self.total = sum((d.subtotal for d in self.details), ZERO)

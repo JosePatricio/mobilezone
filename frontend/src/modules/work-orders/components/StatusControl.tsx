@@ -4,13 +4,13 @@ import { useAuth } from '@/app/store/AuthProvider';
 import { useBranchOptions } from '@/modules/branches/services/branchApi';
 import { PaymentDialog, type PaymentResult } from '@/modules/sales/components/PaymentDialog';
 import { SALES_KEY } from '@/modules/sales/services/saleApi';
-import { Button, Input, Modal, Select, StatusBadge, Textarea, useToast } from '@/shared/components';
+import { Button, Input, Modal, MoneyInput, Select, StatusBadge, Textarea, useToast } from '@/shared/components';
 import { Combobox } from '@/shared/components/Combobox';
 import { getErrorMessage } from '@/shared/services/apiError';
 import type { NamedRef } from '@/shared/types/api';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatOrderNumber, fromDateTimeLocal, toDateTimeLocal } from '@/shared/utils/format';
-import { formatMoney } from '@/shared/utils/money';
+import { formatMoney, fromCents, isValidMoney, toCents } from '@/shared/utils/money';
 import { statusTone, useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
 import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
 import { WORK_ORDER_STATUS, type WorkOrderListItem } from '../types';
@@ -38,7 +38,8 @@ interface Props {
 /**
  * Status selector of an order (Recibido / En proceso / Finalizado):
  * - En proceso asks for the approximate delivery time and a note.
- * - Finalizado asks for confirmation (the order is closed), the supplier and the payment: it registers a sale.
+ * - Finalizado asks for confirmation (the order is closed), the supplier, the spare part cost (optional)
+ *   and the payment: it registers a sale whose profit is the repair cost minus the spare part cost.
  */
 export function StatusControl({ order, canUpdate }: Props) {
   const { statuses } = useWorkOrderStatuses();
@@ -192,15 +193,28 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
     supplierOptions.push({ value: order.supplier.id, label: order.supplier.nombre }); // kept even if inactive
   }
   const [supplierError, setSupplierError] = useState<string | null>(null);
+  // Optional: the profit of the sale is the repair cost minus the spare part cost.
+  const [costo, setCosto] = useState('');
+  const [costoError, setCostoError] = useState<string | null>(null);
+  const costoValid = costo.trim() !== '' && isValidMoney(costo);
+  const costoRepuesto = costoValid ? fromCents(toCents(costo)) : null;
   const [error, setError] = useState<string | null>(null);
   const finalize = useMutation({
     mutationFn: (payment: PaymentResult) =>
-      workOrderApi.finalize(order.id, { ...payment, branch_id: selectedBranch as number, supplier_id: supplierId }),
+      workOrderApi.finalize(order.id, {
+        ...payment,
+        branch_id: selectedBranch as number,
+        supplier_id: supplierId,
+        costo_repuesto: costoRepuesto,
+      }),
   });
 
   const confirm = async (payment: PaymentResult) => {
     setError(null);
-    if (supplierId === null) return setSupplierError('Seleccione el proveedor.');
+    const badCosto = costo.trim() !== '' && !costoValid;
+    if (badCosto) setCostoError('Ingrese un valor válido, por ejemplo 12.50.');
+    if (supplierId === null) setSupplierError('Seleccione el proveedor.');
+    if (badCosto || supplierId === null) return;
     try {
       const saved = await finalize.mutateAsync(payment);
       onDone();
@@ -270,6 +284,20 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
               error={supplierError ?? undefined}
             />
           )}
+          <MoneyInput
+            label="Costo de repuesto $"
+            hint={
+              costoRepuesto !== null
+                ? `Ganancia de la venta: ${formatMoney((toCents(order.presupuesto) - toCents(costoRepuesto)) / 100)}`
+                : 'Opcional. La ganancia de la venta será el costo de reparación menos este valor.'
+            }
+            value={costo}
+            onChange={(e) => {
+              setCosto(e.target.value);
+              setCostoError(null);
+            }}
+            error={costoError ?? undefined}
+          />
         </>
       }
     >

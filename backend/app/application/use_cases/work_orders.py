@@ -261,6 +261,7 @@ class FinalizeWorkOrderUseCase(UseCase):
                 cliente_id=order.cliente_id,
                 work_order_id=order.id,  # type: ignore[arg-type]
                 total=order.presupuesto,
+                costo_repuesto=data.costo_repuesto,
             )
             sale.apply_payment(data.metodo_pago, data.monto_recibido, pagado_previo=order.anticipo)
             self.uow.sales.add(sale)

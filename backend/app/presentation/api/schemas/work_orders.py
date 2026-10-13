@@ -136,6 +136,9 @@ class FinalizeWorkOrderRequest(RequestSchema):
     monto_recibido: Money | None = Field(default=None, description="Solo efectivo: monto recibido para el cambio")
     observacion: Note = None
     supplier_id: int | None = Field(default=None, description="Proveedor de la reparación (activo)")
+    costo_repuesto: Money | None = Field(
+        default=None, description="Costo del repuesto; la ganancia de la venta es el costo de reparación - este costo"
+    )
 
 
 class StatusChangeResponse(Schema):
@@ -160,6 +163,8 @@ class WorkOrderSaleRef(Schema):
     total: Decimal
     total_pagar: Decimal
     metodo_pago: PaymentMethod | None
+    costo_repuesto: Decimal | None
+    ganancia: Decimal | None = Field(description="total - costo de repuesto (null sin costo de repuesto)")
 
 
 class BalanceRequest(RequestSchema):

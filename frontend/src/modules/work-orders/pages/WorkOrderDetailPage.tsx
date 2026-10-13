@@ -87,6 +87,12 @@ export function WorkOrderDetailPage() {
         title={`Orden #${formatOrderNumber(order.num_orden)}`}
         actions={
           <>
+            {canUpdate && !finalized && (
+              <span className="header-status">
+                Actualizar estado
+                <StatusControl order={order} canUpdate />
+              </span>
+            )}
             <Link to="/work-orders" className="btn btn-secondary btn-md">
               Volver
             </Link>
@@ -118,6 +124,12 @@ export function WorkOrderDetailPage() {
               <Link to={`/sales/${order.sale.id}`}>
                 #{order.sale.id} · {formatMoney(order.sale.total_pagar)}
               </Link>
+              {order.sale.ganancia !== null && (
+                <>
+                  {' '}
+                  (costo de repuesto {formatMoney(order.sale.costo_repuesto)} · ganancia {formatMoney(order.sale.ganancia)})
+                </>
+              )}
             </>
           )}
         </div>
@@ -175,7 +187,8 @@ export function WorkOrderDetailPage() {
             <dd className="pre-line">{order.observacion ?? '—'}</dd>
             <dt>Estado</dt>
             <dd>
-              <StatusControl order={order} canUpdate={canUpdate} />
+              {/* Changed with "Actualizar estado" in the header. */}
+              <StatusControl order={order} canUpdate={false} />
             </dd>
             {order.supplier && (
               <>

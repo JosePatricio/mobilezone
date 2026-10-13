@@ -425,6 +425,7 @@ CREATE TABLE sales (
     monto_recibido DECIMAL(12,2)      COMMENT 'cash received',
     cambio         DECIMAL(12,2)      COMMENT 'change given back (cash)',
     work_order_id  INTEGER            COMMENT 'sale of a finalized work order (no product lines)',
+    costo_repuesto DECIMAL(12,2)      COMMENT 'work order sale: cost of the spare part (profit = total - costo)',
     created_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     CONSTRAINT pk_sales PRIMARY KEY (id),

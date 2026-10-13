@@ -66,6 +66,10 @@ export interface Sale extends Timestamps {
   /** Sale of a finalized work order (no product lines; it cannot be modified nor cancelled). */
   work_order_id: Id | null;
   work_order: { id: Id; num_orden: number } | null;
+  /** Work order sale: cost of the spare part entered when finalizing (null = not entered). */
+  costo_repuesto: Money | null;
+  /** total - costo_repuesto (null without a spare part cost). */
+  ganancia: Money | null;
   details: SaleDetail[];
 }
 

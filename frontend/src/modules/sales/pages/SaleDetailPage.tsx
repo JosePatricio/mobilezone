@@ -171,6 +171,20 @@ export function SaleDetailPage() {
           </table>
         </div>
       </Card>
+      {sale.work_order && sale.costo_repuesto !== null && (
+        <Card title="Ganancia de la reparación">
+          <dl className="detail-list detail-inline">
+            <dt>Costo de reparación</dt>
+            <dd>{formatMoney(sale.total)}</dd>
+            <dt>Costo de repuesto</dt>
+            <dd>- {formatMoney(sale.costo_repuesto)}</dd>
+            <dt>Ganancia</dt>
+            <dd data-testid="sale-profit" className={Number(sale.ganancia) < 0 ? 'text-danger' : undefined}>
+              <strong>{formatMoney(sale.ganancia)}</strong>
+            </dd>
+          </dl>
+        </Card>
+      )}
       <ReceiptViewer saleId={viewing ? sale.id : null} onClose={() => setViewing(false)} />
     </>
   );

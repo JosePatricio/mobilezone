@@ -112,7 +112,7 @@ describe('StatusControl', () => {
     await vi.waitFor(() => expect(finalizeCalls).toHaveLength(1));
     expect(finalizeCalls[0]).toEqual({
       id: 5,
-      body: { metodo_pago: 'TRANSFERENCIA', monto_recibido: null, branch_id: 1, supplier_id: 4 },
+      body: { metodo_pago: 'TRANSFERENCIA', monto_recibido: null, branch_id: 1, supplier_id: 4, costo_repuesto: null },
     });
     expect(await screen.findByText(/Venta #77 registrada en Ventas/)).toBeInTheDocument();
   });
@@ -148,5 +148,29 @@ describe('StatusControl', () => {
     await userEvent.click(confirm);
     await vi.waitFor(() => expect(finalizeCalls).toHaveLength(1));
     expect(finalizeCalls[0]).toMatchObject({ body: { supplier_id: 4 } });
+  });
+
+  it('Finalizado takes an optional spare part cost and shows the profit of the sale', async () => {
+    const withSupplier = { ...order(1), supplier_id: 4, supplier: { id: 4, nombre: 'Partes Guayaquil' } };
+    renderWithProviders(<StatusControl order={withSupplier} canUpdate />, { auth });
+    await screen.findByRole('option', { name: 'Finalizado' });
+    await userEvent.selectOptions(screen.getByRole('combobox'), '2');
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Transferencia' }));
+    const confirm = within(dialog).getByRole('button', { name: 'Finalizar y registrar venta' });
+    await vi.waitFor(() => expect(confirm).toBeEnabled());
+
+    const costo = within(dialog).getByLabelText('Costo de repuesto $');
+    await userEvent.type(costo, 'abc');
+    await userEvent.click(confirm);
+    expect(await within(dialog).findByText('Ingrese un valor válido, por ejemplo 12.50.')).toBeInTheDocument();
+    expect(finalizeCalls).toHaveLength(0);
+
+    await userEvent.clear(costo);
+    await userEvent.type(costo, '35,5');
+    expect(dialog).toHaveTextContent('Ganancia de la venta: $ 64,50'); // repair cost 100 - 35.50
+    await userEvent.click(confirm);
+    await vi.waitFor(() => expect(finalizeCalls).toHaveLength(1));
+    expect(finalizeCalls[0]).toMatchObject({ body: { supplier_id: 4, costo_repuesto: '35.50' } });
   });
 });

@@ -78,6 +78,8 @@ class SaleResponse(Schema):
     cliente: ClientSummary | None = Field(description="null = consumidor final")
     work_order_id: int | None = Field(description="Venta de una orden de trabajo finalizada (sin productos)")
     work_order: SaleWorkOrderRef | None
+    costo_repuesto: Decimal | None = Field(description="Venta de una orden: costo del repuesto")
+    ganancia: Decimal | None = Field(description="Venta de una orden: total - costo de repuesto (null sin costo)")
     details: list[SaleDetailResponse]
     created_at: datetime
     updated_at: datetime

@@ -241,6 +241,7 @@ class FinalizeWorkOrderData:
     monto_recibido: Decimal | None = None
     observacion: str | None = None
     supplier_id: int | None = None  # proveedor of the repair
+    costo_repuesto: Decimal | None = None  # cost of the spare part: profit of the sale = total - costo
 
 
 @dataclass(frozen=True)

@@ -89,10 +89,27 @@ describe('WorkOrderDetailPage', () => {
     expect(await screen.findByText('Listado de órdenes')).toBeInTheDocument();
   });
 
+  it('updates the status from the header of the detail', async () => {
+    api.statuses.mockResolvedValue([
+      { value: 0, label: 'Recibido' },
+      { value: 1, label: 'En proceso' },
+      { value: 2, label: 'Finalizado' },
+    ]);
+    renderDetail([P.WORK_ORDERS_VIEW, P.WORK_ORDERS_UPDATE]);
+    const select = await screen.findByRole('combobox', { name: 'Estado de la orden 000012' });
+    expect(select.closest('.header-status')).toHaveTextContent('Actualizar estado');
+    await screen.findByRole('option', { name: 'Finalizado' });
+    await userEvent.selectOptions(select, '2');
+    // Same validation as in the list: the supplier is required to finalize.
+    const dialog = await screen.findByRole('alertdialog', { name: 'Finalizar orden #000012' });
+    expect(within(dialog).getByLabelText('Costo de repuesto $')).toBeInTheDocument();
+  });
+
   it('hides the button without permission', async () => {
     renderDetail([P.WORK_ORDERS_VIEW]);
     expect(await screen.findByRole('heading', { name: 'Orden #000012' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Eliminar' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Actualizar estado')).not.toBeInTheDocument();
   });
 });
 
