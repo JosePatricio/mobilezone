@@ -17,7 +17,7 @@ const order = {
   fecha: '2026-10-06',
   fecha_entrega: null,
   cliente_id: 7,
-  cliente: { id: 7, nombre: 'Juan', apellido: 'Pérez', identificacion: '1712345675', celular: null, email: null },
+  cliente: { id: 7, nombre: 'Juan', apellido: 'Pérez', identificacion: '1712345675', celular: '0991234567', email: null },
   marca_id: 1,
   marca: { id: 1, nombre: 'Samsung' },
   modelo_id: 2,
@@ -101,7 +101,10 @@ describe('WorkOrdersPage', () => {
     renderWithProviders(<WorkOrdersPage />, { auth: fakeAuth({ permissionCodes: [P.WORK_ORDERS_VIEW] }) });
     expect(await screen.findByText('Samsung A10')).toBeInTheDocument();
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent?.replace(/[↕↑↓]/g, '').trim());
-    expect(headers).toEqual(['N.º Orden', 'Cliente', 'Equipo', 'Saldo', 'Entrega', 'Estado']);
+    expect(headers).toEqual(['N.º Orden', 'Cliente', 'WhatsApp', 'Equipo', 'Saldo', 'Entrega', 'Estado']);
+    const whatsapp = screen.getByRole('link', { name: 'WhatsApp de Juan Pérez' });
+    expect(whatsapp).toHaveAttribute('href', 'https://web.whatsapp.com/send?phone=593991234567');
+    expect(whatsapp).toHaveAttribute('target', '_blank');
     expect(screen.queryByRole('button', { name: 'Ver' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Filtrar por vendedor' })).not.toBeInTheDocument();

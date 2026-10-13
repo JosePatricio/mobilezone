@@ -96,8 +96,8 @@ def list_order_branches(uow: UowDep, _: CanEdit):
 
 
 @router.get("/suppliers", response_model=list[SupplierSummary])
-def list_order_suppliers(uow: UowDep, _: CanUpdate):
-    """Active suppliers (proveedores) for finalizing an order (does not require ``suppliers.view``)."""
+def list_order_suppliers(uow: UowDep, _: CanEdit):
+    """Active suppliers (proveedores) for the order form and for finalizing (no ``suppliers.view`` needed)."""
     result = SupplierUseCases(uow).list(PageRequest(1, MAX_PAGE_SIZE), estado=True)
     return [SupplierSummary.model_validate(s) for s in result.items]
 

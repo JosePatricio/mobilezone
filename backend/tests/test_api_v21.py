@@ -55,3 +55,36 @@ def test_finalize_rejects_unknown_or_inactive_supplier(client, admin_headers, uo
     assert wrong.status_code == 400 and wrong.json()["error"]["code"] == "SUPPLIER_INACTIVE"
     # Nothing was finalized.
     assert client.get(f"{API}/work-orders/{order['id']}", headers=admin_headers).json()["estado"] == 0
+
+
+def test_order_form_saves_an_optional_supplier(client, admin_headers, uow, factory):
+    supplier = _supplier(uow, "Proveedor Formulario")
+    body = _order_body(factory, supplier_id=supplier.id)
+    created = client.post(f"{API}/work-orders", json=body, headers=admin_headers)
+    assert created.status_code == 201, created.text
+    order = created.json()
+    assert order["supplier"] == {"id": supplier.id, "nombre": "Proveedor Formulario"}
+    listed = client.get(f"{API}/work-orders", params={"num_orden": order["num_orden"]}, headers=admin_headers).json()
+    assert listed["items"][0]["supplier_id"] == supplier.id
+
+    # An inactive supplier is kept on the order that already has it, but cannot be newly chosen.
+    with uow.transaction():
+        uow.suppliers.get(supplier.id).estado = False
+    kept = client.put(f"{API}/work-orders/{order['id']}", json=body, headers=admin_headers)
+    assert kept.status_code == 200, kept.text
+    other = client.post(f"{API}/work-orders", json=body, headers=admin_headers)
+    assert other.status_code == 400 and other.json()["error"]["code"] == "SUPPLIER_INACTIVE"
+
+    # Optional: it can be removed.
+    cleared = client.put(f"{API}/work-orders/{order['id']}", json={**body, "supplier_id": None}, headers=admin_headers)
+    assert cleared.json()["supplier"] is None
+
+
+def test_finalize_without_supplier_keeps_the_one_from_the_form(client, admin_headers, uow, factory):
+    supplier = _supplier(uow, "Proveedor Previo")
+    order = client.post(
+        f"{API}/work-orders", json=_order_body(factory, supplier_id=supplier.id), headers=admin_headers
+    ).json()
+    done = client.post(f"{API}/work-orders/{order['id']}/finalize", json=_finalize_body(factory), headers=admin_headers)
+    assert done.status_code == 200, done.text
+    assert done.json()["supplier_id"] == supplier.id

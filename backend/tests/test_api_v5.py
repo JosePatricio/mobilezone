@@ -130,8 +130,9 @@ class TestWorkOrdersV5:
 
     def test_catalogs(self, client, admin_headers):
         catalogs = client.get(f"{API}/work-orders/catalogs", headers=admin_headers).json()
-        assert len(catalogs["motivos_ingreso"]) == 14
-        assert {"value": "PANTALLA", "label": "Pantalla"} in catalogs["motivos_ingreso"]
+        assert len(catalogs["motivos_ingreso"]) == 13
+        assert {"value": "PIN_CARGA", "label": "PIN de carga"} in catalogs["motivos_ingreso"]
+        assert "PANTALLA" not in [o["value"] for o in catalogs["motivos_ingreso"]]  # no longer offered
         assert [o["value"] for o in catalogs["tipos_display"]] == ["INCELL", "OLED", "ORIGINAL"]
         assert {o["value"] for o in catalogs["tipos_bloqueo"]} == {"NINGUNO", "PATRON", "PIN"}
         assert catalogs["estados"] and "tipos_garantia" not in catalogs

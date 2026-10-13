@@ -28,7 +28,7 @@ export function ColorPalette({ value, onChange, error }: Props) {
   // A color typed in an older order that is not in the palette is kept as its own option.
   const colors = current && !PHONE_COLORS.some((c) => c.name === current) ? [...PHONE_COLORS, { name: current, hex: '' }] : PHONE_COLORS;
   return (
-    <div className={`field full ${error ? 'field-invalid' : ''}`}>
+    <div className={`field ${error ? 'field-invalid' : ''}`}>
       <span className="field-label" id="color-palette-label">
         Color{current ? `: ${current}` : ''}
       </span>

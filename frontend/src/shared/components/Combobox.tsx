@@ -8,6 +8,8 @@ interface BaseProps {
   error?: string;
   required?: boolean;
   disabled?: boolean;
+  /** Called every time the list is opened (e.g. to query the options again). */
+  onOpen?: () => void;
 }
 
 interface SingleProps extends BaseProps {
@@ -33,7 +35,7 @@ const normalize = (text: string) =>
 
 /** Select with a search box (filters the options while typing; accents are ignored). */
 export function Combobox(props: ComboboxProps) {
-  const { label, options, placeholder = 'Seleccione…', error, required, disabled } = props;
+  const { label, options, placeholder = 'Seleccione…', error, required, disabled, onOpen } = props;
   const id = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -103,7 +105,10 @@ export function Combobox(props: ComboboxProps) {
         aria-labelledby={`${id}-label ${id}-value`}
         aria-invalid={Boolean(error)}
         disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) onOpen?.();
+          setOpen(!open);
+        }}
       >
         <span id={`${id}-value`} className={selectedLabels.length ? '' : 'muted'}>
           {selectedLabels.length ? selectedLabels.join(', ') : placeholder}

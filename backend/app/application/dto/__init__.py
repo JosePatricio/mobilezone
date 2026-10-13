@@ -219,6 +219,7 @@ class WorkOrderData:
     fecha_entrega: datetime | None = None  # timezone-aware
     branch_id: int | None = None  # sucursal (local); None = the user's branch
     fecha_hora: datetime | None = None  # reception date and time (timezone-aware); None = now
+    supplier_id: int | None = None  # proveedor (optional)
 
 
 @dataclass(frozen=True)

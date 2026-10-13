@@ -50,11 +50,13 @@ const publicOrder: PublicWorkOrder = {
 };
 
 const createdCustomers: Record<string, unknown>[] = [];
+const supplierList = vi.hoisted(() => vi.fn(() => Promise.resolve([{ id: 3, nombre: 'Repuestos Quito' }])));
 vi.mock('@/shared/components/LocationFields', () => ({ LocationFields: () => null, useProvinces: () => ({ isSuccess: true }) }));
 vi.mock('../services/workOrderApi', () => ({
   WORK_ORDERS_KEY: 'work-orders',
   workOrderApi: {
     catalogs: () => Promise.resolve(catalogs),
+    suppliers: supplierList,
     statuses: () => Promise.resolve(catalogs.estados),
     branches: () =>
       Promise.resolve([
@@ -91,6 +93,26 @@ function renderForm(onSubmit = vi.fn<(body: WorkOrderRequest, photos: PhotoChang
 }
 
 describe('WorkOrderForm', () => {
+  it('starts with the phone data; the supplier is optional', async () => {
+    const onSubmit = renderForm();
+    const titles = screen.getAllByRole('heading').map((h) => h.textContent);
+    expect(titles).toEqual(['Datos del celular', 'Cliente', 'Desbloqueo del equipo', 'Trabajo', 'Valores']);
+    // First row: phone data | client; below them, the lock (left column).
+    const columns = screen.getByRole('heading', { name: 'Datos del celular' }).closest('.form-columns')!;
+    expect(columns).toContainElement(screen.getByRole('heading', { name: 'Cliente' }));
+    expect(columns).toContainElement(screen.getByRole('heading', { name: 'Desbloqueo del equipo' }));
+    // Trabajo: photos, then observaciones, reception and delivery dates (first column).
+    const work = screen.getByRole('heading', { name: 'Trabajo' }).closest('section')!;
+    const labels = within(work).getAllByText(/^(Observaciones|Fecha y hora de ingreso|Fecha de entrega)/).map((l) => l.textContent);
+    expect(labels).toEqual(['Observaciones', 'Fecha y hora de ingreso *', 'Fecha de entrega']);
+    expect(within(work).getByLabelText('Observaciones').closest('.field')).toHaveClass('col-first');
+    // Valores: cost | advance, and the balance on its own row.
+    expect(screen.getByTestId('form-saldo').closest('.field')).toHaveClass('full');
+    expect(screen.getByRole('button', { name: /Proveedor/ })).toHaveTextContent('Sin proveedor');
+    expect(screen.getByText('Proveedor').querySelector('.field-required')).toBeNull(); // not required
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it('fills an existing client after typing the cédula and pressing Enter', async () => {
     renderForm();
     await userEvent.type(screen.getByLabelText(/Cédula \/ RUC/), '1712345675{Enter}');
@@ -171,6 +193,13 @@ describe('WorkOrderForm', () => {
     // The display type appears only when a display change is among the reasons.
     await userEvent.selectOptions(screen.getByLabelText(/Tipo de display/), 'OLED');
 
+    // Optional supplier (proveedor), queried again every time its selector is opened.
+    const calls = supplierList.mock.calls.length;
+    await userEvent.click(screen.getByRole('button', { name: /Proveedor/ }));
+    await vi.waitFor(() => expect(supplierList.mock.calls.length).toBeGreaterThan(calls));
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar proveedor' }), 'quito');
+    await userEvent.click(await screen.findByRole('option', { name: 'Repuestos Quito' }));
+
     const warranty = screen.getByLabelText(/Tiempo de garantía/);
     await userEvent.clear(warranty);
     await userEvent.type(warranty, '90');
@@ -208,6 +237,7 @@ describe('WorkOrderForm', () => {
       presupuesto: '80.00',
       anticipo: '20.00',
       fecha_entrega: new Date(2026, 9, 5, 16, 30).toISOString(),
+      supplier_id: 3,
     });
     expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('tecnico_id');
   }, 15_000); // long scripted flow: slower when the whole suite runs in parallel

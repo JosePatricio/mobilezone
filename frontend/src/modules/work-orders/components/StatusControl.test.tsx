@@ -134,4 +134,19 @@ describe('StatusControl', () => {
       await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     }
   });
+
+  it('Finalizado preselects the supplier chosen in the order form', async () => {
+    const withSupplier = { ...order(1), supplier_id: 4, supplier: { id: 4, nombre: 'Partes Guayaquil' } };
+    renderWithProviders(<StatusControl order={withSupplier} canUpdate />, { auth });
+    await screen.findByRole('option', { name: 'Finalizado' });
+    await userEvent.selectOptions(screen.getByRole('combobox'), '2');
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByRole('button', { name: /Proveedor/ })).toHaveTextContent('Partes Guayaquil');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Transferencia' }));
+    const confirm = within(dialog).getByRole('button', { name: 'Finalizar y registrar venta' });
+    await vi.waitFor(() => expect(confirm).toBeEnabled());
+    await userEvent.click(confirm);
+    await vi.waitFor(() => expect(finalizeCalls).toHaveLength(1));
+    expect(finalizeCalls[0]).toMatchObject({ body: { supplier_id: 4 } });
+  });
 });

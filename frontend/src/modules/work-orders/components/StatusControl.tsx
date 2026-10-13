@@ -17,7 +17,16 @@ import { WORK_ORDER_STATUS, type WorkOrderListItem } from '../types';
 
 type Order = Pick<
   WorkOrderListItem,
-  'id' | 'num_orden' | 'estado' | 'estado_label' | 'presupuesto' | 'anticipo' | 'saldo' | 'fecha_entrega'
+  | 'id'
+  | 'num_orden'
+  | 'estado'
+  | 'estado_label'
+  | 'presupuesto'
+  | 'anticipo'
+  | 'saldo'
+  | 'fecha_entrega'
+  | 'supplier_id'
+  | 'supplier'
 >;
 
 interface Props {
@@ -176,7 +185,12 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
     gcTime: 0,
     refetchOnMount: 'always',
   });
-  const [supplierId, setSupplierId] = useState<number | null>(null);
+  // Preselected: the supplier chosen in the order form.
+  const [supplierId, setSupplierId] = useState<number | null>(order.supplier_id ?? null);
+  const supplierOptions = (suppliers.data ?? []).map((s) => ({ value: s.id, label: s.nombre }));
+  if (order.supplier && !supplierOptions.some((o) => o.value === order.supplier?.id)) {
+    supplierOptions.push({ value: order.supplier.id, label: order.supplier.nombre }); // kept even if inactive
+  }
   const [supplierError, setSupplierError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const finalize = useMutation({
@@ -206,7 +220,7 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
       confirmLabel="Finalizar y registrar venta"
       totalLabel="Saldo a cobrar"
       loading={finalize.isPending}
-      confirmDisabled={selectedBranch === null || suppliers.isPending || suppliers.data?.length === 0}
+      confirmDisabled={selectedBranch === null || suppliers.isPending || (suppliers.isSuccess && supplierOptions.length === 0)}
       onCancel={onClose}
       onConfirm={(payment) => void confirm(payment)}
       header={
@@ -237,7 +251,7 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
             <div className="alert alert-error" role="alert">
               {getErrorMessage(suppliers.error)}
             </div>
-          ) : suppliers.data?.length === 0 ? (
+          ) : suppliers.isSuccess && supplierOptions.length === 0 ? (
             <div className="alert alert-error" role="alert">
               No hay proveedores activos. Agréguelos en Proveedores.
             </div>
@@ -247,7 +261,7 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
               required
               placeholder={suppliers.isPending ? 'Cargando…' : 'Seleccione el proveedor…'}
               disabled={suppliers.isPending}
-              options={(suppliers.data ?? []).map((s) => ({ value: s.id, label: s.nombre }))}
+              options={supplierOptions}
               value={supplierId}
               onChange={(value) => {
                 setSupplierId(Number(value));

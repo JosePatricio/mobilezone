@@ -42,6 +42,19 @@ def _get_order(uow: UnitOfWork, work_order_id: int) -> WorkOrder:
     return order
 
 
+def _validate_supplier(uow: UnitOfWork, supplier_id: int | None, current_id: int | None = None) -> None:
+    """Supplier (proveedor) of the order: it must exist and be active (the current one is kept even if inactive)."""
+    if supplier_id is None:
+        return
+    supplier = uow.suppliers.get(supplier_id)
+    if supplier is None:
+        raise NotFoundError("Proveedor no encontrado.", code="SUPPLIER_NOT_FOUND", details={"field": "supplier_id"})
+    if not supplier.estado and supplier_id != current_id:
+        raise ValidationError(
+            "El proveedor seleccionado está inactivo.", code="SUPPLIER_INACTIVE", details={"field": "supplier_id"}
+        )
+
+
 class _WorkOrderValidation(UseCase):
     """Validates the differentiated user references and catalog references."""
 
@@ -107,6 +120,8 @@ class _WorkOrderValidation(UseCase):
         order.garantia_dias = validate_warranty_days(data.garantia_dias)
         order.fecha_entrega = data.fecha_entrega
         order.modelo_tecnico = optional_text(data.modelo_tecnico)
+        _validate_supplier(self.uow, data.supplier_id, order.supplier_id)
+        order.supplier_id = data.supplier_id
 
     def _resolve_branch(self, branch_id: int | None, actor: User) -> Branch:
         """Sucursal (local) of the order; its address and phone are printed on the receipt.
@@ -239,12 +254,7 @@ class FinalizeWorkOrderUseCase(UseCase):
             order = _get_order(self.uow, work_order_id)
             order.ensure_editable()
             ensure_branch_access(self.uow, actor, data.branch_id)
-            if data.supplier_id is not None:
-                supplier = self.uow.suppliers.get(data.supplier_id)
-                if supplier is None:
-                    raise NotFoundError("Proveedor no encontrado.", code="SUPPLIER_NOT_FOUND")
-                if not supplier.estado:
-                    raise ValidationError("El proveedor seleccionado está inactivo.", code="SUPPLIER_INACTIVE")
+            _validate_supplier(self.uow, data.supplier_id, order.supplier_id)
             sale = Sale.for_work_order(
                 user_id=actor.id,  # type: ignore[arg-type]
                 branch_id=data.branch_id,

@@ -10,6 +10,7 @@ import { useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
 import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
 import { DeliveryCountdown } from '../components/DeliveryCountdown';
 import { StatusControl } from '../components/StatusControl';
+import { WhatsAppLink } from '../components/WhatsAppLink';
 import { WORK_ORDER_STATUS, type WorkOrderListItem } from '../types';
 
 export function WorkOrdersPage() {
@@ -50,6 +51,12 @@ export function WorkOrdersPage() {
         </>
       ),
       sortValue: (r) => fullName(r.cliente),
+    },
+    {
+      key: 'whatsapp',
+      header: 'WhatsApp',
+      align: 'center',
+      render: (r) => <WhatsAppLink celular={r.cliente.celular} nombre={fullName(r.cliente)} />,
     },
     {
       key: 'equipo',

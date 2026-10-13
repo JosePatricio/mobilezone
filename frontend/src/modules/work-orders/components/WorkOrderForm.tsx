@@ -58,6 +58,7 @@ export const workOrderSchema = z
     anticipo: zMoney,
     fecha_entrega: z.string().optional(),
     branch_id: zOptionalId,
+    supplier_id: zOptionalId,
     fecha_hora: z.string().min(1, 'Ingrese la fecha y hora de ingreso'),
   })
   .superRefine((v, ctx) => {
@@ -145,6 +146,7 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
       // Reception: now for a new order (editable), the registered one when editing.
       fecha_hora: toDateTimeLocal(order?.fecha_hora ?? new Date().toISOString()),
       branch_id: order ? (order.branch_id ?? '') : (user?.branches[0]?.id ?? ''),
+      supplier_id: order?.supplier_id ?? '',
     },
   });
 
@@ -165,6 +167,13 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
   const motivos = useWatch({ control, name: 'motivo_ingreso' }) as string[] | undefined;
   const bloqueo = useWatch({ control, name: 'bloqueo_tipo' }) as LockType;
   const [presupuesto, anticipo] = useWatch({ control, name: ['presupuesto', 'anticipo'] });
+  // Suppliers (proveedores) can be added from another tab: queried again every time the selector is opened.
+  const suppliers = useQuery({
+    queryKey: [WORK_ORDERS_KEY, 'suppliers'],
+    queryFn: workOrderApi.suppliers,
+    staleTime: 0,
+    refetchOnMount: 'always',
+  });
   const brands = useOptions(BRANDS_KEY, brandApi);
   const models = useOptions(MODELS_KEY, modelApi, { brand_id: Number(marcaId) }, Boolean(marcaId));
 
@@ -247,6 +256,21 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
     order?.modelo.nombre,
   );
 
+  const supplierOptions = [
+    { value: '', label: 'Sin proveedor' },
+    ...withCurrent(
+      (suppliers.data ?? []).map((s) => ({ value: s.id, label: s.nombre })),
+      order?.supplier?.id,
+      order?.supplier?.nombre,
+    ),
+  ];
+  // "Pantalla" is no longer offered; an older order that has it keeps it.
+  const reasonOptions =
+    order?.motivo_ingreso.includes('PANTALLA') && !catalogs.motivos_ingreso.some((o) => o.value === 'PANTALLA')
+      ? [...catalogs.motivos_ingreso, { value: 'PANTALLA', label: 'Pantalla' }]
+      : catalogs.motivos_ingreso;
+  const showDisplayType = Boolean(motivos?.includes(DISPLAY_CHANGE));
+
   const submit = handleSubmit(async (values) => {
     setServerError(null);
     if (lookup !== 'found') {
@@ -273,191 +297,222 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           {serverError}
         </div>
       )}
-      <Card title="Cliente">
-        <div className="form-grid">
-          <div className="lookup-row full">
-            <Input
-              label="Cédula / RUC"
+      {/* Two columns: phone data | client; below, the lock (its right column stays empty). */}
+      <div className="form-columns">
+        <Card title="Datos del celular">
+          <div className="form-grid">
+            <Select
+              label="Marca"
               required
-              inputMode="numeric"
-              maxLength={13}
-              hint="Presione Enter para buscar al cliente"
-              error={errors.cliente?.identificacion?.message}
-              {...register('cliente.identificacion', {
-                onChange: () => lookup !== 'idle' && setLookup('idle'),
-              })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  void lookupClient();
-                }
-              }}
+              options={brandOptions}
+              placeholder="Seleccione…"
+              error={errors.marca_id?.message}
+              onMouseDown={refreshDevices}
+              onFocus={refreshDevices}
+              {...register('marca_id')}
             />
-            <Button variant="secondary" onClick={() => void lookupClient()} loading={lookup === 'searching'}>
-              Buscar
-            </Button>
-          </div>
-          {lookup === 'missing' && (
-            <p className="field-hint full">
-              El cliente no está registrado.{' '}
-              <button type="button" className="link-button" onClick={() => setRegistering(cleanIdentificacion(String(getValues('cliente.identificacion') ?? '')))}>
-                Registrar cliente
-              </button>
-            </p>
-          )}
-          <Input label="Nombres" required readOnly error={errors.cliente?.nombre?.message} {...register('cliente.nombre')} />
-          <Input label="Apellidos" required readOnly error={errors.cliente?.apellido?.message} {...register('cliente.apellido')} />
-          <Input label="Celular" readOnly error={errors.cliente?.celular?.message} {...register('cliente.celular')} />
-          <Input
-            label="Email"
-            type="email"
-            readOnly={clientHasEmail}
-            hint={clientHasEmail ? undefined : 'Opcional: se guarda en el cliente'}
-            error={errors.cliente?.email?.message}
-            {...register('cliente.email')}
-          />
-        </div>
-      </Card>
-
-      <Card title="Datos del celular">
-        <div className="form-grid">
-          <Select
-            label="Marca"
-            required
-            options={brandOptions}
-            placeholder="Seleccione…"
-            error={errors.marca_id?.message}
-            onMouseDown={refreshDevices}
-            onFocus={refreshDevices}
-            {...register('marca_id')}
-          />
-          <Select
-            label="Modelo"
-            required
-            onMouseDown={refreshDevices}
-            onFocus={refreshDevices}
-            options={modelOptions}
-            placeholder={marcaId ? 'Seleccione…' : 'Seleccione primero una marca'}
-            disabled={!marcaId}
-            error={errors.modelo_id?.message}
-            {...register('modelo_id')}
-          />
-          <Input
-            label="Modelo técnico"
-            placeholder="Ej.: SM-A105M"
-            hint="Código del modelo (Ajustes › Acerca del teléfono)"
-            autoComplete="off"
-            error={errors.modelo_tecnico?.message}
-            {...register('modelo_tecnico')}
-          />
-          <Controller
-            control={control}
-            name="color"
-            render={({ field, fieldState }) => (
-              <ColorPalette value={field.value as string} onChange={field.onChange} error={fieldState.error?.message} />
-            )}
-          />
-          <Controller
-            control={control}
-            name="motivo_ingreso"
-            render={({ field, fieldState }) => (
-              <Combobox
-                label="Motivo de ingreso"
+            <Select
+              label="Modelo"
+              required
+              onMouseDown={refreshDevices}
+              onFocus={refreshDevices}
+              options={modelOptions}
+              placeholder={marcaId ? 'Seleccione…' : 'Seleccione primero una marca'}
+              disabled={!marcaId}
+              error={errors.modelo_id?.message}
+              {...register('modelo_id')}
+            />
+            <Input
+              label="Modelo técnico"
+              placeholder="Ej.: SM-A105M"
+              hint="Código del modelo (Ajustes › Acerca del teléfono)"
+              autoComplete="off"
+              error={errors.modelo_tecnico?.message}
+              {...register('modelo_tecnico')}
+            />
+            <Controller
+              control={control}
+              name="color"
+              render={({ field, fieldState }) => (
+                <ColorPalette value={field.value as string} onChange={field.onChange} error={fieldState.error?.message} />
+              )}
+            />
+            {/* Motivo de ingreso and, beside it, the display type (only for a display change). */}
+            <div className={showDisplayType ? undefined : 'full'}>
+              <Controller
+                control={control}
+                name="motivo_ingreso"
+                render={({ field, fieldState }) => (
+                  <Combobox
+                    label="Motivo de ingreso"
+                    required
+                    multiple
+                    options={reasonOptions}
+                    value={field.value as string[]}
+                    onChange={field.onChange}
+                    error={fieldState.error?.message}
+                  />
+                )}
+              />
+            </div>
+            {showDisplayType && (
+              <Select
+                label="Tipo de display"
                 required
-                multiple
-                options={catalogs.motivos_ingreso}
-                value={field.value as string[]}
-                onChange={field.onChange}
-                error={fieldState.error?.message}
+                options={catalogs.tipos_display}
+                placeholder="Seleccione…"
+                error={errors.tipo_display?.message}
+                {...register('tipo_display')}
               />
             )}
-          />
-          {motivos?.includes(DISPLAY_CHANGE) && (
-            <Select
-              label="Tipo de display"
-              required
-              options={catalogs.tipos_display}
-              placeholder="Seleccione…"
-              error={errors.tipo_display?.message}
-              {...register('tipo_display')}
+            <Controller
+              control={control}
+              name="supplier_id"
+              render={({ field, fieldState }) => (
+                <Combobox
+                  label="Proveedor"
+                  placeholder="Sin proveedor"
+                  options={supplierOptions}
+                  value={field.value as string | number}
+                  onChange={field.onChange}
+                  onOpen={() => void suppliers.refetch({ cancelRefetch: false })}
+                  error={fieldState.error?.message}
+                />
+              )}
             />
-          )}
-          <Input
-            label="Tiempo de garantía (días)"
-            type="number"
-            inputMode="numeric"
-            min={0}
-            max={MAX_WARRANTY_DAYS}
-            step={1}
-            hint="0 = sin garantía"
-            error={errors.garantia_dias?.message}
-            {...register('garantia_dias')}
-          />
-        </div>
-      </Card>
-
-      <Card title="Desbloqueo del equipo">
-        <div className="lock-types" role="radiogroup" aria-label="Tipo de bloqueo">
-          {catalogs.tipos_bloqueo.map((option) => (
-            <label key={option.value} className="radio">
-              <input type="radio" value={option.value} {...register('bloqueo_tipo')} />
-              {option.label}
-            </label>
-          ))}
-        </div>
-        {bloqueo === 'PATRON' && (
-          <Controller
-            control={control}
-            name="patron"
-            render={({ field, fieldState }) => (
-              <div className="field">
-                <p className="field-hint">
-                  Dibuje el patrón con el mouse o el dedo (también punto por punto), uniendo al menos {MIN_PATTERN_DOTS} puntos.
-                </p>
-                <PatternLock value={(field.value as string) || null} onChange={field.onChange} />
-                <div className="pattern-actions">
-                  <span className="muted">{field.value ? `Secuencia: ${field.value}` : 'Sin patrón'}</span>
-                  {Boolean(field.value) && (
-                    <Button size="sm" variant="ghost" onClick={() => field.onChange('')}>
-                      Borrar
-                    </Button>
-                  )}
-                </div>
-                {fieldState.error && (
-                  <p className="field-error" role="alert">
-                    {fieldState.error.message}
-                  </p>
-                )}
-              </div>
-            )}
-          />
-        )}
-        {bloqueo === 'PIN' && (
-          <div className="form-grid">
             <Input
-              label="PIN"
-              required
+              label="Tiempo de garantía (días)"
+              type="number"
               inputMode="numeric"
-              autoComplete="off"
-              maxLength={12}
-              error={errors.pin?.message}
-              {...register('pin', {
-                onChange: (e) => setValue('pin', String(e.target.value).replace(/\D/g, '')),
-              })}
+              min={0}
+              max={MAX_WARRANTY_DAYS}
+              step={1}
+              hint="0 = sin garantía"
+              error={errors.garantia_dias?.message}
+              {...register('garantia_dias')}
             />
           </div>
-        )}
-      </Card>
+        </Card>
+
+        <Card title="Cliente">
+          <div className="form-grid">
+            <div className="lookup-row full">
+              <Input
+                label="Cédula / RUC"
+                required
+                inputMode="numeric"
+                maxLength={13}
+                hint="Presione Enter para buscar al cliente"
+                error={errors.cliente?.identificacion?.message}
+                {...register('cliente.identificacion', {
+                  onChange: () => lookup !== 'idle' && setLookup('idle'),
+                })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void lookupClient();
+                  }
+                }}
+              />
+              <Button variant="secondary" onClick={() => void lookupClient()} loading={lookup === 'searching'}>
+                Buscar
+              </Button>
+            </div>
+            {lookup === 'missing' && (
+              <p className="field-hint full">
+                El cliente no está registrado.{' '}
+                <button type="button" className="link-button" onClick={() => setRegistering(cleanIdentificacion(String(getValues('cliente.identificacion') ?? '')))}>
+                  Registrar cliente
+                </button>
+              </p>
+            )}
+            <Input label="Nombres" required readOnly error={errors.cliente?.nombre?.message} {...register('cliente.nombre')} />
+            <Input label="Apellidos" required readOnly error={errors.cliente?.apellido?.message} {...register('cliente.apellido')} />
+            <Input label="Celular" readOnly error={errors.cliente?.celular?.message} {...register('cliente.celular')} />
+            <Input
+              label="Email"
+              type="email"
+              readOnly={clientHasEmail}
+              hint={clientHasEmail ? undefined : 'Opcional: se guarda en el cliente'}
+              error={errors.cliente?.email?.message}
+              {...register('cliente.email')}
+            />
+          </div>
+        </Card>
+
+        <Card title="Desbloqueo del equipo">
+          <div className="lock-types" role="radiogroup" aria-label="Tipo de bloqueo">
+            {catalogs.tipos_bloqueo.map((option) => (
+              <label key={option.value} className="radio">
+                <input type="radio" value={option.value} {...register('bloqueo_tipo')} />
+                {option.label}
+              </label>
+            ))}
+          </div>
+          {bloqueo === 'PATRON' && (
+            <Controller
+              control={control}
+              name="patron"
+              render={({ field, fieldState }) => (
+                <div className="field">
+                  <p className="field-hint">
+                    Dibuje el patrón con el mouse o el dedo (también punto por punto), uniendo al menos {MIN_PATTERN_DOTS} puntos.
+                  </p>
+                  <PatternLock value={(field.value as string) || null} onChange={field.onChange} />
+                  <div className="pattern-actions">
+                    <span className="muted">{field.value ? `Secuencia: ${field.value}` : 'Sin patrón'}</span>
+                    {Boolean(field.value) && (
+                      <Button size="sm" variant="ghost" onClick={() => field.onChange('')}>
+                        Borrar
+                      </Button>
+                    )}
+                  </div>
+                  {fieldState.error && (
+                    <p className="field-error" role="alert">
+                      {fieldState.error.message}
+                    </p>
+                  )}
+                </div>
+              )}
+            />
+          )}
+          {bloqueo === 'PIN' && (
+            <div className="form-grid">
+              <Input
+                label="PIN"
+                required
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={12}
+                error={errors.pin?.message}
+                {...register('pin', {
+                  onChange: (e) => setValue('pin', String(e.target.value).replace(/\D/g, '')),
+                })}
+              />
+            </div>
+          )}
+        </Card>
+      </div>
 
       <Card title="Trabajo">
         <div className="form-grid">
-          <Textarea label="Observaciones" rows={4} className="full" error={errors.observacion?.message} {...register('observacion')} />
           <div className="full">
             <PhotoSlots value={photos} onChange={setPhotos} />
           </div>
+          <Textarea label="Observaciones" rows={4} className="col-first" error={errors.observacion?.message} {...register('observacion')} />
+          <Input
+            label="Fecha y hora de ingreso"
+            type="datetime-local"
+            required
+            className="col-first"
+            hint="Por defecto, la fecha y hora actuales"
+            error={errors.fecha_hora?.message}
+            {...register('fecha_hora')}
+          />
           <Input
             label="Fecha de entrega"
             type="datetime-local"
+            className="col-first"
             min={order ? undefined : toDateTimeLocal(new Date().toISOString())}
             error={errors.fecha_entrega?.message}
             {...register('fecha_entrega')}
@@ -466,10 +521,10 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
       </Card>
 
       <Card title="Valores">
-        <div className="form-grid form-grid-3">
+        <div className="form-grid">
           <MoneyInput label="Costo de reparación $" required error={errors.presupuesto?.message} {...register('presupuesto')} />
           <MoneyInput label="Anticipo $" required error={errors.anticipo?.message} {...register('anticipo')} />
-          <div className="field">
+          <div className="field full">
             <span className="field-label">Saldo $</span>
             <p className={`readonly-value ${toCents(saldo) < 0 ? 'text-danger' : ''}`} data-testid="form-saldo">
               {formatMoney(saldo)}
@@ -477,19 +532,6 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           </div>
         </div>
         <p className="field-hint">El saldo definitivo es calculado por el sistema al guardar.</p>
-      </Card>
-
-      <Card title="Ingreso">
-        <div className="form-grid">
-          <Input
-            label="Fecha y hora de ingreso"
-            type="datetime-local"
-            required
-            hint="Por defecto, la fecha y hora actuales"
-            error={errors.fecha_hora?.message}
-            {...register('fecha_hora')}
-          />
-        </div>
       </Card>
 
       <div className="form-actions">

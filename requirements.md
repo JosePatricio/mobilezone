@@ -1,4 +1,13 @@
-En el modulo Ordenes
-En el formulario para nuevo orden, en la fecha de entrega, que la fecha por defecta se la actual (hoy)
-En la tabla de ordenes, quitar filtro de los vendedores, Quitar la Opcion de Ver y Editar, por que cuando ingresamos ya podemos editarlo entonces es redundante.s
-En la tabla en el campo Entrega, hacer como un countdown con fecha actual y la fecha de entrega, Algo asi como: Tienes 5 Horas, o Tienes 2 dias, 2 horas y 15 minutos. abajo en texto pequeño si podrias poner la fecha de entrega con el mismo formato, eso hacer para cada registro y que sea en tiempo real el tiempo que esta pasando
+en Desbloqueo del equipo igual dividir en dos columnas, no importa que a la derecha este vacia
+Abajo que vaya las fotos del equipo
+Abajo Campo observacion (igual en la primera columna)
+Abajo Fecha de ingreso
+Abajo fecha de entrega
+y al ultimo los valores
+
+Columna 1 Costo de reparación $ *, columna 2 Anticipo $ *
+Abajo toda la columna Saldo $
+
+
+
+En la primera row, al frente de datos del equipo, en la seguna columna, que vaya datos del cliente (asi como esta ahorita sta bien, solo tocaria poner toda esa seccion a la derecha, es decir primera fila segunda columna)

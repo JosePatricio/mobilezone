@@ -233,7 +233,8 @@ class WorkOrder:
     ) -> WorkOrderStatusChange:
         self.ensure_editable()
         self.estado = int(WorkOrderStatus.FINALIZADO)
-        self.supplier_id = supplier_id
+        if supplier_id is not None:  # without one, the supplier chosen in the form is kept
+            self.supplier_id = supplier_id
         return self.record_status(user_id, observacion)
 
     def record_status(

@@ -64,6 +64,9 @@ export interface WorkOrderListItem {
   fecha_hora: string;
   /** Promised delivery date and time (ISO 8601). */
   fecha_entrega: string | null;
+  /** Supplier (proveedor), optional: chosen in the form or when the order is finalized. */
+  supplier_id: Id | null;
+  supplier: NamedRef | null;
 }
 
 export interface WorkOrderSparePart {
@@ -118,9 +121,6 @@ export interface WorkOrder extends WorkOrderListItem, Timestamps {
   user: UserRef;
   branch_id: Id | null;
   branch: WorkOrderBranch | null;
-  /** Supplier (proveedor) chosen when the order was finalized. */
-  supplier_id: Id | null;
-  supplier: NamedRef | null;
   observacion: string | null;
   /** Technical model code of the phone, e.g. SM-A105M. */
   modelo_tecnico: string | null;
@@ -165,6 +165,8 @@ export interface WorkOrderRequest {
   branch_id: Id | null;
   /** Reception date and time (ISO 8601); defaults to now in the form. */
   fecha_hora: string | null;
+  /** Supplier (proveedor), optional. */
+  supplier_id: Id | null;
 }
 
 /** Public status page (QR): no client data and no unlock code. */

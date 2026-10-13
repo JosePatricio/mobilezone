@@ -71,6 +71,7 @@ class WorkOrderRequest(RequestSchema):
         default=None,
         description="Fecha y hora de ingreso (ISO 8601; sin zona = hora local). Vacío: ahora al crear, sin cambio al editar",
     )
+    supplier_id: int | None = Field(default=None, description="Proveedor (opcional, activo)")
 
 
 class WorkOrderStatusOption(Schema):
@@ -95,7 +96,8 @@ class WorkOrderCatalogsResponse(Schema):
             return [CatalogOption(value=k.value, label=v) for k, v in labels.items()]
 
         return cls(
-            motivos_ingreso=options(ENTRY_REASON_LABELS),
+            # PANTALLA is no longer offered (older orders keep it).
+            motivos_ingreso=[o for o in options(ENTRY_REASON_LABELS) if o.value != EntryReason.PANTALLA.value],
             tipos_display=options(DISPLAY_TYPE_LABELS),
             tipos_bloqueo=options(LOCK_TYPE_LABELS),
             estados=[WorkOrderStatusOption(value=int(k), label=v) for k, v in WORK_ORDER_STATUS_LABELS.items()],
@@ -223,6 +225,8 @@ class WorkOrderListItem(Schema):
     fecha: date
     fecha_hora: datetime = Field(description="Fecha y hora de ingreso")
     fecha_entrega: datetime | None
+    supplier_id: int | None
+    supplier: SupplierSummary | None = Field(description="Proveedor (opcional)")
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -239,8 +243,6 @@ class WorkOrderResponse(WorkOrderListItem):
     user: UserSummary = Field(description="Usuario que registró la orden")
     branch_id: int | None
     branch: BranchContact | None = Field(description="Sucursal (local): dirección y teléfono para la orden impresa")
-    supplier_id: int | None
-    supplier: SupplierSummary | None = Field(description="Proveedor elegido al finalizar")
     observacion: str | None
     modelo_tecnico: str | None
     bloqueo_tipo: LockType
