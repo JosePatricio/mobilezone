@@ -102,7 +102,10 @@ describe('WorkOrderForm', () => {
     // The logged user is the technician (not shown); there is no date field (today), only the delivery date.
     expect(screen.queryByText('Ana Pérez (usted)')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^Fecha\s*\*?$/)).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Fecha de entrega')).toHaveAttribute('type', 'datetime-local');
+    const delivery = screen.getByLabelText('Fecha de entrega') as HTMLInputElement;
+    expect(delivery).toHaveAttribute('type', 'datetime-local');
+    // New order: delivery defaults to today (now).
+    expect(delivery.value.startsWith(todayIso())).toBe(true);
     // Last field: reception date and time, prefilled with now.
     const reception = screen.getByLabelText(/Fecha y hora de ingreso/) as HTMLInputElement;
     expect(reception).toHaveAttribute('type', 'datetime-local');

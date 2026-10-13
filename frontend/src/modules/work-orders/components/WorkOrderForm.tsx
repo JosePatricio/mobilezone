@@ -140,7 +140,8 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
       observacion: order?.observacion ?? '',
       presupuesto: order?.presupuesto ?? '0.00',
       anticipo: order?.anticipo ?? '0.00',
-      fecha_entrega: toDateTimeLocal(order?.fecha_entrega),
+      // New order: delivery today (now) by default.
+      fecha_entrega: toDateTimeLocal(order ? order.fecha_entrega : new Date().toISOString()),
       // Reception: now for a new order (editable), the registered one when editing.
       fecha_hora: toDateTimeLocal(order?.fecha_hora ?? new Date().toISOString()),
       branch_id: order ? (order.branch_id ?? '') : (user?.branches[0]?.id ?? ''),

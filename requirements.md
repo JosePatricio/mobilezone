@@ -1,2 +1,4 @@
 En el modulo Ordenes
-En la columna Estado, cuando se ponga Finalizado, Abrir un modal, para seleccionar el proveedor (un selector con filtro texto de busqueda), este proveedor es el mismo de la tabla de proveedores, Cada que se cargue e selector, haz una consulta a base de datos, porque desde otra pesta;as puedo agregar mas proveedores y no quiero recargar la pagina cada vez que agregue
+En el formulario para nuevo orden, en la fecha de entrega, que la fecha por defecta se la actual (hoy)
+En la tabla de ordenes, quitar filtro de los vendedores, Quitar la Opcion de Ver y Editar, por que cuando ingresamos ya podemos editarlo entonces es redundante.s
+En la tabla en el campo Entrega, hacer como un countdown con fecha actual y la fecha de entrega, Algo asi como: Tienes 5 Horas, o Tienes 2 dias, 2 horas y 15 minutos. abajo en texto pequeño si podrias poner la fecha de entrega con el mismo formato, eso hacer para cada registro y que sea en tiempo real el tiempo que esta pasando

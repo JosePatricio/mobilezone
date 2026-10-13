@@ -101,7 +101,10 @@ describe('WorkOrdersPage', () => {
     renderWithProviders(<WorkOrdersPage />, { auth: fakeAuth({ permissionCodes: [P.WORK_ORDERS_VIEW] }) });
     expect(await screen.findByText('Samsung A10')).toBeInTheDocument();
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent?.replace(/[↕↑↓]/g, '').trim());
-    expect(headers).toEqual(['N.º Orden', 'Cliente', 'Equipo', 'Saldo', 'Entrega', 'Acciones', 'Estado']);
+    expect(headers).toEqual(['N.º Orden', 'Cliente', 'Equipo', 'Saldo', 'Entrega', 'Estado']);
+    expect(screen.queryByRole('button', { name: 'Ver' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Filtrar por vendedor' })).not.toBeInTheDocument();
     expect(screen.getByText('Pantalla')).toBeInTheDocument();
   });
 });
