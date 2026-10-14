@@ -33,6 +33,12 @@ const order = {
 } as unknown as WorkOrder;
 
 describe('PrintableOrder', () => {
+  it('does not print the tracking QR (temporarily off)', () => {
+    renderWithProviders(<PrintableOrder order={order} />);
+    expect(screen.queryByText('Consulte el estado de su orden:')).not.toBeInTheDocument();
+    expect(document.querySelector('.print-qr')).toBeNull();
+  });
+
   it('prints the address and phone of the branch', () => {
     renderWithProviders(<PrintableOrder order={order} />);
     expect(screen.getByText('Matriz')).toBeInTheDocument();

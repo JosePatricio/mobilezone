@@ -207,8 +207,8 @@ grep ADMIN_ /opt/mobilezone/.env
 
 ## 11. Public site on the domain (https://pixcell.net)
 
-The app includes two public pages that need no login: `/home` (landing page) and `/privacy` (privacy policy, e.g. for the Google OAuth consent screen).
-To serve them at `https://pixcell.net/home` and `https://pixcell.net/privacy`, point the domain's DNS **A** record (`pixcell.net` and `www`) to the server IP, then add an nginx site for it:
+1. At your domain registrar, add DNS **A** records `pixcell.net` and `www` → the server IP.
+2. Create the nginx site:
 
 ```bash
 sudo nano /etc/nginx/sites-available/pixcell
@@ -230,7 +230,7 @@ server {
 }
 ```
 
-Enable it and get the HTTPS certificate (certbot adds the port 443 block and the redirect from http):
+3. Enable it and get the HTTPS certificate:
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/pixcell /etc/nginx/sites-enabled/
@@ -240,31 +240,40 @@ sudo certbot --nginx -d pixcell.net -d www.pixcell.net
 curl -I https://pixcell.net/privacy
 ```
 
-Ports 80 and 443 must be open in the Hetzner firewall (they already are if the other sites work). The contact email shown on both pages is `SITE_CONTACT_EMAIL` in `frontend/src/modules/site/paths.ts`.
+Then open https://pixcell.net/home and https://pixcell.net/privacy.
 
-## 12. WhatsApp campaigns (Meta Cloud API)
+## 12. WhatsApp campaigns
 
-Propaganda → CRM → WhatsApp → **Enviar por WhatsApp Business** sends an approved template to the selected clients from the server. Without these variables the button shows "no está activado" and everything else keeps working.
+**1. Copy the values** (https://developers.facebook.com → My Apps → your app):
 
-1. In https://developers.facebook.com → your app → **WhatsApp → API Setup**, copy the **Phone number ID** and the **WhatsApp Business Account ID**. In **App settings → Basic**, copy the **App secret**.
-2. Add them to `/opt/mobilezone/.env` (never commit them):
+| `.env` variable | Where |
+|---|---|
+| `WHATSAPP_ACCESS_TOKEN` | WhatsApp → API Setup → **Generate access token** (expires in 24 h) |
+| `WHATSAPP_PHONE_NUMBER_ID` | WhatsApp → API Setup → under the "From" number |
+| `WHATSAPP_BUSINESS_ACCOUNT_ID` | WhatsApp → API Setup → under the "From" number |
+| `WHATSAPP_APP_SECRET` | App settings → Basic → App secret → **Show** |
+| `WHATSAPP_VERIFY_TOKEN` | Any text you invent (`openssl rand -hex 16`) |
 
-   ```bash
-   WHATSAPP_ACCESS_TOKEN=<token>
-   WHATSAPP_PHONE_NUMBER_ID=<phone number id>
-   WHATSAPP_BUSINESS_ACCOUNT_ID=<business account id>
-   WHATSAPP_APP_SECRET=<app secret>
-   WHATSAPP_VERIFY_TOKEN=<any random text, e.g. openssl rand -hex 16>
-   ```
+**2. Paste them on the server and restart:**
 
-   The token of API Setup expires in 24 hours (fine for a first test). For production create a permanent one: **business.facebook.com → Settings → Users → System users → Add** (Admin), **Assign assets** → your app (full control) and the WhatsApp account, then **Generate token** with the permissions `whatsapp_business_messaging` and `whatsapp_business_management`, expiration **Never**.
-3. Apply the database upgrade and restart: `docker compose up -d --build` (the entrypoint runs `alembic upgrade head`, which creates the `whatsapp_*` tables of upgrade 024).
-4. Webhook (delivered / read states and the BAJA replies). It needs the HTTPS domain of section 11. In **WhatsApp → Configuration → Webhook → Edit**:
-   - Callback URL: `https://pixcell.net/api/v1/whatsapp/webhook`
-   - Verify token: the same `WHATSAPP_VERIFY_TOKEN`
-   - Then **Manage** → subscribe to **messages**.
+```bash
+cd /opt/mobilezone
+nano .env          # add the 5 lines WHATSAPP_...=value
+git pull
+docker compose up -d --build
+```
 
-While the app uses Meta's test number, messages only reach the (up to 5) numbers added in API Setup → "To". Clients answering **BAJA** / **STOP** (or Meta's "Detener promociones" button) stop receiving campaigns; **ALTA** subscribes them again. A campaign interrupted by a restart keeps its unsent messages as "Pendiente".
+**3. Webhook** — same app → WhatsApp → Configuration → Webhook → **Edit**:
+
+- Callback URL: `https://pixcell.net/api/v1/whatsapp/webhook`
+- Verify token: the same `WHATSAPP_VERIFY_TOKEN`
+- **Verify and save**, then **Manage** → **messages** → **Subscribe**
+
+**4. Template** — https://business.facebook.com → WhatsApp Manager → Message templates → **Create template** (Marketing, Spanish), e.g. body `Hola {{1}}, tenemos una oferta para tu {{2}}`, footer `Responde BAJA para no recibir más`. Wait until it is **Active**.
+
+**5. Send** — app → Propaganda → CRM → WhatsApp → select clients → **Enviar por WhatsApp Business**. With the test number, only the numbers added in API Setup → "To" receive messages.
+
+**Permanent token** (when the 24 h token expires): https://business.facebook.com → Settings → Users → System users → **Add** (Admin) → **Assign assets** (your app, full control) → **Generate token** → permissions `whatsapp_business_messaging` + `whatsapp_business_management`, expiration **Never**. Replace `WHATSAPP_ACCESS_TOKEN` in `.env` and run `docker compose up -d`.
 
 ---
 

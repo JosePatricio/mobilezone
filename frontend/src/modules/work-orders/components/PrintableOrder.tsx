@@ -7,6 +7,9 @@ import type { WorkOrder } from '../types';
 import { useOrderQr } from './OrderQr';
 import { formatPattern, parsePattern, PatternLock } from './PatternLock';
 
+/** Tracking QR (public status page) on the printed order. Temporarily off: set to true to print it again. */
+export const PRINT_TRACKING_QR = false;
+
 const LOCK_LABELS = { NINGUNO: 'Sin bloqueo', PATRON: 'Patrón registrado', PIN: 'PIN registrado' } as const;
 
 /** One receipt line: label on the left, value aligned to the right (wraps below when long). */
@@ -19,12 +22,23 @@ function Row({ label, children, strong }: { label: string; children: ReactNode; 
   );
 }
 
+/** QR and link of the public status page of the order. */
+function TrackingQr({ codigo }: { codigo: string }) {
+  const { url, image } = useOrderQr(codigo);
+  return (
+    <div className="receipt-center print-qr">
+      {image && <img src={image} alt="" />}
+      <small>Consulte el estado de su orden:</small>
+      <small className="print-url">{url}</small>
+    </div>
+  );
+}
+
 /**
  * Printable receipt of the order for an 80 mm thermal printer (hidden on screen, the only thing
  * printed by window.print). The unlock pattern and the PIN are printed so the technician can unlock the device.
  */
 export function PrintableOrder({ order }: { order: WorkOrder }) {
-  const { url, image } = useOrderQr(order.codigo_publico);
   const { user } = useAuth();
   // Technician of the order (the user who registered it); orders without one show the logged user.
   const technician = order.tecnico ?? user;
@@ -86,11 +100,7 @@ export function PrintableOrder({ order }: { order: WorkOrder }) {
       <Row label="Estado">{order.estado_label}</Row>
       <Row label="Vendedor">{fullName(technician)}</Row>
 
-      <div className="receipt-center print-qr">
-        {image && <img src={image} alt="" />}
-        <small>Consulte el estado de su orden:</small>
-        <small className="print-url">{url}</small>
-      </div>
+      {PRINT_TRACKING_QR && <TrackingQr codigo={order.codigo_publico} />}
 
       <footer className="print-signatures">
         <span>Firma del cliente</span>
