@@ -13,6 +13,7 @@ from app.infrastructure.security.jwt_tokens import JwtTokenService
 from app.infrastructure.security.passwords import BcryptPasswordHasher
 from app.infrastructure.pdf.receipt import ReportLabReceiptRenderer
 from app.infrastructure.storage.local import LocalFileStorage
+from app.infrastructure.whatsapp.cloud_api import CloudApiWhatsAppGateway
 from app.presentation.api.routes import (
     affiliate_parts,
     auth,
@@ -55,6 +56,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.file_storage = LocalFileStorage(media_dir)
     app.state.receipt_renderer = ReportLabReceiptRenderer(settings.company_name, settings.timezone)
     configure_media_url(settings.media_url)
+    app.state.whatsapp_gateway = None
+    if settings.whatsapp_access_token and settings.whatsapp_phone_number_id and settings.whatsapp_business_account_id:
+        app.state.whatsapp_gateway = CloudApiWhatsAppGateway(
+            access_token=settings.whatsapp_access_token,
+            phone_number_id=settings.whatsapp_phone_number_id,
+            business_account_id=settings.whatsapp_business_account_id,
+            app_secret=settings.whatsapp_app_secret,
+            api_version=settings.whatsapp_api_version,
+        )
 
     app.add_middleware(
         CORSMiddleware,
@@ -89,6 +99,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         affiliate_parts.public_router,
         dashboard.router,
         marketing.router,
+        marketing.webhook_router,
     ):
         api.include_router(router)
     app.include_router(api)

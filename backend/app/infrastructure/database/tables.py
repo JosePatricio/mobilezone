@@ -55,6 +55,7 @@ from app.domain.entities import (
 from app.domain.entities.base import utcnow
 from app.domain.value_objects.affiliate_parts import AffiliatePartStatus, AffiliatePartType, PartCondition
 from app.domain.value_objects.enums import PaymentMethod, SaleStatus, StockMovementType
+from app.domain.value_objects.whatsapp import WhatsAppMessageStatus
 from app.domain.value_objects.work_orders import DisplayType, EntryReason, LockType
 
 NAMING_CONVENTION = {
@@ -472,6 +473,47 @@ cash_openings_table = Table(
     Column("created_at", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
     UniqueConstraint("user_id", "fecha", name="uq_cash_openings_user_id_fecha"),
     CheckConstraint("monto_inicial >= 0", name="monto_inicial_non_negative"),
+)
+
+# Propaganda through the WhatsApp Cloud API: one campaign = one approved template sent to many clients.
+whatsapp_campaigns_table = Table(
+    "whatsapp_campaigns",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("plantilla", String(512), nullable=False),  # template name in Meta
+    Column("idioma", String(15), nullable=False),
+    Column("categoria", String(20), nullable=False),  # MARKETING | UTILITY (price per message)
+    Column("created_by", ForeignKey("users.id", ondelete="SET NULL"), index=True),
+    Column("created_at", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
+)
+
+whatsapp_messages_table = Table(
+    "whatsapp_messages",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("campaign_id", ForeignKey("whatsapp_campaigns.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("cliente_id", ForeignKey("users.id", ondelete="SET NULL"), index=True),
+    Column("telefono", String(20), nullable=False),  # international, without "+"
+    Column("parametros", Text),  # values of the template placeholders (JSON list), kept for the history
+    Column("estado", _str_enum(WhatsAppMessageStatus), nullable=False),
+    Column("wa_message_id", String(128), unique=True),  # id given by Meta; the webhooks refer to it
+    Column("error", String(500)),
+    Column(
+        "updated_at",
+        TIMESTAMP,
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+        server_default=text("CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)"),
+    ),
+)
+
+# Phones that answered BAJA / STOP: the campaigns skip them until they answer ALTA.
+whatsapp_opt_outs_table = Table(
+    "whatsapp_opt_outs",
+    metadata,
+    Column("telefono", String(20), primary_key=True),
+    Column("created_at", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
 )
 
 Index("ix_users_nombre_apellido", users_table.c.nombre, users_table.c.apellido)

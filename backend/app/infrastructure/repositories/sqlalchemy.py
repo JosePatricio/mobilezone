@@ -1,11 +1,12 @@
 """SQLAlchemy implementations of the domain repositories."""
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Generic, TypeVar
 
-from sqlalchemy import Select, and_, case, func, or_, select, update
+from sqlalchemy import Integer, Select, and_, case, cast, func, or_, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.orm import Session, undefer
 
@@ -30,6 +31,7 @@ from app.domain.entities import (
 )
 from app.domain.value_objects.enums import SaleStatus
 from app.domain.value_objects.pagination import Page, PageRequest
+from app.domain.value_objects.whatsapp import STATUS_RANK, WhatsAppMessageStatus
 from app.infrastructure.database.tables import (
     affiliate_parts_table,
     branches_table,
@@ -48,6 +50,9 @@ from app.infrastructure.database.tables import (
     stock_movements_table,
     suppliers_table,
     users_table,
+    whatsapp_campaigns_table,
+    whatsapp_messages_table,
+    whatsapp_opt_outs_table,
     work_order_spare_parts_table,
     work_order_status_changes_table,
     work_orders_table,
@@ -645,3 +650,126 @@ class SqlAlchemyCashOpeningRepository(SqlAlchemyRepository[CashOpening], ports.C
     def get_for_day(self, user_id, fecha):
         c = cash_openings_table.c
         return self.session.scalars(select(CashOpening).where(c.user_id == user_id, c.fecha == fecha)).first()
+
+
+class SqlAlchemyWhatsAppRepository(ports.WhatsAppRepository):
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def create_campaign(self, *, plantilla, idioma, categoria, created_by):
+        result = self.session.execute(
+            whatsapp_campaigns_table.insert().values(
+                plantilla=plantilla, idioma=idioma, categoria=categoria, created_by=created_by
+            )
+        )
+        return int(result.inserted_primary_key[0])
+
+    def add_messages(self, campaign_id, messages):
+        if not messages:
+            return
+        self.session.execute(
+            whatsapp_messages_table.insert(),
+            [
+                {
+                    "campaign_id": campaign_id,
+                    "cliente_id": cliente_id,
+                    "telefono": telefono,
+                    "parametros": json.dumps(parametros, ensure_ascii=False),
+                    "estado": WhatsAppMessageStatus.PENDIENTE,
+                }
+                for cliente_id, telefono, parametros in messages
+            ],
+        )
+
+    def pending_messages(self, campaign_id):
+        m = whatsapp_messages_table.c
+        rows = self.session.execute(
+            select(m.id, m.telefono, m.parametros)
+            .where(m.campaign_id == campaign_id, m.estado == WhatsAppMessageStatus.PENDIENTE)
+            .order_by(m.id)
+        ).all()
+        return [
+            ports.PendingWhatsAppMessage(id, telefono, [tuple(p) for p in json.loads(parametros or "[]")])
+            for id, telefono, parametros in rows
+        ]
+
+    def _update(self, message_filter, **values) -> int:
+        return self.session.execute(update(whatsapp_messages_table).where(message_filter).values(**values)).rowcount
+
+    def mark_sent(self, message_id, wa_message_id):
+        c = whatsapp_messages_table.c
+        self._update(c.id == message_id, estado=WhatsAppMessageStatus.ENVIADO, wa_message_id=wa_message_id, error=None)
+
+    def mark_failed(self, message_id, error):
+        c = whatsapp_messages_table.c
+        self._update(c.id == message_id, estado=WhatsAppMessageStatus.FALLIDO, error=error[:500])
+
+    def apply_status(self, wa_message_id, estado, error=None):
+        c = whatsapp_messages_table.c
+        current = self.session.scalar(select(c.estado).where(c.wa_message_id == wa_message_id).with_for_update())
+        if current is None:
+            return False
+        if STATUS_RANK[estado] > STATUS_RANK[WhatsAppMessageStatus(current)]:
+            values = {"estado": estado}
+            if error:
+                values["error"] = error[:500]
+            self._update(c.wa_message_id == wa_message_id, **values)
+        return True
+
+    def _summaries(self) -> Select:
+        k, m, u = whatsapp_campaigns_table.c, whatsapp_messages_table.c, users_table.c
+
+        def count(estado: WhatsAppMessageStatus):
+            return cast(func.coalesce(func.sum(case((m.estado == estado, 1), else_=0)), 0), Integer)
+
+        return (
+            select(
+                k.id, k.plantilla, k.idioma, k.categoria, k.created_at,
+                func.concat(u.nombre, " ", u.apellido),
+                func.count(m.id),
+                *(count(s) for s in (
+                    WhatsAppMessageStatus.PENDIENTE,
+                    WhatsAppMessageStatus.ENVIADO,
+                    WhatsAppMessageStatus.ENTREGADO,
+                    WhatsAppMessageStatus.LEIDO,
+                    WhatsAppMessageStatus.FALLIDO,
+                )),
+            )
+            .select_from(whatsapp_campaigns_table)
+            .outerjoin(whatsapp_messages_table, m.campaign_id == k.id)
+            .outerjoin(users_table, u.id == k.created_by)
+            .group_by(k.id, u.nombre, u.apellido)
+        )
+
+    def campaigns(self, limit=50):
+        k = whatsapp_campaigns_table.c
+        rows = self.session.execute(self._summaries().order_by(k.id.desc()).limit(limit)).all()
+        return [ports.WhatsAppCampaignSummary(*row) for row in rows]
+
+    def campaign(self, campaign_id):
+        k = whatsapp_campaigns_table.c
+        row = self.session.execute(self._summaries().where(k.id == campaign_id)).first()
+        return ports.WhatsAppCampaignSummary(*row) if row else None
+
+    def campaign_messages(self, campaign_id):
+        m, u = whatsapp_messages_table.c, users_table.c
+        rows = self.session.execute(
+            select(m.id, m.cliente_id, func.concat(u.nombre, " ", u.apellido), m.telefono, m.estado, m.error, m.updated_at)
+            .outerjoin(users_table, u.id == m.cliente_id)
+            .where(m.campaign_id == campaign_id)
+            .order_by(m.id)
+        ).all()
+        return [ports.WhatsAppMessageRow(*row) for row in rows]
+
+    def opted_out(self, telefonos):
+        if not telefonos:
+            return set()
+        c = whatsapp_opt_outs_table.c
+        return set(self.session.scalars(select(c.telefono).where(c.telefono.in_(telefonos))))
+
+    def set_opt_out(self, telefono, opted_out):
+        if opted_out:
+            self.session.execute(mysql_insert(whatsapp_opt_outs_table).prefix_with("IGNORE").values(telefono=telefono))
+        else:
+            c = whatsapp_opt_outs_table.c
+            self.session.execute(whatsapp_opt_outs_table.delete().where(c.telefono == telefono))

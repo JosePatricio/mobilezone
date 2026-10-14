@@ -37,6 +37,17 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+    # WhatsApp Cloud API (Meta) for the Propaganda campaigns: developers.facebook.com → your app → WhatsApp.
+    # Without the token, phone number id and business account id the campaigns are disabled.
+    whatsapp_access_token: str | None = None
+    whatsapp_phone_number_id: str | None = None
+    whatsapp_business_account_id: str | None = None
+    whatsapp_app_secret: str | None = None  # App settings → Basic; checks that webhooks come from Meta
+    whatsapp_verify_token: str | None = None  # any random text, also typed in the webhook configuration
+    whatsapp_api_version: str = "v23.0"
+    whatsapp_country_code: str = "593"  # added to local numbers (0991234567 → 593991234567)
+    whatsapp_send_interval_seconds: float = 0.1  # pause between messages of a campaign
+
     # Initial administrator created by the seed script.
     admin_email: str = "admin@example.com"
     admin_password: str = "Admin12345"

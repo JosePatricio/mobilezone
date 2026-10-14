@@ -16,6 +16,8 @@ import {
 import { formatDate, fullName } from '@/shared/utils/format';
 import { MediaPicker } from '../components/MediaPicker';
 import { MessagePreview } from '../components/MessagePreview';
+import { WhatsAppApiSender } from '../components/WhatsAppApiSender';
+import { WhatsAppCampaigns } from '../components/WhatsAppCampaigns';
 import { RichTextEditor } from '../components/RichTextEditor';
 import {
   clientVariables,
@@ -63,6 +65,8 @@ export function MarketingPage() {
           </EmptyState>
         </Card>
       )}
+
+      <WhatsAppCampaigns />
     </>
   );
 }
@@ -169,7 +173,7 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
     if (selected.length === 0) return setError('Seleccione al menos un cliente con celular.');
     setError(null);
     setPrepared(selected.map((client) => ({ client, text: formatMessage(personalize(lines, clientVariables(client)), channel) })));
-    toast.success(`${selected.length} mensaje(s) preparado(s). El envío masivo aún no está disponible.`);
+    toast.success(`${selected.length} mensaje(s) preparado(s) para copiar.`);
   };
 
   const copy = async (text: string) => {
@@ -303,6 +307,7 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
               Preparar mensajes
             </Button>
           </Card>
+          {channel === 'WHATSAPP' && <WhatsAppApiSender recipients={selected} />}
         </aside>
       </div>
 
@@ -310,7 +315,7 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
         <Card title={`Mensajes preparados (${prepared.length})`}>
           <div className="alert alert-info">
             Los mensajes están listos con el formato de {CHANNEL_LABELS[channel]}
-            {media ? ` y ${media.kind === 'image' ? 'la imagen' : 'el video'} adjunto` : ''}. Por ahora no se envían.
+            {media ? ` y ${media.kind === 'image' ? 'la imagen' : 'el video'} adjunto` : ''}. Cópielos y envíelos uno por uno.
           </div>
           <ul className="prepared-list">
             {prepared.map(({ client, text }) => (

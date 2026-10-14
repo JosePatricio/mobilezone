@@ -29,6 +29,7 @@ from app.domain.entities import (
 from app.domain.value_objects.affiliate_parts import AffiliatePartStatus, AffiliatePartType, PartCondition
 from app.domain.value_objects.enums import SaleStatus
 from app.domain.value_objects.pagination import Page, PageRequest
+from app.domain.value_objects.whatsapp import WhatsAppMessageStatus
 
 T = TypeVar("T")
 
@@ -347,6 +348,83 @@ class CashOpeningRepository(ABC):
     def get_for_day(self, user_id: int, fecha: date) -> CashOpening | None: ...
 
 
+@dataclass(frozen=True)
+class WhatsAppCampaignSummary:
+    """A campaign of the WhatsApp Cloud API with how many of its messages are in each state."""
+
+    id: int
+    plantilla: str
+    idioma: str
+    categoria: str
+    created_at: datetime
+    creado_por: str | None  # full name of the user who sent it
+    total: int
+    pendientes: int
+    enviados: int
+    entregados: int
+    leidos: int
+    fallidos: int
+
+
+@dataclass(frozen=True)
+class WhatsAppMessageRow:
+    id: int
+    cliente_id: int | None
+    cliente: str | None  # full name; None if the client was deleted
+    telefono: str
+    estado: WhatsAppMessageStatus
+    error: str | None
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class PendingWhatsAppMessage:
+    id: int
+    telefono: str
+    parametros: list[tuple[str, str]]  # (placeholder, value) of the template body
+
+
+class WhatsAppRepository(ABC):
+    """Campaigns, messages and opt-outs of the WhatsApp Cloud API."""
+
+    @abstractmethod
+    def create_campaign(self, *, plantilla: str, idioma: str, categoria: str, created_by: int | None) -> int: ...
+
+    @abstractmethod
+    def add_messages(self, campaign_id: int, messages: list[tuple[int, str, list[tuple[str, str]]]]) -> None:
+        """Queues (cliente_id, telefono, parametros) as PENDIENTE."""
+
+    @abstractmethod
+    def pending_messages(self, campaign_id: int) -> list[PendingWhatsAppMessage]: ...
+
+    @abstractmethod
+    def mark_sent(self, message_id: int, wa_message_id: str) -> None: ...
+
+    @abstractmethod
+    def mark_failed(self, message_id: int, error: str) -> None: ...
+
+    @abstractmethod
+    def apply_status(self, wa_message_id: str, estado: WhatsAppMessageStatus, error: str | None = None) -> bool:
+        """State reported by a webhook; only moves forward (see STATUS_RANK). False if the message is unknown."""
+
+    @abstractmethod
+    def campaigns(self, limit: int = 50) -> list[WhatsAppCampaignSummary]:
+        """Most recent first."""
+
+    @abstractmethod
+    def campaign(self, campaign_id: int) -> WhatsAppCampaignSummary | None: ...
+
+    @abstractmethod
+    def campaign_messages(self, campaign_id: int) -> list[WhatsAppMessageRow]: ...
+
+    @abstractmethod
+    def opted_out(self, telefonos: list[str]) -> set[str]:
+        """The phones of the list that answered BAJA / STOP."""
+
+    @abstractmethod
+    def set_opt_out(self, telefono: str, opted_out: bool) -> None: ...
+
+
 class UnitOfWork(ABC):
     """Transaction boundary shared by all repositories of one operation."""
 
@@ -368,6 +446,7 @@ class UnitOfWork(ABC):
     page_visits: PageVisitRepository
     settings: SettingsRepository
     cash_openings: CashOpeningRepository
+    whatsapp: WhatsAppRepository
 
     @abstractmethod
     def flush(self) -> None: ...

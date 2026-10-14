@@ -242,6 +242,30 @@ curl -I https://pixcell.net/privacy
 
 Ports 80 and 443 must be open in the Hetzner firewall (they already are if the other sites work). The contact email shown on both pages is `SITE_CONTACT_EMAIL` in `frontend/src/modules/site/paths.ts`.
 
+## 12. WhatsApp campaigns (Meta Cloud API)
+
+Propaganda → CRM → WhatsApp → **Enviar por WhatsApp Business** sends an approved template to the selected clients from the server. Without these variables the button shows "no está activado" and everything else keeps working.
+
+1. In https://developers.facebook.com → your app → **WhatsApp → API Setup**, copy the **Phone number ID** and the **WhatsApp Business Account ID**. In **App settings → Basic**, copy the **App secret**.
+2. Add them to `/opt/mobilezone/.env` (never commit them):
+
+   ```bash
+   WHATSAPP_ACCESS_TOKEN=<token>
+   WHATSAPP_PHONE_NUMBER_ID=<phone number id>
+   WHATSAPP_BUSINESS_ACCOUNT_ID=<business account id>
+   WHATSAPP_APP_SECRET=<app secret>
+   WHATSAPP_VERIFY_TOKEN=<any random text, e.g. openssl rand -hex 16>
+   ```
+
+   The token of API Setup expires in 24 hours (fine for a first test). For production create a permanent one: **business.facebook.com → Settings → Users → System users → Add** (Admin), **Assign assets** → your app (full control) and the WhatsApp account, then **Generate token** with the permissions `whatsapp_business_messaging` and `whatsapp_business_management`, expiration **Never**.
+3. Apply the database upgrade and restart: `docker compose up -d --build` (the entrypoint runs `alembic upgrade head`, which creates the `whatsapp_*` tables of upgrade 024).
+4. Webhook (delivered / read states and the BAJA replies). It needs the HTTPS domain of section 11. In **WhatsApp → Configuration → Webhook → Edit**:
+   - Callback URL: `https://pixcell.net/api/v1/whatsapp/webhook`
+   - Verify token: the same `WHATSAPP_VERIFY_TOKEN`
+   - Then **Manage** → subscribe to **messages**.
+
+While the app uses Meta's test number, messages only reach the (up to 5) numbers added in API Setup → "To". Clients answering **BAJA** / **STOP** (or Meta's "Detener promociones" button) stop receiving campaigns; **ALTA** subscribes them again. A campaign interrupted by a restart keeps its unsent messages as "Pendiente".
+
 ---
 
 ## Deploy changes
