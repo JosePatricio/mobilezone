@@ -360,7 +360,7 @@ sudo RCLONE_REMOTE=gdrive:mobilezone-backups scripts/backup.sh
 sudo rclone ls gdrive:mobilezone-backups
 ```
 
-### 4. Schedule it every day at 02:30
+### 4. Schedule it every day at 02:30 Ecuador time (07:30 UTC, the server clock)
 
 ```bash
 sudo crontab -e
@@ -369,7 +369,7 @@ sudo crontab -e
 Add this line (use `dropbox:mobilezone-backups` or `onedrive:mobilezone-backups` if that is your remote):
 
 ```
-30 2 * * * RCLONE_REMOTE=gdrive:mobilezone-backups /opt/mobilezone/scripts/backup.sh >> /var/log/mobilezone-backup.log 2>&1
+30 7 * * * RCLONE_REMOTE=gdrive:mobilezone-backups /opt/mobilezone/scripts/backup.sh >> /var/log/mobilezone-backup.log 2>&1
 ```
 
 Optional settings for the same line: `KEEP_DAYS=30` (days to keep) and `HEALTHCHECK_URL=https://hc-ping.com/<uuid>` (free [healthchecks.io](https://healthchecks.io) check that emails you when a day's backup does not run).
