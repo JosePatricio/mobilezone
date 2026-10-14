@@ -205,6 +205,43 @@ Open `http://<server-ip>:8082` in the browser and log in with `ADMIN_EMAIL` and 
 grep ADMIN_ /opt/mobilezone/.env
 ```
 
+## 11. Public site on the domain (https://pixcell.net)
+
+The app includes two public pages that need no login: `/home` (landing page) and `/privacy` (privacy policy, e.g. for the Google OAuth consent screen).
+To serve them at `https://pixcell.net/home` and `https://pixcell.net/privacy`, point the domain's DNS **A** record (`pixcell.net` and `www`) to the server IP, then add an nginx site for it:
+
+```bash
+sudo nano /etc/nginx/sites-available/pixcell
+```
+
+```nginx
+server {
+    listen 80;
+    server_name pixcell.net www.pixcell.net;
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Enable it and get the HTTPS certificate (certbot adds the port 443 block and the redirect from http):
+
+```bash
+sudo ln -s /etc/nginx/sites-available/pixcell /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d pixcell.net -d www.pixcell.net
+curl -I https://pixcell.net/privacy
+```
+
+Ports 80 and 443 must be open in the Hetzner firewall (they already are if the other sites work). The contact email shown on both pages is `SITE_CONTACT_EMAIL` in `frontend/src/modules/site/paths.ts`.
+
 ---
 
 ## Deploy changes
@@ -304,7 +341,7 @@ sudo rclone config
 
 - `n` (new remote) → name: `gdrive` (or `dropbox`, `onedrive`)
 - Storage: `drive` for Google Drive, `dropbox` for Dropbox, `onedrive` for OneDrive
-- Leave client id / secret empty. For Google Drive choose scope `drive.file` (rclone only sees the files it creates).
+- Google Drive: rclone's shared client id is being retired during 2026, so create your own first ([guide](https://rclone.org/drive/#making-your-own-client-id)): Google Cloud project → enable **Google Drive API** → consent screen (External) → **Publish app** (otherwise the login expires after 7 days) → OAuth client of type **Desktop app**. Paste its client id and secret into rclone, and choose scope `drive.file` (rclone only sees the files it creates).
 - **"Use web browser to automatically authenticate?" → `n`** (the server has no browser). rclone prints a command like `rclone authorize "drive"`. On the **Windows PC**, install rclone (`winget install Rclone.Rclone`), run that command, log in in the browser, and paste the token it prints back into the server.
 
 Test it:

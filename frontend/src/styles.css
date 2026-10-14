@@ -748,6 +748,24 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .part-card-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
 .part-card-header h2 { margin: 0; font-size: 1.1rem; }
 .public-visits { text-align: center; }
+
+/* Public site (/home, /privacy) */
+.site { width: 100%; max-width: 960px; display: flex; flex-direction: column; gap: 24px; }
+.site-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.site-nav { display: flex; gap: 16px; }
+.site-nav a { color: var(--text); font-weight: 600; text-decoration: none; }
+.site-nav a:hover { color: var(--primary-ink); }
+.site-hero { padding: 24px 0; }
+.site-hero h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); max-width: 22ch; margin-bottom: 12px; }
+.site-hero p { font-size: 1.1rem; max-width: 60ch; }
+.site-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+.site-features { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+.site-features h2 { font-size: 1.1rem; margin-bottom: 6px; }
+.site-features p { margin: 0; }
+.site-section h2 { margin-bottom: 8px; }
+.site-legal { line-height: 1.6; }
+.site-legal h2 { font-size: 1.15rem; margin-top: 20px; }
+.site-footer { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; padding: 16px 0; border-top: 1px solid var(--border); font-size: 0.9rem; }
 .d-block { display: block; }
 
 /* Work orders v6 */

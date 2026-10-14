@@ -21,6 +21,9 @@ import { EditSalePage } from '@/modules/sales/pages/EditSalePage';
 import { NewSalePage } from '@/modules/sales/pages/NewSalePage';
 import { SaleDetailPage } from '@/modules/sales/pages/SaleDetailPage';
 import { SalesPage } from '@/modules/sales/pages/SalesPage';
+import { HomePage } from '@/modules/site/pages/HomePage';
+import { PrivacyPage } from '@/modules/site/pages/PrivacyPage';
+import { SITE_HOME_PATH, SITE_PRIVACY_PATH } from '@/modules/site/paths';
 import { SettingsPage } from '@/modules/settings/pages/SettingsPage';
 import { SuppliersPage } from '@/modules/suppliers/pages/SuppliersPage';
 import { UsersPage } from '@/modules/users/pages/UsersPage';
@@ -41,6 +44,9 @@ export function AppRouter() {
       {/* Public catalog of the affiliate spare parts; no session needed. */}
       <Route path={PUBLIC_CATALOG_PATH} element={<PublicAffiliatePartsPage />} />
       <Route path={publicPartPath(':id')} element={<PublicAffiliatePartPage />} />
+      {/* Public site: landing page and privacy policy; no session needed. */}
+      <Route path={SITE_HOME_PATH} element={<HomePage />} />
+      <Route path={SITE_PRIVACY_PATH} element={<PrivacyPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
