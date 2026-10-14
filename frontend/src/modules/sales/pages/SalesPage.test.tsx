@@ -1,8 +1,9 @@
-import { screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { todayIso } from '@/shared/utils/format';
 import { fakeAuth, renderWithProviders } from '@/test/utils';
+import { SaleReceipt } from '../components/PrintableSale';
 import type { Sale } from '../types';
 import { SalesPage } from './SalesPage';
 
@@ -123,13 +124,26 @@ describe('SalesPage', () => {
     expect(preview).toHaveTextContent('Av. Amazonas N24-10');
     expect(preview).toHaveTextContent('Cargador USB-C');
     expect(preview).toHaveTextContent('2 x $ 50,00');
-    expect(preview).toHaveTextContent('Descuento- $ 10,00');
+    expect(preview).toHaveTextContent(/Descuento- \$ 10,00Subtotal/); // the discount goes before the subtotal
     expect(preview).toHaveTextContent('TOTAL A PAGAR$ 95,40');
+    // No payment data: the no-returns notice instead.
+    expect(preview).toHaveTextContent('Salida la mercadería no se aceptan devoluciones');
+    expect(preview).not.toHaveTextContent(/Recibido|Cambio|Pago/);
     // The thermal sheet printed by window.print (hidden on screen).
     expect(document.querySelector('body > .print-sheet')).toHaveTextContent('Descuento- $ 10,00');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Imprimir' }));
     expect(print).toHaveBeenCalledTimes(1);
     print.mockRestore();
+  });
+});
+
+describe('SaleReceipt', () => {
+  it('shows a zero discount before the subtotal and the no-returns notice instead of the payment', () => {
+    render(<SaleReceipt sale={{ ...sale(2, 'CONFIRMADA'), metodo_pago: 'EFECTIVO', monto_recibido: '120.00', cambio: '14.00' }} />);
+    const receipt = document.body;
+    expect(receipt).toHaveTextContent(/Descuento\$ 0,00Subtotal\$ 100,00/);
+    expect(receipt).toHaveTextContent('Salida la mercadería no se aceptan devoluciones');
+    expect(receipt).not.toHaveTextContent(/Recibido|Cambio|Efectivo/);
   });
 });

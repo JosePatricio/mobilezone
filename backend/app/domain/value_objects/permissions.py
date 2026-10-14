@@ -76,6 +76,8 @@ class Perm:
     AFFILIATE_PARTS_MANAGE = "affiliate_parts.manage"
     AFFILIATE_PARTS_ANY = "affiliate_parts.any"
 
+    MARKETING_MANAGE = "marketing.manage"
+
 
 PERMISSION_CATALOG: dict[str, str] = {
     Perm.USERS_VIEW: "Ver usuarios",
@@ -132,6 +134,7 @@ PERMISSION_CATALOG: dict[str, str] = {
     Perm.SETTINGS_MANAGE: "Configuración: metas de venta del día (emoji de la cabecera)",
     Perm.AFFILIATE_PARTS_MANAGE: "Repuestos de afiliados: publicar y administrar sus propios repuestos",
     Perm.AFFILIATE_PARTS_ANY: "Repuestos de afiliados: administrar los repuestos de todos los afiliados",
+    Perm.MARKETING_MANAGE: "Propaganda: preparar mensajes CRM (WhatsApp / SMS) para los clientes de órdenes",
 }
 
 ALL_PERMISSIONS: list[str] = list(PERMISSION_CATALOG)

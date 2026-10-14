@@ -3,7 +3,10 @@ import { createPortal } from 'react-dom';
 import { formatDateTime, formatOrderNumber, fullName } from '@/shared/utils/format';
 import { formatMoney, toCents } from '@/shared/utils/money';
 import { CARD_SURCHARGE_PERCENT } from '../payment';
-import { CONSUMIDOR_FINAL, PAYMENT_METHOD_LABELS, customerName, type Sale } from '../types';
+import { CONSUMIDOR_FINAL, customerName, type Sale } from '../types';
+
+/** Printed instead of the payment data (Pago / Recibido / Cambio). */
+export const NO_RETURNS_NOTICE = 'Salida la mercadería no se aceptan devoluciones';
 
 /** One receipt line: label on the left, value aligned to the right (wraps below when long). */
 function Row({ label, children, strong }: { label: ReactNode; children: ReactNode; strong?: boolean }) {
@@ -63,8 +66,10 @@ export function SaleReceipt({ sale }: { sale: Sale }) {
       ))}
 
       <hr />
+      <Row label="Descuento">
+        {toCents(sale.descuento) > 0 ? `- ${formatMoney(sale.descuento)}` : formatMoney(0)}
+      </Row>
       <Row label="Subtotal">{formatMoney(sale.total)}</Row>
-      {toCents(sale.descuento) > 0 && <Row label="Descuento">- {formatMoney(sale.descuento)}</Row>}
       {toCents(sale.recargo) > 0 && (
         <Row label={`Recargo tarjeta (${CARD_SURCHARGE_PERCENT} %)`}>{formatMoney(sale.recargo)}</Row>
       )}
@@ -72,13 +77,7 @@ export function SaleReceipt({ sale }: { sale: Sale }) {
         {formatMoney(sale.total_pagar)}
       </Row>
       <hr />
-      <Row label="Pago">{sale.metodo_pago ? PAYMENT_METHOD_LABELS[sale.metodo_pago] : '—'}</Row>
-      {sale.monto_recibido !== null && (
-        <>
-          <Row label="Recibido">{formatMoney(sale.monto_recibido)}</Row>
-          <Row label="Cambio">{formatMoney(sale.cambio)}</Row>
-        </>
-      )}
+      <p className="receipt-center receipt-strong">{NO_RETURNS_NOTICE}</p>
 
       <footer className="receipt-center receipt-footer">
         <p>¡Gracias por su compra!</p>

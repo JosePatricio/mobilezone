@@ -490,6 +490,39 @@ class SqlAlchemyWorkOrderRepository(SqlAlchemyRepository[WorkOrder], ports.WorkO
         c = work_orders_table.c
         return list(self.session.scalars(select(c.fecha).where(c.fecha >= desde, c.fecha <= hasta)))
 
+    def order_clients(self, *, search=None, marca_id=None):
+        w, u = work_orders_table.c, users_table.c
+        per_client = (
+            select(w.cliente_id, func.max(w.id).label("last_id"), func.count().label("ordenes"))
+            .group_by(w.cliente_id)
+            .subquery()
+        )
+        last = work_orders_table.alias("last_order")
+        stmt = (
+            select(
+                u.id, u.nombre, u.apellido, u.celular,
+                brands_table.c.nombre, models_table.c.nombre, per_client.c.ordenes, last.c.fecha,
+            )
+            .join(per_client, per_client.c.cliente_id == u.id)
+            .join(last, last.c.id == per_client.c.last_id)
+            .join(brands_table, brands_table.c.id == last.c.marca_id)
+            .join(models_table, models_table.c.id == last.c.modelo_id)
+            .where(u.estado.is_(True))
+        )
+        if search:
+            pattern = _like(search)
+            stmt = stmt.where(
+                or_(
+                    func.lower(u.nombre + " " + u.apellido).like(pattern, escape="\\"),
+                    u.celular.like(pattern, escape="\\"),
+                    u.identificacion.like(pattern, escape="\\"),
+                )
+            )
+        if marca_id is not None:
+            stmt = stmt.where(last.c.marca_id == marca_id)
+        rows = self.session.execute(stmt.order_by(u.nombre, u.apellido, u.id)).all()
+        return [ports.OrderClient(*row) for row in rows]
+
     def get_by_num_orden(self, num_orden: int) -> WorkOrder | None:
         return self.session.scalars(select(WorkOrder).where(work_orders_table.c.num_orden == num_orden)).first()
 

@@ -76,7 +76,7 @@ describe('navigation', () => {
     const all = Object.values(PERMISSIONS);
     const groups = visibleNavigation(fakeAuth({ permissionCodes: all }).hasAnyPermission);
     expect(groups.map((g) => [g.label ?? null, g.items.map((i) => i.label)])).toEqual([
-      [null, ['Dashboard', 'Órdenes', 'Ventas', 'Repuestos afiliados']],
+      [null, ['Dashboard', 'Órdenes', 'Ventas', 'Propaganda', 'Repuestos afiliados']],
       ['Comercial', ['Productos', 'Proveedores', 'Inventario', 'Categorías', 'Marcas', 'Clientes']],
       ['Configuración', ['Usuarios', 'Sucursales', 'Roles', 'Permisos', 'Metas de venta']],
     ]);

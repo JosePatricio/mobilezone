@@ -286,6 +286,72 @@ docker compose exec -T db sh -c 'mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" --si
 
 If you add permissions or roles in `backend/app/domain/value_objects/permissions.py`, deploying the backend is enough. The seed runs on every start and adds only what is missing.
 
+## Backups (daily, uploaded to Google Drive / Dropbox / OneDrive)
+
+`scripts/backup.sh` saves the database and the uploaded images to `/var/backups/mobilezone`, uploads them with [rclone](https://rclone.org) and deletes backups older than 14 days (locally and in the cloud). Run all the commands below as root, because cron runs the backup as root.
+
+### 1. Install rclone (server, once)
+
+```bash
+sudo -v ; curl https://rclone.org/install.sh | sudo bash
+```
+
+### 2. Connect your cloud account (server, once)
+
+```bash
+sudo rclone config
+```
+
+- `n` (new remote) → name: `gdrive` (or `dropbox`, `onedrive`)
+- Storage: `drive` for Google Drive, `dropbox` for Dropbox, `onedrive` for OneDrive
+- Leave client id / secret empty. For Google Drive choose scope `drive.file` (rclone only sees the files it creates).
+- **"Use web browser to automatically authenticate?" → `n`** (the server has no browser). rclone prints a command like `rclone authorize "drive"`. On the **Windows PC**, install rclone (`winget install Rclone.Rclone`), run that command, log in in the browser, and paste the token it prints back into the server.
+
+Test it:
+
+```bash
+sudo rclone mkdir gdrive:mobilezone-backups
+sudo rclone lsd gdrive:
+```
+
+### 3. Try a backup by hand
+
+```bash
+cd /opt/mobilezone
+chmod +x scripts/backup.sh scripts/restore.sh
+sudo RCLONE_REMOTE=gdrive:mobilezone-backups scripts/backup.sh
+sudo rclone ls gdrive:mobilezone-backups
+```
+
+### 4. Schedule it every day at 02:30
+
+```bash
+sudo crontab -e
+```
+
+Add this line (use `dropbox:mobilezone-backups` or `onedrive:mobilezone-backups` if that is your remote):
+
+```
+30 2 * * * RCLONE_REMOTE=gdrive:mobilezone-backups /opt/mobilezone/scripts/backup.sh >> /var/log/mobilezone-backup.log 2>&1
+```
+
+Optional settings for the same line: `KEEP_DAYS=30` (days to keep) and `HEALTHCHECK_URL=https://hc-ping.com/<uuid>` (free [healthchecks.io](https://healthchecks.io) check that emails you when a day's backup does not run).
+
+Check the log: `tail -n 20 /var/log/mobilezone-backup.log`
+
+### Restore
+
+Download the files if they are only in the cloud, then restore. This **replaces** the current data:
+
+```bash
+cd /opt/mobilezone
+sudo rclone copy gdrive:mobilezone-backups/mobilezone_db_2026-10-14_0230.sql.gz /tmp/
+sudo rclone copy gdrive:mobilezone-backups/mobilezone_media_2026-10-14_0230.tar.gz /tmp/
+sudo scripts/restore.sh /tmp/mobilezone_db_2026-10-14_0230.sql.gz /tmp/mobilezone_media_2026-10-14_0230.tar.gz
+```
+
+Also keep a copy of the `.env` file somewhere safe (a password manager, for example). It is not in the backups.
+
 ## Common commands (run from `/opt/mobilezone`)
 
 ```bash
@@ -308,7 +374,6 @@ Do **not** run `docker compose down -v`. It deletes the database volume and all 
 cd /opt/mobilezone
 git pull
 docker compose up -d --build
-
 
 
 

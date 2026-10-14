@@ -250,6 +250,21 @@ class SparePartRepository(Repository[SparePart]):
     def list(self, page: PageRequest, *, search: str | None = None, estado: bool | None = None) -> Page[SparePart]: ...
 
 
+@dataclass(frozen=True)
+class OrderClient:
+    """A client that came through Órdenes (has at least one work order), with the phone of
+    their most recent order. Recipient of the Propaganda (CRM) messages."""
+
+    cliente_id: int
+    nombre: str
+    apellido: str
+    celular: str | None
+    marca: str  # brand of the phone of the most recent order
+    modelo: str
+    ordenes: int  # number of work orders of the client
+    ultima_orden: date  # reception date of the most recent order
+
+
 class WorkOrderRepository(Repository[WorkOrder]):
     @abstractmethod
     def day_activity(self, *, day: date, desde: datetime, hasta: datetime) -> tuple[int, int, int]:
@@ -258,6 +273,11 @@ class WorkOrderRepository(Repository[WorkOrder]):
     @abstractmethod
     def reception_dates(self, *, desde: date, hasta: date) -> list[date]:
         """Reception date of every order received between ``desde`` and ``hasta`` (inclusive)."""
+
+    @abstractmethod
+    def order_clients(self, *, search: str | None = None, marca_id: int | None = None) -> list[OrderClient]:
+        """Active clients with at least one work order (not the ones that only bought in Ventas),
+        ordered by name. ``marca_id`` keeps the clients whose most recent order is of that brand."""
 
     @abstractmethod
     def get_by_num_orden(self, num_orden: int) -> WorkOrder | None: ...

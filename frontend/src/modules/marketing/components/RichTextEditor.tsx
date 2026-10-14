@@ -1,0 +1,156 @@
+import { useCallback, useEffect, useId, useRef, useState, type ClipboardEvent } from 'react';
+import { type Line, parseEditor, VARIABLES } from '../message';
+
+type Format = 'bold' | 'italic' | 'strikeThrough';
+
+const FORMATS: { command: Format; label: string; text: string; className: string }[] = [
+  { command: 'bold', label: 'Negrita', text: 'B', className: 'rte-bold' },
+  { command: 'italic', label: 'Cursiva', text: 'I', className: 'rte-italic' },
+  { command: 'strikeThrough', label: 'Tachado', text: 'S', className: 'rte-strike' },
+];
+
+/** Values of execCommand('fontSize'): 2 small, 3 normal, 5 large. */
+const SIZES = [
+  { value: '2', label: 'Pequeño' },
+  { value: '3', label: 'Normal' },
+  { value: '5', label: 'Grande' },
+];
+
+function runCommand(command: string, value?: string): boolean {
+  try {
+    return typeof document.execCommand === 'function' && document.execCommand(command, false, value);
+  } catch {
+    return false;
+  }
+}
+
+function commandState(command: Format): boolean {
+  try {
+    return typeof document.queryCommandState === 'function' && document.queryCommandState(command);
+  } catch {
+    return false;
+  }
+}
+
+interface Props {
+  label: string;
+  onChange: (lines: Line[]) => void;
+  placeholder?: string;
+}
+
+/**
+ * Text editor with bold, italic, strikethrough and size, plus buttons to insert the variables
+ * (@NOMBRE, @TELEFONO). Pasted content goes in as plain text.
+ */
+export function RichTextEditor({ label, onChange, placeholder }: Props) {
+  const ref = useRef<HTMLDivElement>(null);
+  const labelId = useId();
+  const [active, setActive] = useState<Record<Format, boolean>>({ bold: false, italic: false, strikeThrough: false });
+  const [size, setSize] = useState('3');
+
+  const emit = useCallback(() => {
+    if (ref.current) onChange(parseEditor(ref.current));
+  }, [onChange]);
+
+  const refreshToolbar = useCallback(() => {
+    const editor = ref.current;
+    const selection = document.getSelection();
+    if (!editor || !selection?.anchorNode || !editor.contains(selection.anchorNode)) return;
+    setActive({ bold: commandState('bold'), italic: commandState('italic'), strikeThrough: commandState('strikeThrough') });
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('selectionchange', refreshToolbar);
+    return () => document.removeEventListener('selectionchange', refreshToolbar);
+  }, [refreshToolbar]);
+
+  const exec = (command: string, value?: string) => {
+    ref.current?.focus();
+    runCommand(command, value);
+    refreshToolbar();
+    emit();
+  };
+
+  /** Inserts at the cursor; without editing support (or focus) it is added at the end. */
+  const insertText = (text: string) => {
+    const editor = ref.current;
+    if (!editor) return;
+    const selection = document.getSelection();
+    const inside = selection?.anchorNode && editor.contains(selection.anchorNode);
+    if (!inside || !runCommand('insertText', text)) editor.append(document.createTextNode(text));
+    emit();
+  };
+
+  const onPaste = (e: ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    insertText(e.clipboardData.getData('text/plain'));
+  };
+
+  return (
+    <div className="rte">
+      <span id={labelId} className="field-label">
+        {label}
+      </span>
+      <div className="rte-toolbar" role="toolbar" aria-label="Formato del texto">
+        {FORMATS.map((f) => (
+          <button
+            key={f.command}
+            type="button"
+            className={`rte-btn ${f.className}`}
+            aria-label={f.label}
+            title={f.label}
+            aria-pressed={active[f.command]}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => exec(f.command)}
+          >
+            {f.text}
+          </button>
+        ))}
+        <select
+          className="input rte-size"
+          aria-label="Tamaño"
+          title="Tamaño"
+          value={size}
+          onChange={(e) => {
+            setSize(e.target.value);
+            exec('fontSize', e.target.value);
+          }}
+        >
+          {SIZES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <span className="rte-separator" aria-hidden />
+        {VARIABLES.map((v) => (
+          <button
+            key={v.token}
+            type="button"
+            className="rte-btn rte-variable"
+            title={`Insertar ${v.token}: ${v.hint}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => insertText(v.token)}
+          >
+            {v.token}
+          </button>
+        ))}
+      </div>
+      <div
+        ref={ref}
+        className="rte-content input"
+        contentEditable
+        suppressContentEditableWarning
+        role="textbox"
+        aria-multiline="true"
+        aria-labelledby={labelId}
+        data-placeholder={placeholder}
+        onInput={emit}
+        onPaste={onPaste}
+        onDrop={(e) => e.preventDefault()}
+        onKeyUp={refreshToolbar}
+        onMouseUp={refreshToolbar}
+      />
+    </div>
+  );
+}

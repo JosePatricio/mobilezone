@@ -65,7 +65,8 @@ INSERT INTO permissions (codigo, descripcion) VALUES
     ('spare_parts.delete', 'Eliminar repuestos'),
     ('settings.manage', 'Configuración: metas de venta del día (emoji de la cabecera)'),
     ('affiliate_parts.manage', 'Repuestos de afiliados: publicar y administrar sus propios repuestos'),
-    ('affiliate_parts.any', 'Repuestos de afiliados: administrar los repuestos de todos los afiliados')
+    ('affiliate_parts.any', 'Repuestos de afiliados: administrar los repuestos de todos los afiliados'),
+    ('marketing.manage', 'Propaganda: preparar mensajes CRM (WhatsApp / SMS) para los clientes de órdenes')
 ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion);
 
 -- System roles (the role defines the kind of user) ---------------------------

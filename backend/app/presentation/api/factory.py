@@ -13,7 +13,19 @@ from app.infrastructure.security.jwt_tokens import JwtTokenService
 from app.infrastructure.security.passwords import BcryptPasswordHasher
 from app.infrastructure.pdf.receipt import ReportLabReceiptRenderer
 from app.infrastructure.storage.local import LocalFileStorage
-from app.presentation.api.routes import affiliate_parts, auth, dashboard, catalog, inventory, products, roles, sales, users, work_orders
+from app.presentation.api.routes import (
+    affiliate_parts,
+    auth,
+    catalog,
+    dashboard,
+    inventory,
+    marketing,
+    products,
+    roles,
+    sales,
+    users,
+    work_orders,
+)
 from app.presentation.api.routes import settings as settings_routes
 from app.presentation.api.schemas.common import configure_media_url
 from app.presentation.middleware.errors import register_error_handlers
@@ -76,6 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         affiliate_parts.router,
         affiliate_parts.public_router,
         dashboard.router,
+        marketing.router,
     ):
         api.include_router(router)
     app.include_router(api)

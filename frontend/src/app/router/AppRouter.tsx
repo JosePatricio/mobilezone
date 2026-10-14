@@ -10,6 +10,7 @@ import { BrandsPage } from '@/modules/brands/pages/BrandsPage';
 import { CategoriesPage } from '@/modules/categories/pages/CategoriesPage';
 import { ClientsPage } from '@/modules/clients/pages/ClientsPage';
 import { InventoryPage } from '@/modules/inventory/pages/InventoryPage';
+import { MarketingPage } from '@/modules/marketing/pages/MarketingPage';
 import { ModelsPage } from '@/modules/models/pages/ModelsPage';
 import { PermissionsPage } from '@/modules/permissions/pages/PermissionsPage';
 import { ProductsPage } from '@/modules/products/pages/ProductsPage';
@@ -87,6 +88,9 @@ export function AppRouter() {
             <Route path="work-orders/:id/edit" element={<WorkOrderFormPage />} />
           </Route>
 
+          <Route element={<PermissionRoute permission={P.MARKETING_MANAGE} />}>
+            <Route path="marketing" element={<MarketingPage />} />
+          </Route>
           <Route element={<PermissionRoute permission={P.AFFILIATE_PARTS_MANAGE} />}>
             <Route path="affiliate-parts" element={<AffiliatePartsPage />} />
           </Route>

@@ -57,6 +57,7 @@ export const PERMISSIONS = {
   SETTINGS_MANAGE: 'settings.manage',
   AFFILIATE_PARTS_MANAGE: 'affiliate_parts.manage',
   AFFILIATE_PARTS_ANY: 'affiliate_parts.any',
+  MARKETING_MANAGE: 'marketing.manage',
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

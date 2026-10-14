@@ -888,3 +888,42 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 
 /* Work order detail: status selector in the page header */
 .header-status { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+
+/* Propaganda (CRM) */
+.channel-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.channel-option { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 12px; border: 1px solid var(--input-border); border-radius: var(--radius); background: var(--surface); color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+.channel-option:hover, .channel-option:focus-visible { border-color: var(--primary); background: var(--primary-soft); outline: none; }
+.channel-option svg { width: 32px; height: 32px; }
+.channel-sms { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--brand-black); color: var(--brand-gray); font-size: 0.7rem; font-weight: 700; }
+.crm-channel { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.crm-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.crm-side { position: sticky; top: calc(var(--header-h) + 16px); }
+@media (max-width: 1000px) { .crm-grid { grid-template-columns: 1fr; } .crm-side { position: static; } }
+.choice-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.media-name { margin: 8px 0 0; font-size: 0.85rem; overflow-wrap: anywhere; }
+.rte-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 4px 0 6px; }
+.rte-btn { min-width: 32px; height: 32px; padding: 0 8px; border: 1px solid var(--input-border); border-radius: 6px; background: var(--surface); color: inherit; font: inherit; cursor: pointer; }
+.rte-btn:hover { background: var(--surface-alt); }
+.rte-btn[aria-pressed='true'] { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-ink); }
+.rte-bold { font-weight: 700; }
+.rte-italic { font-style: italic; font-family: Georgia, serif; }
+.rte-strike { text-decoration: line-through; }
+.rte-variable { font-size: 0.8rem; font-weight: 600; color: var(--primary-ink); }
+.rte-size { width: auto; height: 32px; padding-top: 0; padding-bottom: 0; }
+.rte-separator { width: 1px; height: 22px; margin: 0 4px; background: var(--border); }
+.rte-content { min-height: 140px; height: auto; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; }
+.rte-content:empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
+.crm-count, .crm-sample { margin: 8px 0 0; font-size: 0.85rem; }
+.crm-sample { margin: 0 0 8px; }
+.message-bubble { padding: 8px 10px; border-radius: 10px; border-top-left-radius: 2px; background: #ffffff; color: #111b21; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12); overflow-wrap: anywhere; }
+.message-bubble-whatsapp { background: #e7fcd8; }
+.message-bubble-sms { background: #e9e9eb; }
+.message-line { margin: 0; min-height: 1.3em; line-height: 1.35; }
+.message-media { display: block; width: 100%; max-height: 260px; object-fit: cover; margin-bottom: 6px; border-radius: 6px; background: #000; }
+.crm-prepare { width: 100%; margin-top: 12px; }
+.crm-side .alert { margin: 12px 0 0; }
+.prepared-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.prepared-item { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; }
+.prepared-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.prepared-head .btn { margin-left: auto; }
+.prepared-text { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 0.9rem; }

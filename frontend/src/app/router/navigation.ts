@@ -27,6 +27,7 @@ export const NAVIGATION: NavGroup[] = [
       { to: '/', label: 'Dashboard', permissions: DASHBOARD_PERMISSIONS },
       { to: '/work-orders', label: 'Órdenes', permissions: [P.WORK_ORDERS_VIEW] },
       { to: '/sales', label: 'Ventas', permissions: [P.SALES_VIEW, P.SALES_CREATE] },
+      { to: '/marketing', label: 'Propaganda', permissions: [P.MARKETING_MANAGE] },
       { to: '/affiliate-parts', label: 'Repuestos afiliados', permissions: [P.AFFILIATE_PARTS_MANAGE] },
     ],
   },

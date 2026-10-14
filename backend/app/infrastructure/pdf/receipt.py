@@ -15,13 +15,10 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from app.application.services.receipts import ReceiptRenderer
 from app.domain.entities import Sale
-from app.domain.value_objects.enums import PaymentMethod, SaleStatus
+from app.domain.value_objects.enums import SaleStatus
 
-PAYMENT_LABELS = {
-    PaymentMethod.EFECTIVO: "Efectivo",
-    PaymentMethod.TRANSFERENCIA: "Transferencia",
-    PaymentMethod.TARJETA: "Tarjeta de crédito",
-}
+# Printed instead of the payment data (método de pago / recibido / cambio).
+NO_RETURNS_NOTICE = "Salida la mercadería no se aceptan devoluciones"
 
 
 def _money(value: Decimal | None) -> str:
@@ -134,9 +131,8 @@ class ReportLabReceiptRenderer(ReceiptRenderer):
         )
         story += [items, Spacer(1, 3 * mm)]
 
-        totals = [["Subtotal", _money(sale.total)]]
-        if sale.descuento:
-            totals.append(["Descuento", f"- {_money(sale.descuento)}"])
+        descuento = f"- {_money(sale.descuento)}" if sale.descuento else _money(Decimal("0"))
+        totals = [["Descuento", descuento], ["Subtotal", _money(sale.total)]]
         if sale.recargo:
             totals.append(["Recargo tarjeta de crédito (6 %)", _money(sale.recargo)])
         totals.append(["<b>TOTAL A PAGAR</b>", f"<b>{_money(sale.total_pagar or sale.total)}</b>"])
@@ -145,17 +141,13 @@ class ReportLabReceiptRenderer(ReceiptRenderer):
                 ["Anticipo (orden de trabajo)", _money(order.anticipo)],
                 ["Saldo cobrado", _money((sale.total_pagar or sale.total) - order.anticipo)],
             ]
-        if sale.metodo_pago is not None:
-            totals.append(["Método de pago", PAYMENT_LABELS[sale.metodo_pago]])
-        if sale.monto_recibido is not None:
-            totals += [["Recibido", _money(sale.monto_recibido)], ["Cambio", _money(sale.cambio)]]
         totals_table = Table(
             [[Paragraph(label, right), Paragraph(value, right)] for label, value in totals],
             colWidths=[None, 30 * mm],
         )
-        bold_row = 1 + (1 if sale.descuento else 0) + (1 if sale.recargo else 0)
+        bold_row = 2 + (1 if sale.recargo else 0)
         totals_table.setStyle(TableStyle([("LINEABOVE", (0, bold_row), (-1, bold_row), 0.6, colors.black)]))
-        story += [totals_table, Spacer(1, 6 * mm)]
+        story += [totals_table, Spacer(1, 4 * mm), Paragraph(f"<b>{NO_RETURNS_NOTICE}</b>", center), Spacer(1, 4 * mm)]
         story.append(
             Paragraph(
                 "Documento interno de venta. No reemplaza al comprobante electrónico autorizado por el SRI.",

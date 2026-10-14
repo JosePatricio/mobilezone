@@ -72,6 +72,7 @@ Estado de servidor con TanStack Query, formularios con react-hook-form + zod.
 | work-orders | CRUD, `PATCH /{id}/status`, `GET /by-number/{n}`, `GET /statuses`, `GET /branches` (sucursal de la orden: su dirección y teléfono se imprimen), `POST /calculate-balance`, `POST/DELETE /{id}/spare-parts` |
 | affiliate-parts | Repuestos de afiliados (rol TECNICO, permiso `affiliate_parts.manage`): `GET` (los propios; todos con `affiliate_parts.any`, filtros `tipo`, `condicion`, `estado`, `garantia`, `search`, `user_id`), `GET /{id}`, `POST`, `PUT /{id}`, `PATCH /{id}/status` (DISPONIBLE / VENDIDO), `DELETE /{id}`, `PUT/DELETE /{id}/image`, `GET /visits` (solo administrador, `affiliate_parts.any`) |
 | public/affiliate-parts | Catálogo público sin login (página `/repuestos`): `GET` (repuestos de todos los afiliados activos, con su dirección `users.direccion`), `GET /{id}` (detalle público de un repuesto, página `/repuestos/{id}`), `GET /catalogs`, `POST /visits` (cuenta la visita; el total solo lo ve el administrador) |
+| marketing | Propaganda › CRM (permiso `marketing.manage`): `GET /marketing/recipients` (filtros `search`, `marca_id`): clientes activos con al menos una orden de trabajo (no los que solo compraron en Ventas) con la marca y modelo del teléfono de su orden más reciente. El mensaje (WhatsApp / SMS, imagen o video, texto con @NOMBRE y @TELEFONO) se prepara en el frontend; aún no se envía |
 
 Listados paginados: `?page=&size=` (máx. 100) → `{items, total, page, size, pages}`. Montos como string decimal (`"10.50"`).
 
