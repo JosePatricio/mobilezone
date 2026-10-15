@@ -1,3 +1,3 @@
 En el Ordenes
 
-En la factura, quitar temporalmente el QR de seguimiento
+En la columna de whatsapp, funciona bien para web pero cuando estoy desde mi telefono no funciona, arreglar
