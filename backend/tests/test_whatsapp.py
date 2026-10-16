@@ -276,6 +276,19 @@ def test_campaign_skips_invalid_repeated_and_opted_out_numbers():
     ]
 
 
+def test_campaign_sends_to_numbers_typed_by_hand():
+    uow = FakeUow([_client(1, "0991234567", nombre="Ana")])
+    created = CreateWhatsAppCampaignUseCase(uow, FakeGateway([PROMO]), "593").execute(
+        ADMIN, plantilla="promo", idioma="es", cliente_ids=[], parametros=NAME_AND_BRAND,
+        numeros=["0987654321", "099 123 4567", "123"],  # 2nd is client 1's number (not chosen); 3rd invalid
+    )
+    assert (created.encolados, created.sin_numero) == (2, 1)
+    assert [(m["cliente_id"], m["telefono"], m["parametros"]) for m in uow.whatsapp.messages.values()] == [
+        (None, "593987654321", [("1", "Cliente"), ("2", "-")]),
+        (None, "593991234567", [("1", "Cliente"), ("2", "-")]),
+    ]
+
+
 def test_campaign_validates_template_params_and_media():
     uow = FakeUow([_client(1, "0991234567")])
     use_case = CreateWhatsAppCampaignUseCase(uow, FakeGateway([PROMO, WITH_IMAGE]), "593")

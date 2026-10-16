@@ -59,6 +59,8 @@ export interface CampaignRequest {
   plantilla: string;
   idioma: string;
   cliente_ids: number[];
+  /** Numbers typed by hand (tests), sent without client data. */
+  numeros: string[];
   parametros: TemplateParam[];
 }
 

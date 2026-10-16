@@ -76,7 +76,10 @@ def _clean(value: str | None) -> str:
     return re.sub(r"\s+", " ", value or "").strip() or "-"
 
 
-def param_value(param: TemplateParam, client: OrderClient) -> str:
+def param_value(param: TemplateParam, client: OrderClient | None) -> str:
+    """Value of a placeholder for one client; None = a number typed by hand (no client data)."""
+    if client is None:
+        return _clean({ParamSource.TEXTO: param.texto, ParamSource.NOMBRE: "Cliente"}.get(param.source))
     return _clean(
         {
             ParamSource.NOMBRE: client.nombre,
@@ -130,7 +133,9 @@ class CreateWhatsAppCampaignUseCase(UseCase):
         cliente_ids: list[int],
         parametros: list[TemplateParam],
         media: MediaFile | None = None,
+        numeros: list[str] | None = None,
     ) -> CampaignCreated:
+        """`numeros`: extra phone numbers typed by hand (e.g. for a test), sent without client data."""
         template = self._template(plantilla, idioma)
         if len(parametros) != len(template.body_params):
             raise ValidationError(
@@ -150,14 +155,19 @@ class CreateWhatsAppCampaignUseCase(UseCase):
 
         wanted = set(cliente_ids)
         clients = [c for c in self.uow.work_orders.order_clients() if c.cliente_id in wanted]
-        recipients: dict[str, OrderClient] = {}
-        for client in clients:
-            number = whatsapp_number(client.celular, self.country_code)
+        extra = numeros or []
+        recipients: dict[str, OrderClient | None] = {}
+        for celular, client in [(c.celular, c) for c in clients] + [(n, None) for n in extra]:
+            number = whatsapp_number(celular, self.country_code)
             if number and number not in recipients:
                 recipients[number] = client
         opted_out = self.uow.whatsapp.opted_out(list(recipients))
         queue = [
-            (client.cliente_id, number, [(name, param_value(p, client)) for name, p in zip(template.body_params, parametros)])
+            (
+                client.cliente_id if client else None,
+                number,
+                [(name, param_value(p, client)) for name, p in zip(template.body_params, parametros)],
+            )
             for number, client in recipients.items()
             if number not in opted_out
         ]
@@ -178,7 +188,7 @@ class CreateWhatsAppCampaignUseCase(UseCase):
         return CampaignCreated(
             campaign_id=campaign_id,
             encolados=len(queue),
-            sin_numero=len(wanted) - len(recipients),
+            sin_numero=len(wanted) + len(extra) - len(recipients),
             dados_de_baja=len(recipients) - len(queue),
             header_media=header_media,
         )

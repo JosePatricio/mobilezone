@@ -130,6 +130,7 @@ def create_whatsapp_campaign(
         plantilla=body.plantilla,
         idioma=body.idioma,
         cliente_ids=body.cliente_ids,
+        numeros=body.numeros,
         parametros=[TemplateParam(p.source, p.texto) for p in body.parametros],
         media=media,
     )

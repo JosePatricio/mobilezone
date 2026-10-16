@@ -51,6 +51,14 @@ function fillTemplate(template: WhatsAppTemplate, params: TemplateParam[], clien
   });
 }
 
+/** Same rule as the server (whatsapp_number): "0991234567" → 593991234567; 10 to 15 digits. */
+function validNumber(value: string): boolean {
+  let digits = value.replace(/\D/g, '');
+  if (!value.trim().startsWith('+') && digits.startsWith('0')) digits = `593${digits.slice(1)}`;
+  if (digits.length < 10 || digits.length > 15) return false;
+  return !digits.startsWith('5939') || digits.length === 12;
+}
+
 export function formatUsd(value: number): string {
   return `$${value.toFixed(2)}`;
 }
@@ -70,6 +78,20 @@ export function WhatsAppApiSender({ recipients }: Props) {
   const [params, setParams] = useState<TemplateParam[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Numbers typed by hand (e.g. your own phone to test a template before sending it to clients).
+  const [numbers, setNumbers] = useState<string[]>([]);
+  const [draft, setDraft] = useState('');
+  const total = recipients.length + numbers.length;
+
+  const addNumber = () => {
+    const value = draft.trim();
+    if (!value) return;
+    if (!validNumber(value)) return setError(`"${value}" no es un celular válido (ej. 0991234567 o +593991234567).`);
+    if (numbers.includes(value)) return setError('Ese número ya está en la lista.');
+    setError(null);
+    setNumbers((prev) => [...prev, value]);
+    setDraft('');
+  };
 
   const template = useMemo(
     () => templates.data?.find((t) => keyOf(t) === selectedKey),
@@ -96,6 +118,7 @@ export function WhatsAppApiSender({ recipients }: Props) {
           plantilla: template!.name,
           idioma: template!.language,
           cliente_ids: recipients.map((c) => c.cliente_id),
+          numeros: numbers,
           parametros: params,
         },
         file,
@@ -107,15 +130,16 @@ export function WhatsAppApiSender({ recipients }: Props) {
     if (!template) return setError('Elija una plantilla.');
     if (params.some((p) => p.source === 'TEXTO' && !p.texto?.trim())) return setError('Escriba el texto fijo.');
     if (headerFile && !file) return setError('La plantilla necesita un archivo para el encabezado.');
-    if (recipients.length === 0) return setError('Seleccione al menos un cliente con celular.');
+    if (total === 0) return setError('Seleccione al menos un cliente con celular o escriba un número de prueba.');
     setError(null);
     const ok = await confirm({
       title: 'Enviar por WhatsApp',
       message: (
         <>
-          Se enviará la plantilla <strong>{template.name}</strong> a {recipients.length} cliente(s).
+          Se enviará la plantilla <strong>{template.name}</strong> a {recipients.length} cliente(s)
+          {numbers.length > 0 && ` y ${numbers.length} número(s) de prueba`}.
           <br />
-          Costo aproximado: <strong>{formatUsd(recipients.length * price)}</strong> (
+          Costo aproximado: <strong>{formatUsd(total * price)}</strong> (
           {formatUsd(price)} por mensaje de {template.category.toLowerCase()}; el número de prueba es gratis).
         </>
       ),
@@ -169,6 +193,39 @@ export function WhatsAppApiSender({ recipients }: Props) {
         WhatsApp solo permite iniciar conversaciones con plantillas aprobadas por Meta. Créelas en el administrador de
         WhatsApp y aparecerán aquí.
       </p>
+      <div className="wa-numbers">
+        <div className="wa-numbers-add">
+          <Input
+            label="Números de prueba"
+            placeholder="0991234567"
+            inputMode="tel"
+            value={draft}
+            maxLength={20}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addNumber();
+              }
+            }}
+          />
+          <Button variant="secondary" onClick={addNumber}>
+            Agregar
+          </Button>
+        </div>
+        {numbers.length > 0 && (
+          <ul className="wa-number-list">
+            {numbers.map((n) => (
+              <li key={n}>
+                {n}
+                <button type="button" aria-label={`Quitar ${n}`} onClick={() => setNumbers((prev) => prev.filter((x) => x !== n))}>
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <Select
         label="Plantilla"
         placeholder={options.length ? 'Elija una plantilla' : 'No hay plantillas aprobadas'}
@@ -219,7 +276,7 @@ export function WhatsAppApiSender({ recipients }: Props) {
             {template.footer && <small className="muted">{template.footer}</small>}
           </div>
           <p className="muted crm-count">
-            {recipients.length} destinatario(s) · costo aprox. {formatUsd(recipients.length * price)}
+            {total} destinatario(s) · costo aprox. {formatUsd(total * price)}
           </p>
         </div>
       )}

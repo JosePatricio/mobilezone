@@ -122,7 +122,9 @@ function CampaignModal({ id, summary, onClose }: { id: number; summary?: Campaig
             <tbody>
               {query.data!.messages.map((m) => (
                 <tr key={m.id}>
-                  <td>{m.cliente ?? <span className="muted">Cliente eliminado</span>}</td>
+                  <td>
+                    {m.cliente ?? <span className="muted">{m.cliente_id ? 'Cliente eliminado' : 'Número manual'}</span>}
+                  </td>
                   <td>+{m.telefono}</td>
                   <td>
                     <StatusBadge label={STATUS[m.estado].label} tone={STATUS[m.estado].tone} />

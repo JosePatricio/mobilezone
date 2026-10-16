@@ -67,7 +67,9 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     write('Hola <b>@NOMBRE</b>, promo para tu @TELEFONO a 430$.');
     expect(within(screen.getByLabelText('Vista previa del mensaje')).getByText('Ana')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('checkbox', { name: 'Incluir a Luis Pérez' }));
+    // Nobody is checked at first.
+    expect(screen.getByRole('checkbox', { name: 'Incluir a Luis Pérez' })).not.toBeChecked();
+    await user.click(screen.getByRole('checkbox', { name: 'Incluir a Ana Pérez' }));
     await user.click(screen.getByRole('button', { name: 'Preparar mensajes' }));
 
     expect(screen.getByText('Mensajes preparados (1)')).toBeInTheDocument();
@@ -86,6 +88,10 @@ describe('MarketingPage (Propaganda › CRM)', () => {
 
     write('<b>@NOMBRE</b> tu @TELEFONO');
     await user.click(screen.getByRole('button', { name: 'Preparar mensajes' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Seleccione al menos un cliente con celular.');
+
+    await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todos' }));
+    await user.click(screen.getByRole('button', { name: 'Preparar mensajes' }));
     expect(screen.getByText('Mensajes preparados (2)')).toBeInTheDocument();
     const list = screen.getByRole('list');
     expect(within(list).getByText('Ana tu Samsung')).toBeInTheDocument();
@@ -98,6 +104,7 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     await user.click(screen.getByRole('button', { name: 'CRM' }));
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'WhatsApp' }));
     await screen.findByText('Ana Pérez');
+    await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todos' }));
 
     await user.selectOptions(screen.getByRole('combobox', { name: 'Marca del teléfono' }), 'Xiaomi');
     expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument();
@@ -112,11 +119,23 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     await user.click(screen.getByRole('button', { name: 'CRM' }));
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'WhatsApp' }));
     await screen.findByText('Ana Pérez');
+    await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todos' }));
 
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Plantilla' }), 'promo_octubre|es');
     // {{1}} = name, {{2}} = brand of the phone by default; previewed with the first client.
     expect(screen.getByText('Hola Ana, oferta para tu Samsung.')).toBeInTheDocument();
     expect(screen.getByText('2 destinatario(s) · costo aprox. $0.15')).toBeInTheDocument();
+
+    // Test numbers typed by hand: invalid ones are rejected, valid ones can be removed again.
+    const numberInput = screen.getByLabelText('Números de prueba');
+    await user.type(numberInput, '123{Enter}');
+    expect(screen.getByRole('alert')).toHaveTextContent('no es un celular válido');
+    await user.clear(numberInput);
+    await user.type(numberInput, '0987654321');
+    await user.click(screen.getByRole('button', { name: 'Agregar' }));
+    await user.type(numberInput, '0981111111{Enter}');
+    await user.click(screen.getByRole('button', { name: 'Quitar 0981111111' }));
+    expect(screen.getByText('3 destinatario(s) · costo aprox. $0.22')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Enviar' }));
@@ -126,6 +145,7 @@ describe('MarketingPage (Propaganda › CRM)', () => {
         plantilla: 'promo_octubre',
         idioma: 'es',
         cliente_ids: [1, 2],
+        numeros: ['0987654321'],
         parametros: [{ source: 'NOMBRE' }, { source: 'MARCA' }],
       },
       null,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Annotated
 
-from pydantic import Field, StringConstraints
+from pydantic import Field, StringConstraints, model_validator
 
 from app.application.use_cases.whatsapp import ParamSource
 from app.domain.value_objects.whatsapp import WhatsAppMessageStatus
@@ -41,8 +41,17 @@ class TemplateParamRequest(RequestSchema):
 class WhatsAppCampaignRequest(RequestSchema):
     plantilla: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=512)]
     idioma: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=15)]
-    cliente_ids: list[int] = Field(min_length=1, max_length=5000)
+    cliente_ids: list[int] = Field(default_factory=list, max_length=5000)
+    numeros: list[Annotated[str, StringConstraints(strip_whitespace=True, max_length=20)]] = Field(
+        default_factory=list, max_length=50, description="Números escritos a mano (pruebas), sin datos de cliente"
+    )
     parametros: list[TemplateParamRequest] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="after")
+    def _has_recipients(self):
+        if not self.cliente_ids and not self.numeros:
+            raise ValueError("Elija al menos un cliente o escriba un número.")
+        return self
 
 
 class WhatsAppCampaignCreatedResponse(Schema):

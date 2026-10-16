@@ -108,7 +108,8 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
   const [lines, setLines] = useState<Line[]>([[]]);
   const [search, setSearch] = useState('');
   const [marca, setMarca] = useState('');
-  const [excluded, setExcluded] = useState<Set<number>>(new Set());
+  // Nobody is checked at first: messages only go to the clients picked by hand.
+  const [chosen, setChosen] = useState<Set<number>>(new Set());
   const [prepared, setPrepared] = useState<PreparedMessage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -144,23 +145,23 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
     );
   }, [clients, search, marca]);
   const selectable = visible.filter((c) => c.celular);
-  const selected = selectable.filter((c) => !excluded.has(c.cliente_id));
+  const selected = selectable.filter((c) => chosen.has(c.cliente_id));
   const allSelected = selectable.length > 0 && selected.length === selectable.length;
 
   const toggle = (id: number, on: boolean) => {
     setPrepared(null);
-    setExcluded((prev) => {
+    setChosen((prev) => {
       const next = new Set(prev);
-      if (on) next.delete(id);
-      else next.add(id);
+      if (on) next.add(id);
+      else next.delete(id);
       return next;
     });
   };
   const toggleAll = (on: boolean) => {
     setPrepared(null);
-    setExcluded((prev) => {
+    setChosen((prev) => {
       const next = new Set(prev);
-      selectable.forEach((c) => (on ? next.delete(c.cliente_id) : next.add(c.cliente_id)));
+      selectable.forEach((c) => (on ? next.add(c.cliente_id) : next.delete(c.cliente_id)));
       return next;
     });
   };
@@ -265,7 +266,7 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
                             <input
                               type="checkbox"
                               aria-label={`Incluir a ${fullName(c)}`}
-                              checked={!!c.celular && !excluded.has(c.cliente_id)}
+                              checked={!!c.celular && chosen.has(c.cliente_id)}
                               disabled={!c.celular}
                               onChange={(e) => toggle(c.cliente_id, e.target.checked)}
                             />
