@@ -134,4 +134,8 @@ export interface SalesSummary {
   fecha: string;
   cantidad: number;
   total: Money;
+  /** Spare part cost of the work order sales. */
+  costo_repuesto: Money;
+  /** total - costo_repuesto (like the profit of a work order sale). */
+  neto: Money;
 }

@@ -219,8 +219,9 @@ class SaleRepository(Repository[Sale]):
         """Date and amount charged (total_pagar) of every confirmed sale in ``[desde, hasta)``."""
 
     @abstractmethod
-    def summary(self, *, user_id: int, desde: datetime, hasta: datetime) -> tuple[int, Decimal]:
-        """Number of confirmed sales of the user in the range and the amount charged (total_pagar)."""
+    def summary(self, *, user_id: int, desde: datetime, hasta: datetime) -> tuple[int, Decimal, Decimal]:
+        """Number of confirmed sales of the user in the range, the amount charged (total_pagar) and the
+        spare part cost of the work order sales (costo_repuesto)."""
 
 
 class BrandRepository(Repository[Brand]):

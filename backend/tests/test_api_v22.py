@@ -22,6 +22,10 @@ def test_finalize_with_spare_part_cost_registers_the_profit_in_the_sale(client, 
     sale = client.get(f"{API}/sales/{ref['id']}", headers=admin_headers).json()
     total = float(sale["total"])
     assert (sale["costo_repuesto"], float(sale["ganancia"])) == ("12.50", round(total - 12.5, 2))
+    # The header "Has vendido" of the seller also shows the amount minus the spare part costs.
+    summary = client.get(f"{API}/sales/summary/today", headers=admin_headers).json()
+    assert summary["costo_repuesto"] == "12.50"
+    assert float(summary["neto"]) == round(float(summary["total"]) - 12.5, 2)
 
 
 def test_finalize_without_spare_part_cost_has_no_profit(client, admin_headers, uow, factory):

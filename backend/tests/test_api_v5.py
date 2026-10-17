@@ -248,7 +248,7 @@ class TestSalesV5:
         seller = factory.user(SystemRole.VENDEDOR)
         headers = auth_headers(client, seller.email)
         empty = client.get(f"{API}/sales/summary/today", headers=headers).json()
-        assert (empty["cantidad"], empty["total"]) == (0, "0.00")
+        assert (empty["cantidad"], empty["total"], empty["neto"]) == (0, "0.00", "0.00")
 
         _sale(client, headers, factory.inventory(precio="10.00"))
         _sale(client, headers, factory.inventory(precio="5.50"), metodo_pago="TARJETA")  # + 6 %
@@ -259,3 +259,4 @@ class TestSalesV5:
         summary = client.get(f"{API}/sales/summary/today", headers=headers).json()
         assert summary["cantidad"] == 2
         assert summary["total"] == "15.83"  # 10.00 + 5.83
+        assert (summary["costo_repuesto"], summary["neto"]) == ("0.00", "15.83")  # no work order sales

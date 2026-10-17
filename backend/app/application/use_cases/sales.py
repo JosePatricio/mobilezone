@@ -224,6 +224,9 @@ class SalesSummary:
     fecha: date
     cantidad: int
     total: Decimal
+    costo_repuesto: Decimal
+    neto: Decimal
+    """total - costo_repuesto, like the profit of a work order sale."""
 
 
 class SaleQueries(UseCase):
@@ -252,11 +255,11 @@ class SaleQueries(UseCase):
         )
 
     def today_summary(self, actor: User) -> SalesSummary:
-        """Confirmed sales of the user today (local day) and the amount charged."""
+        """Confirmed sales of the user today (local day), the amount charged and that amount minus the spare part costs."""
         today = datetime.now(self.tz).date()
         desde, hasta = day_range(self.tz, today, today)
-        cantidad, total = self.uow.sales.summary(user_id=actor.id, desde=desde, hasta=hasta)  # type: ignore[arg-type]
-        return SalesSummary(fecha=today, cantidad=cantidad, total=total)
+        cantidad, total, costo = self.uow.sales.summary(user_id=actor.id, desde=desde, hasta=hasta)  # type: ignore[arg-type]
+        return SalesSummary(fecha=today, cantidad=cantidad, total=total, costo_repuesto=costo, neto=total - costo)
 
 
 class CashOpeningUseCases(UseCase):

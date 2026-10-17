@@ -696,7 +696,8 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .today-sales:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .today-sales strong { font-weight: 700; }
 .today-sales-emoji { font-size: 1.35rem; line-height: 1; }
-@media (max-width: 640px) { .today-sales > span:first-child { font-size: 0.85rem; } }
+.today-sales-net { padding-left: 8px; border-left: 1px solid var(--border); }
+@media (max-width: 640px) { .today-sales > span:first-child, .today-sales-net { font-size: 0.85rem; } }
 .goal-preview { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
 .goal-preview span { font-size: 1.2rem; margin-right: 6px; }
 

@@ -89,6 +89,8 @@ class SalesSummaryResponse(Schema):
     fecha: date
     cantidad: int
     total: Decimal = Field(description="Monto cobrado (total a pagar) de las ventas confirmadas")
+    costo_repuesto: Decimal = Field(description="Costo de repuesto de las ventas de órdenes de trabajo")
+    neto: Decimal = Field(description="total - costo_repuesto")
 
 
 class CashOpeningRequest(RequestSchema):

@@ -405,14 +405,16 @@ class SqlAlchemySaleRepository(SqlAlchemyRepository[Sale], ports.SaleRepository)
     def summary(self, *, user_id, desde, hasta):
         c = sales_table.c
         row = self.session.execute(
-            select(func.count(), func.coalesce(func.sum(c.total_pagar), 0)).where(
+            select(
+                func.count(), func.coalesce(func.sum(c.total_pagar), 0), func.coalesce(func.sum(c.costo_repuesto), 0)
+            ).where(
                 c.user_id == user_id,
                 c.estado == SaleStatus.CONFIRMADA,
                 c.fecha >= _utc_naive(desde),
                 c.fecha < _utc_naive(hasta),
             )
         ).one()
-        return int(row[0]), Decimal(row[1])
+        return int(row[0]), Decimal(row[1]), Decimal(row[2])
 
 
 class SqlAlchemyBrandRepository(SqlAlchemyRepository[Brand], ports.BrandRepository):

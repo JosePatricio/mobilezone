@@ -14,7 +14,14 @@ vi.mock('@/modules/settings/services/settingsApi', async (importOriginal) => ({
   settingsApi: { salesGoals: () => Promise.resolve({ baja: '20.00', alta: '50.00' }) },
 }));
 
-beforeEach(() => sales.todaySummary.mockResolvedValue({ cantidad: 3, total: '35.50' }));
+const summary = (cantidad: number, total: string, costo_repuesto = '0.00') => ({
+  cantidad,
+  total,
+  costo_repuesto,
+  neto: (Number(total) - Number(costo_repuesto)).toFixed(2),
+});
+
+beforeEach(() => sales.todaySummary.mockResolvedValue(summary(3, '35.50', '12.50')));
 
 describe('TodaySales', () => {
   it('shows "Has vendido" with the emoji of the goals and opens Ventas', async () => {
@@ -26,17 +33,19 @@ describe('TodaySales', () => {
     );
     const button = await screen.findByRole('button', { name: /Has vendido \$ 35,50/ });
     expect(screen.getByText('$ 35,50').tagName).toBe('STRONG');
+    // Net amount: total minus the spare part costs of the work order sales.
+    expect(button).toHaveTextContent('Neto $ 23,00');
     expect(await screen.findByRole('img', { name: 'Meta alcanzada' })).toHaveTextContent('😊');
     await userEvent.click(button);
     expect(screen.getByText('Ventas page')).toBeInTheDocument();
   });
 
   it('sad face below the low goal, money eyes above the high goal', async () => {
-    sales.todaySummary.mockResolvedValue({ cantidad: 1, total: '5.00' });
+    sales.todaySummary.mockResolvedValue(summary(1, '5.00'));
     const { unmount } = renderWithProviders(<TodaySales />);
     expect(await screen.findByRole('img', { name: 'Por debajo de la meta' })).toHaveTextContent('😞');
     unmount();
-    sales.todaySummary.mockResolvedValue({ cantidad: 9, total: '120.00' });
+    sales.todaySummary.mockResolvedValue(summary(9, '120.00'));
     renderWithProviders(<TodaySales />);
     expect(await screen.findByRole('img', { name: 'Meta superada' })).toHaveTextContent('🤑');
   });
