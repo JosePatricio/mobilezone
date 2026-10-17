@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { LOGO_URL } from '@/shared/components';
 import { formatDateTime, formatOrderNumber, fullName } from '@/shared/utils/format';
 import { formatMoney, toCents } from '@/shared/utils/money';
 import { CARD_SURCHARGE_PERCENT } from '../payment';
@@ -24,6 +25,7 @@ export function SaleReceipt({ sale }: { sale: Sale }) {
   return (
     <>
       <header className="receipt-center">
+        <img src={LOGO_URL} alt="MobileZone" className="receipt-logo" />
         <h1>MobileZone</h1>
         <div className="receipt-contact">
           <p>{branch.nombre}</p>

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { vi } from 'vitest';
@@ -148,6 +148,26 @@ describe('NewSalePage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Ver imagen de Pantalla B' }));
     expect(await screen.findByRole('dialog', { name: 'Pantalla B' })).toBeInTheDocument();
+  });
+
+  it('picks a product by name and image in the product grid, filtering while typing', async () => {
+    renderPage();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver productos' }));
+    const dialog = await screen.findByRole('dialog', { name: /Productos/ });
+    const grid = await within(dialog).findByRole('list', { name: 'Productos' });
+    expect(within(grid).getByText('Pantalla A')).toBeInTheDocument();
+    expect(within(grid).getByText('Pantalla B')).toBeInTheDocument();
+    expect(within(grid).getByRole('img', { name: 'Pantalla A' })).toBeInTheDocument();
+    expect(within(grid).queryByText('PAN-A')).not.toBeInTheDocument(); // only name and image
+
+    await userEvent.type(within(dialog).getByLabelText('Filtrar'), 'b');
+    await within(dialog).findByText('Pantalla B');
+    await waitFor(() => expect(within(dialog).queryByText('Pantalla A')).not.toBeInTheDocument());
+    expect(inventoryCalls[inventoryCalls.length - 1]).toMatchObject({ branch_id: 1, search: 'b', active: true });
+
+    await userEvent.click(within(dialog).getByText('Pantalla B'));
+    expect(screen.queryByRole('dialog', { name: /Productos/ })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Cantidad de Pantalla B')).toBeInTheDocument();
   });
 
   it('offers the Inventario module when the product is not in the branch', async () => {

@@ -1,3 +1,2 @@
-En el Ordenes
-
-En la columna de whatsapp, funciona bien para web pero cuando estoy desde mi telefono no funciona, arreglar
+En modulo ventas
+En la parte de Buscar producto, Agregar otro icono boton a la derecha del icono de lupa, cuando se hace click abrir otro modal con una especie de tabla, que aparezca el nombre del producto y su imagen, en este modal debe haber tambien un input text para poder filtrar cada vez que ingrese texto que de resultados que coincidan, en este modal solo deben mostrar nombre y imagen, y debe ser posible seleccionar, cuando se selecciona cerrar el modal y agregar ese producto a la tabla de Detalle para la venta

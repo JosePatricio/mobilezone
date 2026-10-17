@@ -2,9 +2,10 @@ import { useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { inventoryApi } from '@/modules/inventory/services/inventoryApi';
 import type { InventoryItem } from '@/modules/inventory/types';
-import { Button, ProductThumb, SearchIcon } from '@/shared/components';
+import { Button, GridIcon, ProductThumb, SearchIcon } from '@/shared/components';
 import { getErrorMessage } from '@/shared/services/apiError';
 import { formatMoney } from '@/shared/utils/money';
+import { ProductPickerModal } from './ProductPickerModal';
 
 interface Props {
   branchId: number | null;
@@ -16,6 +17,7 @@ interface Props {
 /**
  * Searches products (SKU or name) in the inventory of the sale branch when pressing Enter.
  * One match is added directly; several are listed to choose; none offers the Inventario module.
+ * The grid button next to the magnifier opens the product picker (name and image, filtered while typing).
  */
 export function ProductSearch({ branchId, branchName, canSearchInventory, onSelect }: Props) {
   const id = useId();
@@ -26,11 +28,13 @@ export function ProductSearch({ branchId, branchName, canSearchInventory, onSele
   const [searched, setSearched] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [picking, setPicking] = useState(false);
 
   const select = (item: InventoryItem) => {
     onSelect(item);
     setResults(null);
     setTerm('');
+    setPicking(false);
   };
 
   const search = async () => {
@@ -81,7 +85,24 @@ export function ProductSearch({ branchId, branchName, canSearchInventory, onSele
           onChange={(e) => setTerm(e.target.value)}
         />
         <Button type="submit" variant="secondary" loading={loading} aria-label="Buscar producto" icon={<SearchIcon />} />
+        <Button
+          type="button"
+          variant="secondary"
+          aria-label="Ver productos"
+          title="Ver productos"
+          icon={<GridIcon />}
+          disabled={branchId === null}
+          onClick={() => setPicking(true)}
+        />
       </form>
+      {picking && branchId !== null && (
+        <ProductPickerModal
+          branchId={branchId}
+          branchName={branchName}
+          onClose={() => setPicking(false)}
+          onSelect={select}
+        />
+      )}
       {error && (
         <p className="field-error" role="alert">
           {error}

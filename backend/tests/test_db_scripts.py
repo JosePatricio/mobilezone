@@ -935,3 +935,60 @@ def test_upgrade_022_sale_spare_part_cost(mysql_engine: Engine):
         with mysql_engine.begin() as conn:
             run_script(conn, DROP_TABLES)
             run_script(conn, CREATE_TABLES)
+
+
+def test_upgrade_025_merges_centro_into_matriz(mysql_engine: Engine):
+    """Upgrade 025 moves every record of the branch Centro to Matriz, then removes Centro."""
+    from app.infrastructure.database import sql_scripts as sql
+    from tests.conftest import truncate_all
+
+    truncate_all(mysql_engine)
+    try:
+        with mysql_engine.begin() as conn:
+            q = conn.exec_driver_sql
+            q("INSERT INTO roles (id, nombre) VALUES (1, 'VENDEDOR')")
+            q("INSERT INTO users (id, nombre, apellido, rol_id) VALUES (1, 'Ana', 'A', 1), (2, 'Luis', 'L', 1)")
+            q("INSERT INTO branches (id, nombre, ubicacion) VALUES (1, 'Matriz', 'x'), (2, 'Centro', 'y'), (3, 'Norte', 'z')")
+            q("INSERT INTO user_branches (user_id, branch_id) VALUES (1, 1), (1, 2), (2, 2), (2, 3)")
+            q("INSERT INTO categories (id, nombre) VALUES (1, 'Fundas')")
+            q(
+                "INSERT INTO products (id, category_id, sku, nombre, precio_venta, precio_costo, precio_mayor) "
+                "VALUES (1, 1, 'A', 'A', 1, 1, 1), (2, 1, 'B', 'B', 1, 1, 1)"
+            )
+            # product 1 in both branches, product 2 only in Centro
+            q("INSERT INTO inventory (id, product_id, branch_id, stock) VALUES (1, 1, 1, 5), (2, 1, 2, 3), (3, 2, 2, 7)")
+            q(
+                "INSERT INTO stock_movements (product_id, inventory_id, tipo, cantidad, stock_resultante) "
+                "VALUES (1, 2, 'AJUSTE', 3, 3), (2, 3, 'AJUSTE', 7, 7)"
+            )
+            q("INSERT INTO sales (user_id, branch_id, total, estado) VALUES (1, 2, 10, 'CONFIRMADA'), (2, 3, 4, 'CONFIRMADA')")
+            q("INSERT INTO cash_openings (user_id, branch_id, fecha, monto_inicial) VALUES (2, 2, '2026-10-01', 20)")
+            q("INSERT INTO brands (id, nombre) VALUES (1, 'Samsung')")
+            q("INSERT INTO models (id, brand_id, nombre) VALUES (1, 1, 'A10')")
+            q(
+                "INSERT INTO work_orders (user_id, cliente_id, branch_id, marca_id, modelo_id, motivo_ingreso, "
+                "codigo_publico, presupuesto, anticipo, saldo, fecha) "
+                "VALUES (1, 2, 2, 1, 1, 'BATERIA', 'abc', 10, 0, 10, '2026-10-01')"
+            )
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_025)
+        with mysql_engine.begin() as conn:
+            q = conn.exec_driver_sql
+            assert q("SELECT id, nombre FROM branches ORDER BY id").all() == [(1, "Matriz"), (3, "Norte")]
+            assert q("SELECT product_id, branch_id, stock FROM inventory ORDER BY product_id").all() == [
+                (1, 1, 8), (2, 1, 7)
+            ]
+            assert q(
+                "SELECT COUNT(*) FROM stock_movements sm JOIN inventory i ON i.id = sm.inventory_id WHERE i.branch_id = 1"
+            ).scalar() == 2
+            assert q("SELECT user_id, branch_id FROM user_branches ORDER BY user_id, branch_id").all() == [
+                (1, 1), (2, 1), (2, 3)
+            ]
+            assert q("SELECT branch_id FROM sales ORDER BY id").scalars().all() == [1, 3]
+            assert q("SELECT branch_id FROM cash_openings").scalar() == 1
+            assert q("SELECT branch_id FROM work_orders").scalar() == 1
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_025)  # no Centro left: nothing changes
+            assert conn.exec_driver_sql("SELECT COUNT(*) FROM branches").scalar() == 2
+    finally:
+        truncate_all(mysql_engine)

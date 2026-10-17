@@ -604,6 +604,21 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .search-results button > span { display: flex; flex-direction: column; }
 .search-results button:hover:not(:disabled) { background: var(--primary-soft); }
 .search-results button:disabled { opacity: 0.6; cursor: not-allowed; }
+/* Product picker of the sale: name and image, filtered while typing */
+.product-picker {
+  list-style: none; margin: 12px 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;
+  max-height: 60vh; overflow-y: auto;
+}
+.product-picker button {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; height: 100%;
+  padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+  color: inherit; font: inherit; text-align: center; cursor: pointer; overflow-wrap: anywhere;
+}
+.product-picker button:hover:not(:disabled), .product-picker button:focus-visible { background: var(--primary-soft); border-color: var(--primary); }
+.product-picker button:disabled { opacity: 0.6; cursor: not-allowed; }
+.product-picker .thumb-lg { width: 96px; height: 96px; object-fit: contain; }
+.product-picker-empty { margin-top: 12px; }
 .qty-stepper { display: inline-flex; align-items: center; gap: 4px; }
 .qty-stepper .input-qty { width: 64px; text-align: center; }
 .thumb-button { padding: 0; border: none; background: none; cursor: zoom-in; border-radius: 8px; }
@@ -795,6 +810,7 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
   .print-sheet hr { border: 0; border-top: 1px dashed #000; margin: 4px 0; }
   .print-sheet header { padding-bottom: 4px; margin-bottom: 4px; border-bottom: 1px dashed #000; }
   .receipt-center { text-align: center; }
+  .receipt-logo { display: block; width: 40mm; max-width: 100%; height: auto; margin: 0 auto 2px; }
   .receipt-contact { margin: 2px 0 4px; font-size: 10px; overflow-wrap: anywhere; }
   .receipt-strong { font-weight: 700; font-size: 12px; }
   .receipt-row { display: flex; justify-content: space-between; gap: 6px; break-inside: avoid; }
@@ -829,6 +845,7 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .receipt-preview hr { border: 0; border-top: 1px dashed #000; margin: 4px 0; }
 .receipt-preview header { padding-bottom: 4px; margin-bottom: 4px; border-bottom: 1px dashed #000; }
 .receipt-preview .receipt-center { text-align: center; }
+.receipt-preview .receipt-logo { display: block; width: 40mm; max-width: 100%; height: auto; margin: 0 auto 2px; }
 .receipt-preview .receipt-contact { margin: 2px 0 4px; font-size: 10px; overflow-wrap: anywhere; }
 .receipt-preview .receipt-strong { font-weight: 700; font-size: 12px; }
 .receipt-preview .receipt-row { display: flex; justify-content: space-between; gap: 6px; }
