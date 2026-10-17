@@ -26,7 +26,6 @@ export function SaleReceipt({ sale }: { sale: Sale }) {
     <>
       <header className="receipt-center">
         <img src={LOGO_URL} alt="MobileZone" className="receipt-logo" />
-        <h1>MobileZone</h1>
         <div className="receipt-contact">
           <p>{branch.nombre}</p>
           <p>{branch.direccion ?? branch.ubicacion}</p>

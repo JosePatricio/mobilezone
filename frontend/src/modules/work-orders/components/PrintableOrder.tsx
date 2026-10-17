@@ -48,7 +48,6 @@ export function PrintableOrder({ order }: { order: WorkOrder }) {
     <section className="print-sheet" aria-hidden="true">
       <header className="receipt-center">
         <img src={LOGO_URL} alt="MobileZone" className="receipt-logo" />
-        <h1>MobileZone</h1>
         {order.branch && (
           <div className="receipt-contact">
             <p>{order.branch.nombre}</p>
