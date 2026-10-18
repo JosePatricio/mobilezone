@@ -7,8 +7,8 @@ Step 1: Get a phone number for it
 - It has to be able to receive an SMS or a voice call for the verification code.
 - Once connected, the number only works through the API. You can't use it in the WhatsApp app on a phone anymore.
 - 👉 The easiest option is a new SIM card just for this.
-0991072443
-+593991072443
+0961436384
++593961436384
 
 Step 2: Add the number in Meta
 
@@ -89,4 +89,20 @@ WHATSAPP_VERIFY_TOKEN=mobilezone_webhook_2026_secure
 
 EAAOEdFzCpiMBSu3ycr0AJPHoPzOc62ShtxjYNJG4SqZArr66gKNym1ZB46MZBfFjAsQkL0pLTJzZA9CaaR6odZBxhe98ri82j3lpdFdKwiTMA4V6VUMpvnGlYaa5ZBeVQCJYhzZCAZCWhdjqg95r3GBvzGauGJ2V4tchqxzvmLtTD4qSGalHSpi7diAkd0RVUwZDZD
 
+EL PIN DE WHATSAPP ES 000046
 *********** IGNORE THIS SECTION ******************
+
+
+EAAOEdFzCpiMBSyOIQaH7dTWChAuCVUsRDCzRp5KpsW5kXRFYv7RUSorM17Ms9sHDv462KWlKIwIewyhFxshNXZBpy0jA65k3xLZC38Ooi86gnPUZCACZAvGJHtuvHnJwVfcIUq6HLligUAastVj7alPXUhbYsoqSs8Jda8I9xjFZBbIZBNroda1bOvtxNifwZDZD
+
+NEWTOKEN='EAAOEdFzCpiMBSyOIQaH7dTWChAuCVUsRDCzRp5KpsW5kXRFYv7RUSorM17Ms9sHDv462KWlKIwIewyhFxshNXZBpy0jA65k3xLZC38Ooi86gnPUZCACZAvGJHtuvHnJwVfcIUq6HLligUAastVj7alPXUhbYsoqSs8Jda8I9xjFZBbIZBNroda1bOvtxNifwZDZD'
+curl -s -X POST "https://graph.facebook.com/v21.0/1420301931159458/messages" \
+  -H "Authorization: Bearer $NEWTOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"messaging_product":"whatsapp","to":"593961436384","type":"template","template":{"name":"hello_world","language":{"code":"en_US"}}}'
+
+  USERTOKEN='EAAOEdFzCpiMBSyOIQaH7dTWChAuCVUsRDCzRp5KpsW5kXRFYv7RUSorM17Ms9sHDv462KWlKIwIewyhFxshNXZBpy0jA65k3xLZC38Ooi86gnPUZCACZAvGJHtuvHnJwVfcIUq6HLligUAastVj7alPXUhbYsoqSs8Jda8I9xjFZBbIZBNroda1bOvtxNifwZDZD'
+curl -s -X POST "https://graph.facebook.com/v21.0/1420301931159458/messages" \
+  -H "Authorization: Bearer $USERTOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"messaging_product":"whatsapp","to":"593961436384","type":"template","template":{"name":"hello_world","language":{"code":"en_US"}}}'

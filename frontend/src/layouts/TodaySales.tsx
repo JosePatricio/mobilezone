@@ -5,8 +5,8 @@ import { SETTINGS_KEY, salesMood, settingsApi } from '@/modules/settings/service
 import { formatMoney } from '@/shared/utils/money';
 
 /**
- * "Has vendido $X" of the logged user today and the net amount (minus the spare part costs of the
- * work order sales), with an emoji by the sales goals; opens Ventas.
+ * "Has vendido $X" of the logged user today, net of the spare part costs of the work order sales,
+ * with an emoji by the sales goals; opens Ventas.
  */
 export function TodaySales() {
   const navigate = useNavigate();
@@ -18,19 +18,16 @@ export function TodaySales() {
   const goals = useQuery({ queryKey: [SETTINGS_KEY, 'sales-goals'], queryFn: settingsApi.salesGoals, staleTime: 60_000 });
   if (!query.data) return null;
   const { cantidad, total, costo_repuesto, neto } = query.data;
-  const mood = goals.data ? salesMood(total, goals.data) : null;
+  const mood = goals.data ? salesMood(neto, goals.data) : null;
   return (
     <button
       type="button"
       className="today-sales"
-      title={`${cantidad} venta(s) confirmada(s) hoy · Neto = total - costo de repuestos (${formatMoney(costo_repuesto)}) · Ir a Ventas`}
+      title={`${cantidad} venta(s) confirmada(s) hoy · ${formatMoney(total)} - costo de repuestos (${formatMoney(costo_repuesto)}) · Ir a Ventas`}
       onClick={() => navigate('/sales')}
     >
       <span>
-        Has vendido <strong>{formatMoney(total)}</strong>
-      </span>
-      <span className="today-sales-net">
-        Neto <strong>{formatMoney(neto)}</strong>
+        Has vendido <strong>{formatMoney(neto)}</strong>
       </span>
       {mood && (
         <span className="today-sales-emoji" role="img" aria-label={mood.label}>

@@ -31,10 +31,11 @@ describe('TodaySales', () => {
         <Route path="/sales" element={<p>Ventas page</p>} />
       </Routes>,
     );
-    const button = await screen.findByRole('button', { name: /Has vendido \$ 35,50/ });
-    expect(screen.getByText('$ 35,50').tagName).toBe('STRONG');
-    // Net amount: total minus the spare part costs of the work order sales.
-    expect(button).toHaveTextContent('Neto $ 23,00');
+    // Only the total minus the spare part costs of the work order sales, no separate "Neto".
+    const button = await screen.findByRole('button', { name: /Has vendido \$ 23,00/ });
+    expect(screen.getByText('$ 23,00').tagName).toBe('STRONG');
+    expect(button).not.toHaveTextContent('Neto');
+    expect(button).not.toHaveTextContent('$ 35,50');
     expect(await screen.findByRole('img', { name: 'Meta alcanzada' })).toHaveTextContent('😊');
     await userEvent.click(button);
     expect(screen.getByText('Ventas page')).toBeInTheDocument();

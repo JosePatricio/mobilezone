@@ -1,1 +1,1 @@
-En la parte superior, el valor de las ventas del dia, Tambien debe salir la cantidad total menos los costos de repuesto, asi como en el modulo de ordenes
+En la parte superior solo que aparezca el total, es decir todo menos el precio de repuesto , El campo Neto eliminar
