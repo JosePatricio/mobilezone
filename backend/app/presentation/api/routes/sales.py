@@ -136,6 +136,7 @@ def confirm_sale(
         monto_recibido=body.monto_recibido,
         factura=body.factura,
         cliente_id=body.cliente_id,
+        descuento=body.descuento,
     )
     return SaleResponse.model_validate(ConfirmSaleUseCase(uow).execute(data, actor))
 
@@ -154,6 +155,7 @@ def update_sale(
         monto_recibido=body.monto_recibido,
         factura=body.factura,
         cliente_id=body.cliente_id,
+        descuento=body.descuento,
     )
     return SaleResponse.model_validate(UpdateSaleUseCase(uow).execute(sale_id, data, actor))
 

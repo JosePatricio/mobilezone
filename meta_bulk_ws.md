@@ -1,28 +1,61 @@
-TO send whatssapp from production setup website
 
-https://developers.facebook.com/apps/990060237465123/use_cases/customize/wa-configurations-v2/?product_route=whatsapp-business&business_id=2138196437087761&use_case_enum=WHATSAPP_BUSINESS_MESSAGING&selected_tab=wa-configurations-v2
-
-
-
-=====================================================================
-PENDING — CONTINUE HERE (status as of 2026-10-18)
-=====================================================================
-
-Access Token Info
-App ID	990060237465123 : MobileZone
-Type	System User
-App-Scoped User ID
-Learn More
-122103212511509021 : mobilezone-api
-User last installed this app via API N/A
-Issued	1792168895 (on Friday)
-Expires	Never
-Data Access Expires	Never
-Valid	True
-Origin	Unknown
-Scopes	whatsapp_business_management, whatsapp_business_messaging, public_profile
-Granular Scopes
-whatsapp_business_management	
-Applies to all objects
-whatsapp_business_messaging	
-Applies to all objects
+WhatsApp Manager
+Create template
+Set up template
+Edit template
+Submit for Review
+mobilezone_promo_img • Spanish
+Marketing
+• Default
+Template name and language
+Name your template
+Message template name
+mobilezone_promo_img
+​
+20/512
+Select language
+Languages
+Spanish
+​
+Content
+Add a header, body and footer for your template. Cloud API hosted by Meta will review the template variables and content to protect the security and integrity of our services. About templates
+Type of variable
+Number
+​
+Media sample
+• Optional
+Header type
+None
+​
+Header
+• Optional
+Header text
+Add a short line of text to the header of your message in Spanish
+​
+0/60
+​
+Body
+Enter text in Spanish
+Hello
+​
+5/1024
+​
+Footer
+• Optional
+Message template footer
+Add a short line of text to the bottom of your message in Spanish
+​
+0/60
+Buttons
+• Optional
+Create buttons that let customers respond to your message or take action. You can add up to ten buttons. If you add more than three buttons, they will appear in a list.
+Template preview
+Hello
+20:53
+Meta Business Suite
+Links
+All tools
+Search
+Links
+Settings
+Help
