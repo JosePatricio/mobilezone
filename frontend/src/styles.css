@@ -691,7 +691,10 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 
 /* Today's sales of the logged seller (header) */
 .today-sales { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid transparent; border-radius: 8px; background: var(--primary-soft); color: var(--text); font: inherit; cursor: pointer; }
+.today-sales-wrap { position: relative; display: inline-flex; }
 .today-sales:hover { border-color: var(--primary); }
+.today-sales-tip { display: none; position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 20; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); white-space: nowrap; font-size: 0.85rem; }
+.today-sales-wrap:hover .today-sales-tip, .today-sales:focus-visible + .today-sales-tip { display: block; }
 .today-sales strong { color: var(--primary-ink); }
 .today-sales:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .today-sales strong { font-weight: 700; }

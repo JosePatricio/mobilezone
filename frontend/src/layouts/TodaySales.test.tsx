@@ -31,11 +31,16 @@ describe('TodaySales', () => {
         <Route path="/sales" element={<p>Ventas page</p>} />
       </Routes>,
     );
-    // Only the total minus the spare part costs of the work order sales, no separate "Neto".
+    // Only the total minus the spare part costs of the work order sales; "Neto en ventas" only as the hover tooltip.
     const button = await screen.findByRole('button', { name: /Has vendido \$ 23,00/ });
-    expect(screen.getByText('$ 23,00').tagName).toBe('STRONG');
+    expect(button.querySelector('strong')).toHaveTextContent('$ 23,00');
     expect(button).not.toHaveTextContent('Neto');
     expect(button).not.toHaveTextContent('$ 35,50');
+    expect(button).not.toHaveAttribute('title');
+    const tip = screen.getByRole('tooltip');
+    expect(tip).toHaveTextContent('Neto en ventas $ 23,00');
+    expect(tip.className).toBe('today-sales-tip');
+    expect(button).toHaveAttribute('aria-describedby', tip.id);
     expect(await screen.findByRole('img', { name: 'Meta alcanzada' })).toHaveTextContent('😊');
     await userEvent.click(button);
     expect(screen.getByText('Ventas page')).toBeInTheDocument();
