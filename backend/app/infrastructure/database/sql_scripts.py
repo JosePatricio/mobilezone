@@ -34,6 +34,7 @@ UPGRADE_022 = "upgrades/022_costo_repuesto_venta.sql"
 UPGRADE_023 = "upgrades/023_propaganda.sql"
 UPGRADE_024 = "upgrades/024_whatsapp_api.sql"
 UPGRADE_025 = "upgrades/025_unificar_sucursales.sql"
+UPGRADE_026 = "upgrades/026_minimo_recomendado.sql"
 
 
 def read_statements(script: str | Path) -> list[str]:

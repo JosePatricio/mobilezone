@@ -27,3 +27,12 @@ class DayOrdersResponse(Schema):
     recibidas: int = Field(description="Órdenes recibidas ese día")
     en_proceso: int = Field(description="Órdenes que pasaron a En proceso ese día")
     finalizadas: int = Field(description="Órdenes finalizadas ese día")
+
+
+class LowStockProductResponse(Schema):
+    id: int
+    sku: str
+    nombre: str
+    stock: int = Field(description="Stock total (suma de todas las sucursales)")
+    minimo_recomendado: int
+    faltante: int = Field(description="Unidades que faltan para llegar al mínimo recomendado")

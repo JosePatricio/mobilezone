@@ -141,6 +141,11 @@ class ProductRepository(Repository[Product]):
     def get_by_sku(self, sku: str) -> Product | None: ...
 
     @abstractmethod
+    def below_minimum(self) -> list[Product]:
+        """Active products whose total stock (every branch) is below their ``minimo_recomendado`` (> 0),
+        the biggest shortage first."""
+
+    @abstractmethod
     def list(
         self,
         page: PageRequest,

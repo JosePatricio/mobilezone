@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from './Button';
+import { CameraCapture, cameraSupported } from './CameraCapture';
 
 export const DEFAULT_PRODUCT_IMAGE = '/img/product-default.svg';
 export const DEFAULT_AVATAR = '/img/avatar-default.svg';
@@ -45,14 +46,18 @@ interface ImageFieldProps {
   variant: 'avatar' | 'product';
   value: ImageSelection;
   onChange: (value: ImageSelection) => void;
+  /** "Tomar foto" with the camera (like the photos of the work orders); a file can still be chosen. */
+  camera?: boolean;
 }
 
 /** Image picker with preview, validation (type / 2 MB) and removal. The default image is shown when empty. */
-export function ImageField({ label, currentUrl, variant, value, onChange }: ImageFieldProps) {
+export function ImageField({ label, currentUrl, variant, value, onChange, camera = false }: ImageFieldProps) {
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const captureRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   useEffect(() => {
     if (!value.file) {
@@ -81,6 +86,13 @@ export function ImageField({ label, currentUrl, variant, value, onChange }: Imag
     onChange({ file, remove: false });
   };
 
+  // Live camera when the browser allows it; otherwise the file input with `capture` opens the phone camera.
+  const takePhoto = () => {
+    setError(null);
+    if (cameraSupported()) setCameraOpen(true);
+    else captureRef.current?.click();
+  };
+
   return (
     <div className="field image-field">
       <span className="field-label" id={`${id}-label`}>
@@ -101,8 +113,28 @@ export function ImageField({ label, currentUrl, variant, value, onChange }: Imag
               e.target.value = '';
             }}
           />
+          {camera && (
+            <>
+              <input
+                ref={captureRef}
+                type="file"
+                accept={IMAGE_ACCEPT}
+                capture="environment"
+                className="sr-only"
+                tabIndex={-1}
+                aria-label={`Tomar foto: ${label}`}
+                onChange={(e) => {
+                  onFile(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
+              <Button size="sm" onClick={takePhoto} disabled={cameraOpen}>
+                Tomar foto
+              </Button>
+            </>
+          )}
           <Button size="sm" variant="secondary" onClick={() => inputRef.current?.click()}>
-            {hasImage ? 'Cambiar' : 'Subir imagen'}
+            {camera ? 'Subir imagen' : hasImage ? 'Cambiar' : 'Subir imagen'}
           </Button>
           {hasImage && (
             <Button size="sm" variant="ghost" className="text-danger" onClick={() => onChange({ file: null, remove: true })}>
@@ -112,6 +144,19 @@ export function ImageField({ label, currentUrl, variant, value, onChange }: Imag
           <small className="muted">JPG, PNG o WEBP · máx. 2 MB</small>
         </div>
       </div>
+      {cameraOpen && (
+        <CameraCapture
+          onCapture={(file) => {
+            setCameraOpen(false);
+            onFile(file);
+          }}
+          onClose={() => setCameraOpen(false)}
+          onUnavailable={(message) => {
+            setCameraOpen(false);
+            setError(message);
+          }}
+        />
+      )}
       {error && (
         <p className="field-error" role="alert">
           {error}

@@ -27,6 +27,18 @@ export interface DayOrders {
   finalizadas: number;
 }
 
+/** Active product whose total stock is below its recommended minimum. */
+export interface LowStockProduct {
+  id: number;
+  sku: string;
+  nombre: string;
+  /** Total stock of every branch. */
+  stock: number;
+  minimo_recomendado: number;
+  /** Units missing to reach the minimum. */
+  faltante: number;
+}
+
 export const DASHBOARD_KEY = 'dashboard';
 
 export const dashboardApi = {
@@ -34,4 +46,5 @@ export const dashboardApi = {
     http.get<DashboardCharts>('/dashboard/charts', { params: { agrupacion } }).then((r) => r.data),
   ordersOfTheDay: (fecha: string) =>
     http.get<DayOrders>('/dashboard/orders-day', { params: { fecha } }).then((r) => r.data),
+  lowStock: () => http.get<LowStockProduct[]>('/dashboard/low-stock').then((r) => r.data),
 };

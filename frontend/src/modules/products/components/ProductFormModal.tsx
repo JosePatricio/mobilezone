@@ -39,6 +39,11 @@ export const productSchema = z.object({
   precio_venta: zMoney,
   precio_costo: zMoney,
   precio_mayor: zMoney,
+  minimo_recomendado: z.coerce
+    .number({ invalid_type_error: 'Ingrese un número' })
+    .int('Debe ser entero')
+    .min(0, 'Mínimo 0')
+    .max(1_000_000, 'Máximo 1000000'),
   estado: z.boolean(),
 });
 type FormInput = FormShape<typeof productSchema>;
@@ -85,6 +90,7 @@ export function ProductFormModal({ product, categoryOptions, supplierOptions, on
       precio_venta: product?.precio_venta ?? '',
       precio_costo: product?.precio_costo ?? '',
       precio_mayor: product?.precio_mayor ?? '',
+      minimo_recomendado: product?.minimo_recomendado ?? 0,
       estado: product?.estado ?? true,
     },
   });
@@ -123,7 +129,14 @@ export function ProductFormModal({ product, categoryOptions, supplierOptions, on
           </div>
         )}
         <div className="full">
-          <ImageField label="Imagen" variant="product" currentUrl={product?.imagen_url} value={image} onChange={setImage} />
+          <ImageField
+            label="Imagen"
+            variant="product"
+            camera
+            currentUrl={product?.imagen_url}
+            value={image}
+            onChange={setImage}
+          />
         </div>
         <Input
           label="SKU (código de producto)"
@@ -164,6 +177,15 @@ export function ProductFormModal({ product, categoryOptions, supplierOptions, on
           {...register('precio_costo')}
         />
         <MoneyInput label="Precio al por mayor" required error={errors.precio_mayor?.message} {...register('precio_mayor')} />
+        <Input
+          label="Mínimo recomendado (cantidad)"
+          type="number"
+          min={0}
+          step={1}
+          hint="Si el stock total baja de esta cantidad, el dashboard lo alerta. 0 = sin alerta."
+          error={errors.minimo_recomendado?.message}
+          {...register('minimo_recomendado')}
+        />
         <Textarea label="Descripción" className="full" error={errors.descripcion?.message} {...register('descripcion')} />
         <Checkbox label="Activo" toggle {...register('estado')} />
         {!product && (

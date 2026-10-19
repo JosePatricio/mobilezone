@@ -58,6 +58,7 @@ class ProductUseCases(CrudUseCases[Product]):
             precio_venta=data.precio_venta,
             precio_costo=data.precio_costo,
             precio_mayor=data.precio_mayor,
+            minimo_recomendado=data.minimo_recomendado,
             descripcion=data.descripcion,
             estado=data.estado,
         )
@@ -88,6 +89,7 @@ class ProductUseCases(CrudUseCases[Product]):
             product.supplier_id = changes.supplier_id
             product.nombre, product.descripcion = changes.nombre, changes.descripcion
             product.change_prices(changes.precio_venta, changes.precio_costo, changes.precio_mayor)
+            product.change_minimum(changes.minimo_recomendado)
             product.estado = data.estado
         return product
 

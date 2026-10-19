@@ -6,11 +6,15 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Request
 
-from app.application.use_cases.dashboard import DashboardChartsUseCase, DayOrdersUseCase, Grouping
+from app.application.use_cases.dashboard import DashboardChartsUseCase, DayOrdersUseCase, Grouping, LowStockUseCase
 from app.domain.entities import User
 from app.domain.value_objects.permissions import Perm
 from app.presentation.api.dependencies import UowDep, require_any_permission, require_permissions
-from app.presentation.api.schemas.dashboard import DashboardChartsResponse, DayOrdersResponse
+from app.presentation.api.schemas.dashboard import (
+    DashboardChartsResponse,
+    DayOrdersResponse,
+    LowStockProductResponse,
+)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -42,3 +46,10 @@ def orders_of_the_day(
     """Orders received, moved to En proceso and finalized on ``fecha`` (default: today, shop time zone)."""
     tz = ZoneInfo(request.app.state.settings.timezone)
     return DayOrdersResponse.model_validate(DayOrdersUseCase(uow, tz).execute(fecha))
+
+
+@router.get("/low-stock", response_model=list[LowStockProductResponse])
+def low_stock(uow: UowDep, _: Annotated[User, Depends(require_permissions(Perm.PRODUCTS_VIEW))]):
+    """Active products whose total stock is below their ``minimo_recomendado`` (products with 0 are
+    never alerted), the biggest shortage first."""
+    return [LowStockProductResponse.model_validate(p) for p in LowStockUseCase(uow).execute()]

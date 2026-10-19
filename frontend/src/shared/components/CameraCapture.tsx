@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '@/shared/components';
-import { MAX_IMAGE_BYTES } from '@/shared/components/Images';
+import { Button } from './Button';
+import { MAX_IMAGE_BYTES } from './Images';
 
 /** Longest side of a captured photo (keeps it well under the 2 MB limit). */
 const MAX_SIDE = 1600;
@@ -25,15 +25,15 @@ async function captureFrame(video: HTMLVideoElement): Promise<File> {
 }
 
 interface Props {
-  /** Photos that can still be taken (the parent closes the camera when none is left). */
-  remaining: number;
+  /** Photos that can still be taken (the parent closes the camera when none is left); omitted for a single photo. */
+  remaining?: number;
   onCapture: (file: File) => void;
   onClose: () => void;
   /** The camera is not available (permission denied, no camera, ...). */
   onUnavailable: (message: string) => void;
 }
 
-/** Live camera (rear one on phones): each photo taken goes to the next free slot. */
+/** Live camera (rear one on phones): each photo taken is handed to `onCapture`. */
 export function CameraCapture({ remaining, onCapture, onClose, onUnavailable }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(false);
@@ -83,10 +83,12 @@ export function CameraCapture({ remaining, onCapture, onClose, onUnavailable }: 
       {!ready && <p className="muted camera-status">Abriendo la cámara…</p>}
       <div className="camera-actions">
         <Button onClick={() => void take()} disabled={!ready} loading={taking}>
-          Tomar foto ({remaining} {remaining === 1 ? 'restante' : 'restantes'})
+          {remaining === undefined
+            ? 'Tomar foto'
+            : `Tomar foto (${remaining} ${remaining === 1 ? 'restante' : 'restantes'})`}
         </Button>
         <Button variant="secondary" onClick={onClose}>
-          Listo
+          {remaining === undefined ? 'Cancelar' : 'Listo'}
         </Button>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/shared/components';
 import { IMAGE_ACCEPT, MAX_IMAGE_BYTES } from '@/shared/components/Images';
 import type { WorkOrderPhoto } from '../types';
-import { CameraCapture, cameraSupported } from './CameraCapture';
+import { CameraCapture, cameraSupported } from '@/shared/components/CameraCapture';
 
 export const MAX_PHOTOS = 3;
 

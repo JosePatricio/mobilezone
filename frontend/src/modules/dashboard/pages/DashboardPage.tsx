@@ -6,6 +6,7 @@ import { Button, DatePicker, PageHeader } from '@/shared/components';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatDate, todayIso } from '@/shared/utils/format';
 import { DashboardCharts } from '../components/DashboardCharts';
+import { LowStockAlert } from '../components/LowStockAlert';
 import { DASHBOARD_KEY, dashboardApi } from '../services/dashboardApi';
 
 /** Shifts an ISO date (YYYY-MM-DD) by whole days. */
@@ -19,11 +20,13 @@ export function DashboardPage() {
   const { user, hasPermission } = useAuth();
   const canOrders = hasPermission(P.WORK_ORDERS_VIEW);
   const canSales = hasPermission(P.SALES_VIEW);
+  const canProducts = hasPermission(P.PRODUCTS_VIEW);
 
   return (
     <>
       <PageHeader title={`Hola, ${user?.nombre ?? ''}`}>Resumen general del sistema</PageHeader>
       {canOrders && <OrdersOfTheDay />}
+      {canProducts && <LowStockAlert />}
       {(canSales || canOrders) && <DashboardCharts />}
     </>
   );

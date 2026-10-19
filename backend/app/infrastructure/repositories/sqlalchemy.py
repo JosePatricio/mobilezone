@@ -275,6 +275,17 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository[Product], ports.ProductRe
             stmt = stmt.where(c.estado == estado)
         return self._paginate(stmt.order_by(c.nombre, c.id), page)
 
+    def below_minimum(self):
+        c = products_table.c
+        stock = (
+            select(func.coalesce(func.sum(inventory_table.c.stock), 0))
+            .where(inventory_table.c.product_id == c.id)
+            .correlate(products_table)
+            .scalar_subquery()
+        )
+        stmt = select(Product).where(c.estado.is_(True), c.minimo_recomendado > 0, stock < c.minimo_recomendado)
+        return list(self.session.scalars(stmt.order_by((c.minimo_recomendado - stock).desc(), c.nombre, c.id)))
+
 
 class SqlAlchemySupplierRepository(SqlAlchemyRepository[Supplier], ports.SupplierRepository):
     entity = Supplier

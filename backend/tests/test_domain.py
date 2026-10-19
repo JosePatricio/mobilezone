@@ -90,6 +90,15 @@ class TestProduct:
         with pytest.raises(ValidationError):
             Product(category_id=1, sku="con espacio", nombre="X", precio_venta=Decimal("1"))
 
+    def test_recommended_minimum_is_a_non_negative_integer(self):
+        product = make_product()
+        assert product.minimo_recomendado == 0  # no alert
+        product.change_minimum(5)
+        assert product.minimo_recomendado == 5
+        for invalid in (-1, 1.5, True):
+            with pytest.raises(ValidationError):
+                product.change_minimum(invalid)  # type: ignore[arg-type]
+
 
 class TestIdentificacion:
     @pytest.fixture(autouse=True)

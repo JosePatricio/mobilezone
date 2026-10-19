@@ -992,3 +992,32 @@ def test_upgrade_025_merges_centro_into_matriz(mysql_engine: Engine):
             assert conn.exec_driver_sql("SELECT COUNT(*) FROM branches").scalar() == 2
     finally:
         truncate_all(mysql_engine)
+
+
+def test_upgrade_026_product_recommended_minimum(mysql_engine: Engine):
+    """v25 products -> upgrade 026 adds products.minimo_recomendado (0 for the existing products, never negative)."""
+    from sqlalchemy.exc import DBAPIError
+
+    from app.infrastructure.database import sql_scripts as sql
+    from tests.conftest import truncate_all
+
+    truncate_all(mysql_engine)
+    try:
+        with mysql_engine.begin() as conn:
+            q = conn.exec_driver_sql
+            q("ALTER TABLE products DROP CHECK ck_products_minimo_recomendado_non_negative")
+            q("ALTER TABLE products DROP COLUMN minimo_recomendado")  # the products table of version 25
+            q("INSERT INTO categories (id, nombre) VALUES (1, 'Fundas')")
+            q(
+                "INSERT INTO products (id, category_id, sku, nombre, precio_venta, precio_costo, precio_mayor) "
+                "VALUES (1, 1, 'A', 'A', 1, 1, 1)"
+            )
+        with mysql_engine.begin() as conn:
+            run_script(conn, sql.UPGRADE_026)
+            assert conn.exec_driver_sql("SELECT minimo_recomendado FROM products").scalar() == 0
+        with pytest.raises(DBAPIError), mysql_engine.begin() as conn:
+            conn.exec_driver_sql("UPDATE products SET minimo_recomendado = -1")
+    finally:
+        with mysql_engine.begin() as conn:
+            run_script(conn, DROP_TABLES)
+            run_script(conn, CREATE_TABLES)

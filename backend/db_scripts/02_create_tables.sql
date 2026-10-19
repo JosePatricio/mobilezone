@@ -141,6 +141,7 @@ CREATE TABLE products (
     precio_venta DECIMAL(12,2) NOT NULL COMMENT 'PVP, used in sales',
     precio_costo DECIMAL(12,2) NOT NULL COMMENT 'acquisition cost',
     precio_mayor DECIMAL(12,2) NOT NULL COMMENT 'wholesale price',
+    minimo_recomendado INTEGER NOT NULL DEFAULT 0 COMMENT 'recommended minimum total stock; below it the dashboard alerts (0 = no alert)',
     imagen       VARCHAR(255)           COMMENT 'relative path of the uploaded image; NULL = default image',
     estado       BOOL          NOT NULL DEFAULT 1,
     created_at   DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -148,6 +149,7 @@ CREATE TABLE products (
     CONSTRAINT pk_products PRIMARY KEY (id),
     CONSTRAINT uq_products_sku UNIQUE (sku),
     CONSTRAINT ck_products_precios_non_negative CHECK (precio_venta >= 0 AND precio_costo >= 0 AND precio_mayor >= 0),
+    CONSTRAINT ck_products_minimo_recomendado_non_negative CHECK (minimo_recomendado >= 0),
     CONSTRAINT fk_products_category_id_categories FOREIGN KEY (category_id) REFERENCES categories (id),
     CONSTRAINT fk_products_supplier_id_suppliers FOREIGN KEY (supplier_id) REFERENCES suppliers (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

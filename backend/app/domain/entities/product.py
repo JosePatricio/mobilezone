@@ -37,6 +37,7 @@ class Product(Activatable):
     precio_venta: Decimal
     precio_costo: Decimal = ZERO
     precio_mayor: Decimal = ZERO
+    minimo_recomendado: int = 0  # total stock below it is alerted in the dashboard (0 = no alert)
     descripcion: str | None = None
     imagen: str | None = None
     supplier_id: int | None = None
@@ -55,6 +56,16 @@ class Product(Activatable):
         self.nombre = require_text(self.nombre, "nombre", 150)
         self.descripcion = optional_text(self.descripcion)
         self.change_prices(self.precio_venta, self.precio_costo, self.precio_mayor)
+        self.change_minimum(self.minimo_recomendado)
+
+    def change_minimum(self, minimo_recomendado: int) -> None:
+        if isinstance(minimo_recomendado, bool) or not isinstance(minimo_recomendado, int) or minimo_recomendado < 0:
+            raise ValidationError(
+                "El mínimo recomendado debe ser un número entero mayor o igual a 0.",
+                code="INVALID_MINIMUM",
+                details={"field": "minimo_recomendado"},
+            )
+        self.minimo_recomendado = minimo_recomendado
 
     def change_prices(self, precio_venta: Decimal, precio_costo: Decimal, precio_mayor: Decimal) -> None:
         self.precio_venta = non_negative_money(precio_venta, "precio_venta")

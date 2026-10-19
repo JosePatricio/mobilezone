@@ -17,6 +17,8 @@ export interface Product extends Timestamps {
   precio_costo: Money;
   /** Wholesale price */
   precio_mayor: Money;
+  /** Recommended minimum of the total stock; below it the dashboard alerts (0 = no alert) */
+  minimo_recomendado: number;
   /** Total stock of every branch (read-only; stock is managed per branch in Inventario) */
   stock: number;
   /** null = show the default image */
@@ -35,5 +37,7 @@ export interface ProductRequest {
   precio_venta: Money;
   precio_costo: Money;
   precio_mayor: Money;
+  /** Recommended minimum stock (0 = no alert) */
+  minimo_recomendado: number;
   estado: boolean;
 }

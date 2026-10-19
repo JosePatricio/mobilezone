@@ -25,6 +25,7 @@ class ProductRequest(RequestSchema):
     precio_venta: Money = Field(description="PVP")
     precio_costo: Money = Field(description="Precio de adquisición")
     precio_mayor: Money = Field(description="Precio de venta al por mayor")
+    minimo_recomendado: int = Field(default=0, ge=0, le=1_000_000, description="Stock mínimo recomendado (0 = sin alerta)")
     estado: bool = True
 
 
@@ -55,6 +56,7 @@ class ProductResponse(_WithImage):
     precio_venta: Decimal
     precio_costo: Decimal
     precio_mayor: Decimal
+    minimo_recomendado: int
     stock: int = Field(validation_alias="stock_total", description="Stock total (suma de todas las sucursales)")
     estado: bool
     created_at: datetime

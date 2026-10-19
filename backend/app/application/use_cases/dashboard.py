@@ -119,3 +119,32 @@ class DayOrdersUseCase(UseCase):
         until = datetime.combine(day + timedelta(days=1), time.min, self.tz)
         recibidas, en_proceso, finalizadas = self.uow.work_orders.day_activity(day=day, desde=since, hasta=until)
         return DayOrders(fecha=day, recibidas=recibidas, en_proceso=en_proceso, finalizadas=finalizadas)
+
+
+@dataclass
+class LowStockProduct:
+    id: int
+    sku: str
+    nombre: str
+    stock: int  # total stock of every branch
+    minimo_recomendado: int
+
+    @property
+    def faltante(self) -> int:
+        return self.minimo_recomendado - self.stock
+
+
+class LowStockUseCase(UseCase):
+    """Active products whose total stock is below their recommended minimum (dashboard alert)."""
+
+    def execute(self) -> list[LowStockProduct]:
+        return [
+            LowStockProduct(
+                id=p.id,  # type: ignore[arg-type]
+                sku=p.sku,
+                nombre=p.nombre,
+                stock=p.stock_total,
+                minimo_recomendado=p.minimo_recomendado,
+            )
+            for p in self.uow.products.below_minimum()
+        ]

@@ -220,10 +220,12 @@ products_table = Table(
     Column("precio_venta", MONEY, nullable=False),  # PVP
     Column("precio_costo", MONEY, nullable=False),  # acquisition cost
     Column("precio_mayor", MONEY, nullable=False),  # wholesale
+    Column("minimo_recomendado", Integer, nullable=False, default=0, server_default=FALSE),  # dashboard alert (0 = none)
     Column("imagen", String(255)),  # relative path in the media storage
     Column("estado", Boolean, nullable=False, default=True, server_default=TRUE),
     *_timestamps(),
     CheckConstraint("precio_venta >= 0 AND precio_costo >= 0 AND precio_mayor >= 0", name="precios_non_negative"),
+    CheckConstraint("minimo_recomendado >= 0", name="minimo_recomendado_non_negative"),
 )
 
 branches_table = Table(

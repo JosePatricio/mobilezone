@@ -1,2 +1,2 @@
-En la parte superior aparece el total de ventas calcuado menos los precios de repuesto, eso esta bien, ahora cuando el cursor pase por ese campo mostrar solo asi el valor Neto en ventas, solo cuando se pase e cursor por ese campos.
-Obviemente el valor de ventas sera por vendedor, es decir solo el vendedor logueado podra ver sus ventas
+En el modulo Productos
+En formulario de nuevo, en la parte de imagen, en vez de subir la imagen, permitir que se pueda tomar un foto del producto, asi como en el modulo de Ordenes

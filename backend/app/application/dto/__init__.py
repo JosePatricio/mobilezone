@@ -42,6 +42,7 @@ class ProductData:
     precio_mayor: Decimal
     descripcion: str | None = None
     supplier_id: int | None = None  # proveedor
+    minimo_recomendado: int = 0
     estado: bool = True
 
 
