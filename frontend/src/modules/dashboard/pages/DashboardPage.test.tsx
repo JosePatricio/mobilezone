@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
@@ -50,10 +50,10 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('link', { name: 'Ver productos' })).toHaveAttribute('href', '/products');
   });
 
-  it('hides the alert when no product is below its minimum, and without permission to see products', async () => {
+  it('says so when no product is below its minimum, and hides the alert without permission to see products', async () => {
     const { unmount } = renderWithProviders(<DashboardPage />, { auth: fakeAuth({ permissionCodes: [P.PRODUCTS_VIEW] }) });
-    await waitFor(() => expect(api.lowStock).toHaveBeenCalled());
-    expect(screen.queryByText(/mínimo recomendado/)).not.toBeInTheDocument();
+    expect(await screen.findByText('Todos los productos están sobre el mínimo recomendado')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
     unmount();
     vi.clearAllMocks();
     renderWithProviders(<DashboardPage />, { auth: fakeAuth({ permissionCodes: [P.WORK_ORDERS_VIEW] }) });

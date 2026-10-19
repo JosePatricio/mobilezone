@@ -23,10 +23,17 @@ const columns: Column<LowStockProduct>[] = [
   },
 ];
 
-/** Products whose total stock is below their "Mínimo recomendado"; hidden while there are none. */
+/** Products whose total stock is below their "Mínimo recomendado" (a message while there are none). */
 export function LowStockAlert() {
   const query = useQuery({ queryKey: [DASHBOARD_KEY, 'low-stock'], queryFn: dashboardApi.lowStock });
-  if (!query.data?.length) return null;
+  if (!query.data) return null;
+  if (!query.data.length) {
+    return (
+      <Card title="Productos bajo el mínimo recomendado">
+        <p className="muted">Todos los productos están sobre el mínimo recomendado</p>
+      </Card>
+    );
+  }
   return (
     <Card
       title={`⚠ Productos bajo el mínimo recomendado (${query.data.length})`}
