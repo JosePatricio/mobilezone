@@ -153,6 +153,27 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     expect(await screen.findByText('Enviando 2 mensaje(s).')).toBeInTheDocument();
   });
 
+  it('sends the image of step 1 as the header of a template with an image', async () => {
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:micas', revokeObjectURL: () => undefined }));
+    api.templates.mockResolvedValue([{ ...promo, name: 'promo_img', header_format: 'IMAGE' }]);
+    api.createCampaign.mockResolvedValue({ campaign_id: 8, encolados: 1, sin_numero: 0, dados_de_baja: 0 });
+    const user = userEvent.setup();
+    renderWithProviders(<MarketingPage />);
+    await user.click(screen.getByRole('button', { name: 'CRM' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'WhatsApp' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Incluir a Ana Pérez' }));
+
+    const image = new File(['png'], 'micas.png', { type: 'image/png' });
+    await user.upload(screen.getByTestId('image-input'), image);
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Plantilla' }), 'promo_img|es');
+    expect(screen.getByText(/Se usará "micas.png" del paso 1/)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Imagen del encabezado' })).toHaveAttribute('src', 'blob:micas');
+
+    await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Enviar' }));
+    expect(api.createCampaign).toHaveBeenCalledWith(expect.objectContaining({ plantilla: 'promo_img' }), image);
+  });
+
   it('lists the WhatsApp campaigns with the state of their messages', async () => {
     const campaign: Campaign = {
       id: 7,

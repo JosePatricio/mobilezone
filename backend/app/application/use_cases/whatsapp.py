@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 # File types of each media header (the MIME type of the upload must start with / be one of these).
 MEDIA_MIME = {"IMAGE": ("image/jpeg", "image/png"), "VIDEO": ("video/mp4", "video/3gpp"), "DOCUMENT": ("application/pdf",)}
+# Largest file Meta accepts for each media header, in MB (the upload itself is capped at 10 MB by the API).
+MEDIA_MAX_MB = {"IMAGE": 5, "VIDEO": 16, "DOCUMENT": 100}
 
 
 class ParamSource(str, Enum):
@@ -150,6 +152,9 @@ class CreateWhatsAppCampaignUseCase(UseCase):
             if media.mime_type not in MEDIA_MIME[template.header_format]:
                 allowed = ", ".join(MEDIA_MIME[template.header_format])
                 raise ValidationError(f"El archivo del encabezado debe ser {allowed}.", code="MEDIA_TYPE")
+            max_mb = MEDIA_MAX_MB[template.header_format]
+            if len(media.content) > max_mb * 1024 * 1024:
+                raise ValidationError(f"El archivo del encabezado supera los {max_mb} MB.", code="FILE_TOO_LARGE")
         elif media is not None:
             raise ValidationError("La plantilla no lleva imagen ni video en el encabezado.", code="MEDIA_NOT_ALLOWED")
 

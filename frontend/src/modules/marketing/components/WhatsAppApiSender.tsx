@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, ErrorState, Input, Loading, Select, useConfirm, useToast } from '@/shared/components';
 import { getErrorMessage, toApiError } from '@/shared/services/apiError';
 import { fullName } from '@/shared/utils/format';
 import { MARKETING_KEY, marketingApi } from '../services/marketingApi';
 import {
   PARAM_SOURCE_LABELS,
+  type MediaKind,
+  type MessageMedia,
   type OrderClient,
   type ParamSource,
   type TemplateParam,
@@ -18,10 +20,13 @@ import {
  */
 const PRICE_PER_MESSAGE: Record<string, number> = { MARKETING: 0.074, UTILITY: 0.0113, AUTHENTICATION: 0.0113 };
 
-const HEADER_FILES: Record<string, { accept: string; label: string }> = {
-  IMAGE: { accept: 'image/jpeg,image/png', label: 'Imagen del encabezado (JPG o PNG, máx. 5 MB)' },
-  VIDEO: { accept: 'video/mp4', label: 'Video del encabezado (MP4, máx. 10 MB)' },
-  DOCUMENT: { accept: 'application/pdf', label: 'PDF del encabezado (máx. 10 MB)' },
+const MB = 1024 * 1024;
+
+/** File of each media header: the image / video of step 1 is used when its kind and type fit. */
+const HEADER_FILES: Record<string, { accept: string; label: string; maxMb: number; kind?: MediaKind }> = {
+  IMAGE: { accept: 'image/jpeg,image/png', label: 'Imagen del encabezado (JPG o PNG, máx. 5 MB)', maxMb: 5, kind: 'image' },
+  VIDEO: { accept: 'video/mp4', label: 'Video del encabezado (MP4, máx. 10 MB)', maxMb: 10, kind: 'video' },
+  DOCUMENT: { accept: 'application/pdf', label: 'PDF del encabezado (máx. 10 MB)', maxMb: 10 },
 };
 
 const SOURCE_OPTIONS = (Object.keys(PARAM_SOURCE_LABELS) as ParamSource[]).map((s) => ({
@@ -66,10 +71,12 @@ export function formatUsd(value: number): string {
 interface Props {
   /** Selected clients with a mobile number. */
   recipients: OrderClient[];
+  /** Image / video chosen in "1. ¿Agregar video o imagen?": the header of templates with media. */
+  media?: MessageMedia | null;
 }
 
 /** "Enviar por WhatsApp Business": one approved template, sent by the server through Meta's Cloud API. */
-export function WhatsAppApiSender({ recipients }: Props) {
+export function WhatsAppApiSender({ recipients, media = null }: Props) {
   const toast = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -98,6 +105,15 @@ export function WhatsAppApiSender({ recipients }: Props) {
     [templates.data, selectedKey],
   );
   const headerFile = template?.header_format ? HEADER_FILES[template.header_format] : undefined;
+  // A file chosen here wins over the one of step 1.
+  const stepMedia =
+    headerFile?.kind && media?.kind === headerFile.kind && headerFile.accept.split(',').includes(media.file.type)
+      ? media
+      : null;
+  const headerUpload = file ?? stepMedia?.file ?? null;
+  const fileUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  useEffect(() => () => void (fileUrl && URL.revokeObjectURL(fileUrl)), [fileUrl]);
+  const headerUrl = fileUrl ?? stepMedia?.url;
   const price = template ? (PRICE_PER_MESSAGE[template.category] ?? PRICE_PER_MESSAGE.MARKETING) : 0;
 
   const choose = (key: string) => {
@@ -121,7 +137,7 @@ export function WhatsAppApiSender({ recipients }: Props) {
           numeros: numbers,
           parametros: params,
         },
-        file,
+        headerUpload,
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [MARKETING_KEY, 'campaigns'] }),
   });
@@ -129,7 +145,9 @@ export function WhatsAppApiSender({ recipients }: Props) {
   const send = async () => {
     if (!template) return setError('Elija una plantilla.');
     if (params.some((p) => p.source === 'TEXTO' && !p.texto?.trim())) return setError('Escriba el texto fijo.');
-    if (headerFile && !file) return setError('La plantilla necesita un archivo para el encabezado.');
+    if (headerFile && !headerUpload) return setError('La plantilla necesita un archivo para el encabezado.');
+    if (headerFile && headerUpload && headerUpload.size > headerFile.maxMb * MB)
+      return setError(`El archivo del encabezado supera los ${headerFile.maxMb} MB que permite WhatsApp.`);
     if (total === 0) return setError('Seleccione al menos un cliente con celular o escriba un número de prueba.');
     setError(null);
     const ok = await confirm({
@@ -266,12 +284,28 @@ export function WhatsAppApiSender({ recipients }: Props) {
               label={headerFile.label}
               accept={headerFile.accept}
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              hint={
+                file
+                  ? undefined
+                  : stepMedia
+                    ? `Se usará "${stepMedia.file.name}" del paso 1; elija otro archivo para cambiarlo.`
+                    : media && headerFile.kind
+                      ? `El archivo del paso 1 no sirve para esta plantilla: elija ${headerFile.label.toLowerCase()}.`
+                      : undefined
+              }
             />
           )}
 
           <div className="wa-bubble" aria-label="Vista previa de la plantilla">
             {template.header_format === 'TEXT' && template.header_text && <strong>{template.header_text}</strong>}
-            {headerFile && <span className="muted">[{file ? file.name : 'archivo del encabezado'}]</span>}
+            {headerFile &&
+              (headerUrl && headerFile.kind === 'image' ? (
+                <img src={headerUrl} alt="Imagen del encabezado" className="message-media" />
+              ) : headerUrl && headerFile.kind === 'video' ? (
+                <video src={headerUrl} className="message-media" controls aria-label="Video del encabezado" />
+              ) : (
+                <span className="muted">[{headerUpload ? headerUpload.name : 'archivo del encabezado'}]</span>
+              ))}
             <p>{fillTemplate(template, params, sample)}</p>
             {template.footer && <small className="muted">{template.footer}</small>}
           </div>

@@ -308,7 +308,7 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
               Preparar mensajes
             </Button>
           </Card>
-          {channel === 'WHATSAPP' && <WhatsAppApiSender recipients={selected} />}
+          {channel === 'WHATSAPP' && <WhatsAppApiSender recipients={selected} media={media} />}
         </aside>
       </div>
 

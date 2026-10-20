@@ -303,6 +303,9 @@ def test_campaign_validates_template_params_and_media():
         run(plantilla="promo_img", idioma="es", parametros=[])
     with pytest.raises(ValidationError, match="image/jpeg"):
         run(plantilla="promo_img", idioma="es", parametros=[], media=MediaFile(b"x", "video/mp4", "v.mp4"))
+    with pytest.raises(ValidationError, match="5 MB"):
+        big = b"x" * (5 * 1024 * 1024 + 1)
+        run(plantilla="promo_img", idioma="es", parametros=[], media=MediaFile(big, "image/jpeg", "big.jpg"))
     with pytest.raises(ValidationError, match="no lleva imagen"):
         run(plantilla="promo", idioma="es", parametros=NAME_AND_BRAND, media=MediaFile(b"x", "image/png", "a.png"))
     assert uow.whatsapp.campaigns == []
