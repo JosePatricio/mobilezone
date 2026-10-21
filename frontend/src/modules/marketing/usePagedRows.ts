@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-/** Every table of Propaganda shows 10 rows per page. */
+/** Every table of Promoción shows 10 rows per page. */
 export const PAGE_SIZE = 10;
 
 /** Client-side paging of a list already loaded; the page is clamped when the list shrinks. */

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, ErrorState, Input, Loading, Select, useConfirm, useToast } from '@/shared/components';
 import { getErrorMessage, toApiError } from '@/shared/services/apiError';
@@ -24,7 +24,12 @@ const MB = 1024 * 1024;
 
 /** File of each media header: the image / video of step 1 is used when its kind and type fit. */
 const HEADER_FILES: Record<string, { accept: string; label: string; maxMb: number; kind?: MediaKind }> = {
-  IMAGE: { accept: 'image/jpeg,image/png', label: 'Imagen del encabezado (JPG o PNG, máx. 5 MB)', maxMb: 5, kind: 'image' },
+  IMAGE: {
+    accept: 'image/jpeg,image/png',
+    label: 'Imagen del encabezado (JPG o PNG, máx. 5 MB)',
+    maxMb: 5,
+    kind: 'image',
+  },
   VIDEO: { accept: 'video/mp4', label: 'Video del encabezado (MP4, máx. 10 MB)', maxMb: 10, kind: 'video' },
   DOCUMENT: { accept: 'application/pdf', label: 'PDF del encabezado (máx. 10 MB)', maxMb: 10 },
 };
@@ -42,7 +47,9 @@ const paramOf = (index: number) => PARAMS[index] ?? { ...PARAMS[1], label: `@var
 
 /** A typed value is sent as is; an empty input takes the data of each client. */
 function toParams(texts: string[]): TemplateParam[] {
-  return texts.map((text, i) => (text.trim() ? { source: 'TEXTO', texto: text.trim() } : { source: paramOf(i).source }));
+  return texts.map((text, i) =>
+    text.trim() ? { source: 'TEXTO', texto: text.trim() } : { source: paramOf(i).source },
+  );
 }
 
 const keyOf = (t: WhatsAppTemplate) => `${t.name}|${t.language}`;
@@ -67,14 +74,6 @@ function fillTemplate(template: WhatsAppTemplate, params: TemplateParam[], clien
   });
 }
 
-/** Same rule as the server (whatsapp_number): "0991234567" → 593991234567; 10 to 15 digits. */
-function validNumber(value: string): boolean {
-  let digits = value.replace(/\D/g, '');
-  if (!value.trim().startsWith('+') && digits.startsWith('0')) digits = `593${digits.slice(1)}`;
-  if (digits.length < 10 || digits.length > 15) return false;
-  return !digits.startsWith('5939') || digits.length === 12;
-}
-
 export function formatUsd(value: number): string {
   return `$${value.toFixed(2)}`;
 }
@@ -82,7 +81,7 @@ export function formatUsd(value: number): string {
 interface Props {
   /** Selected clients with a mobile number. */
   recipients: OrderClient[];
-  /** Image / video chosen in "1. ¿Agregar video o imagen?": the header of templates with media. */
+  /** Image chosen in "1. ¿Agregar imagen?": the header of templates with media. */
   media?: MessageMedia | null;
 }
 
@@ -90,32 +89,15 @@ interface Props {
 export function WhatsAppApiSender({ recipients, media = null }: Props) {
   const toast = useToast();
   const confirm = useConfirm();
-  const queryClient = useQueryClient();
   const templates = useQuery({ queryKey: [MARKETING_KEY, 'templates'], queryFn: marketingApi.templates, retry: false });
   const [selectedKey, setSelectedKey] = useState('');
   const [texts, setTexts] = useState<string[]>([]);
   const params = useMemo(() => toParams(texts), [texts]);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Numbers typed by hand (e.g. your own phone to test a template before sending it to clients).
-  const [numbers, setNumbers] = useState<string[]>([]);
-  const [draft, setDraft] = useState('');
-  const total = recipients.length + numbers.length;
+  const total = recipients.length;
 
-  const addNumber = () => {
-    const value = draft.trim();
-    if (!value) return;
-    if (!validNumber(value)) return setError(`"${value}" no es un celular válido (ej. 0991234567 o +593991234567).`);
-    if (numbers.includes(value)) return setError('Ese número ya está en la lista.');
-    setError(null);
-    setNumbers((prev) => [...prev, value]);
-    setDraft('');
-  };
-
-  const template = useMemo(
-    () => templates.data?.find((t) => keyOf(t) === selectedKey),
-    [templates.data, selectedKey],
-  );
+  const template = useMemo(() => templates.data?.find((t) => keyOf(t) === selectedKey), [templates.data, selectedKey]);
   const headerFile = template?.header_format ? HEADER_FILES[template.header_format] : undefined;
   // A file chosen here wins over the one of step 1.
   const stepMedia =
@@ -149,12 +131,10 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
           plantilla: template!.name,
           idioma: template!.language,
           cliente_ids: recipients.map((c) => c.cliente_id),
-          numeros: numbers,
           parametros: params,
         },
         headerUpload,
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [MARKETING_KEY, 'campaigns'] }),
   });
 
   const send = async () => {
@@ -162,17 +142,16 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
     if (headerFile && !headerUpload) return setError('La plantilla necesita un archivo para el encabezado.');
     if (headerFile && headerUpload && headerUpload.size > headerFile.maxMb * MB)
       return setError(`El archivo del encabezado supera los ${headerFile.maxMb} MB que permite WhatsApp.`);
-    if (total === 0) return setError('Seleccione al menos un cliente con celular o escriba un número de prueba.');
+    if (total === 0) return setError('Seleccione al menos un cliente con celular.');
     setError(null);
     const ok = await confirm({
       title: 'Enviar por WhatsApp',
       message: (
         <>
-          Se enviará la plantilla <strong>{template.name}</strong> a {recipients.length} cliente(s)
-          {numbers.length > 0 && ` y ${numbers.length} número(s) de prueba`}.
+          Se enviará la plantilla <strong>{template.name}</strong> a {recipients.length} cliente(s).
           <br />
-          Costo aproximado: <strong>{formatUsd(total * price)}</strong> (
-          {formatUsd(price)} por mensaje de {template.category.toLowerCase()}; el número de prueba es gratis).
+          Costo aproximado: <strong>{formatUsd(total * price)}</strong> ({formatUsd(price)} por mensaje de{' '}
+          {template.category.toLowerCase()}).
         </>
       ),
       confirmLabel: 'Enviar',
@@ -227,39 +206,6 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
         WhatsApp solo permite iniciar conversaciones con plantillas aprobadas por Meta. Créelas en el administrador de
         WhatsApp y aparecerán aquí.
       </p>
-      <div className="wa-numbers">
-        <div className="wa-numbers-add">
-          <Input
-            label="Números de prueba"
-            placeholder="0991234567"
-            inputMode="tel"
-            value={draft}
-            maxLength={20}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addNumber();
-              }
-            }}
-          />
-          <Button variant="secondary" onClick={addNumber}>
-            Agregar
-          </Button>
-        </div>
-        {numbers.length > 0 && (
-          <ul className="wa-number-list">
-            {numbers.map((n) => (
-              <li key={n}>
-                {n}
-                <button type="button" aria-label={`Quitar ${n}`} onClick={() => setNumbers((prev) => prev.filter((x) => x !== n))}>
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
       <Select
         label="Plantilla"
         placeholder={options.length ? 'Elija una plantilla' : 'No hay plantillas aprobadas'}

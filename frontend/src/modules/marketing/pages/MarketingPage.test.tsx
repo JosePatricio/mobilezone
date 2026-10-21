@@ -2,7 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/utils';
-import type { Campaign, OrderClient, WhatsAppTemplate } from '../types';
+import type { OrderClient, WhatsAppTemplate } from '../types';
 import { MarketingPage } from './MarketingPage';
 
 const api = vi.hoisted(() => ({ recipients: vi.fn(), templates: vi.fn(), campaigns: vi.fn(), campaign: vi.fn(), createCampaign: vi.fn() }));
@@ -52,7 +52,7 @@ function write(html: string) {
   fireEvent.input(editor);
 }
 
-describe('MarketingPage (Propaganda › CRM)', () => {
+describe('MarketingPage (Promoción › CRM)', () => {
   it('opens with "Enviar propaganda" and prepares one WhatsApp message per client of the orders', async () => {
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
@@ -168,17 +168,7 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     // {{1}} = name, {{2}} = brand of the phone by default; previewed with the first client.
     expect(screen.getByText('Hola Ana, oferta para tu Samsung.')).toBeInTheDocument();
     expect(screen.getByText('2 destinatario(s) · costo aprox. $0.15')).toBeInTheDocument();
-
-    // Test numbers typed by hand: invalid ones are rejected, valid ones can be removed again.
-    const numberInput = screen.getByLabelText('Números de prueba');
-    await user.type(numberInput, '123{Enter}');
-    expect(screen.getByRole('alert')).toHaveTextContent('no es un celular válido');
-    await user.clear(numberInput);
-    await user.type(numberInput, '0987654321');
-    await user.click(screen.getByRole('button', { name: 'Agregar' }));
-    await user.type(numberInput, '0981111111{Enter}');
-    await user.click(screen.getByRole('button', { name: 'Quitar 0981111111' }));
-    expect(screen.getByText('3 destinatario(s) · costo aprox. $0.22')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Números de prueba')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Enviar' }));
@@ -188,7 +178,6 @@ describe('MarketingPage (Propaganda › CRM)', () => {
         plantilla: 'promo_octubre',
         idioma: 'es',
         cliente_ids: [1, 2],
-        numeros: ['0987654321'],
         parametros: [{ source: 'NOMBRE' }, { source: 'MARCA' }],
       },
       null,
@@ -216,26 +205,23 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     expect(api.createCampaign).toHaveBeenCalledWith(expect.objectContaining({ plantilla: 'promo_img' }), image);
   });
 
-  it('lists the WhatsApp campaigns with the state of their messages', async () => {
-    const campaign: Campaign = {
-      id: 7,
-      plantilla: 'promo_octubre',
-      idioma: 'es',
-      categoria: 'MARKETING',
-      created_at: '2026-10-14T15:00:00Z',
-      creado_por: 'Admin Sistema',
-      total: 3,
-      pendientes: 0,
-      enviados: 0,
-      entregados: 1,
-      leidos: 1,
-      fallidos: 1,
-    };
-    api.campaigns.mockResolvedValue([campaign]);
+  it('filters the clients by the brand of the phone', async () => {
+    const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
+    await screen.findByText('Ana Pérez');
+    await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todos' }));
 
-    const row = (await screen.findByText('Admin Sistema')).closest('tr')!;
-    // total, pendientes, entregados (delivered + read), leídos, fallidos
-    expect([...row.querySelectorAll('td.text-right')].slice(0, 5).map((td) => td.textContent)).toEqual(['3', '0', '2', '1', '1']);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Marca del teléfono' }), 'Xiaomi');
+    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument();
+    expect(screen.getByText('Luis Pérez')).toBeInTheDocument();
+    expect(screen.getByText('1 de 3 número(s) seleccionado(s)')).toBeInTheDocument();
+  });
+
+  it('does not list the sent campaigns any more', async () => {
+    renderWithProviders(<MarketingPage />);
+    expect(await screen.findByRole('heading', { name: 'Promoción' })).toBeInTheDocument();
+    expect(screen.queryByText('Campañas de WhatsApp')).not.toBeInTheDocument();
+    expect(api.campaigns).not.toHaveBeenCalled();
   });
 });

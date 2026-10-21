@@ -1,4 +1,4 @@
-/** Client that came through Órdenes: recipient of the Propaganda (CRM) messages. */
+/** Client that came through Órdenes: recipient of the Promoción (CRM) messages. */
 export interface OrderClient {
   cliente_id: number;
   nombre: string;
@@ -61,8 +61,8 @@ export interface CampaignRequest {
   plantilla: string;
   idioma: string;
   cliente_ids: number[];
-  /** Numbers typed by hand (tests), sent without client data. */
-  numeros: string[];
+  /** Numbers typed by hand, sent without client data (not offered on the page). */
+  numeros?: string[];
   parametros: TemplateParam[];
 }
 

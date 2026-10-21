@@ -10,6 +10,7 @@ import {
   PageHeader,
   Pagination,
   SearchInput,
+  Select,
   useToast,
   WhatsAppIcon,
 } from '@/shared/components';
@@ -17,7 +18,6 @@ import { formatDate, fullName } from '@/shared/utils/format';
 import { MediaPicker } from '../components/MediaPicker';
 import { MessagePreview } from '../components/MessagePreview';
 import { WhatsAppApiSender } from '../components/WhatsAppApiSender';
-import { WhatsAppCampaigns } from '../components/WhatsAppCampaigns';
 import { RichTextEditor } from '../components/RichTextEditor';
 import {
   clientVariables,
@@ -32,7 +32,7 @@ import { MARKETING_KEY, marketingApi } from '../services/marketingApi';
 import type { Channel, MessageMedia, OrderClient } from '../types';
 import { usePagedRows } from '../usePagedRows';
 
-/** Propaganda goes out by WhatsApp only. */
+/** Promotions go out by WhatsApp only. */
 const CHANNEL: Channel = 'WHATSAPP';
 
 /** Text of the approved promo template, with its {{1}} / {{2}} as the variables of the editor. */
@@ -79,13 +79,13 @@ function matches(c: OrderClient, term: string): boolean {
   return c.celular.includes(term) || (number.length > 0 && phoneKey(c.celular).includes(number));
 }
 
-/** Propaganda: the CRM prepares a WhatsApp message for the clients that came through Órdenes. */
+/** Promoción: the CRM prepares a WhatsApp message for the clients that came through Órdenes. */
 export function MarketingPage() {
   const [composing, setComposing] = useState(false);
 
   return (
     <>
-      <PageHeader title="Propaganda">
+      <PageHeader title="Promoción">
         Mensajes de promoción para los clientes que hicieron una orden de trabajo.
       </PageHeader>
 
@@ -104,8 +104,6 @@ export function MarketingPage() {
           </div>
         </Card>
       )}
-
-      <WhatsAppCampaigns />
     </>
   );
 }
@@ -187,6 +185,7 @@ function CrmComposer() {
   const [media, setMediaState] = useState<MessageMedia | null>(null);
   const [lines, setLines] = useState<Line[]>([[]]);
   const [search, setSearch] = useState('');
+  const [marca, setMarca] = useState('');
   const [showRepeated, setShowRepeated] = useState(false);
   const [history, setHistory] = useState<NumberRow | null>(null);
   // Nobody is checked at first: messages only go to the clients picked by hand.
@@ -216,10 +215,20 @@ function CrmComposer() {
   const numbers = useMemo(() => uniqueNumbers(clients), [clients]);
   const repeated = useMemo(() => numbers.filter((r) => r.records.length > 1), [numbers]);
   // A number shows when any of its records matches the search.
+  // The brand is the one shown on the row (phone of the latest order of the number).
+  const brands = useMemo(
+    () =>
+      [...new Set(numbers.map((r) => r.client.marca))]
+        .sort((a, b) => a.localeCompare(b))
+        .map((m) => ({ value: m, label: m })),
+    [numbers],
+  );
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return term ? numbers.filter((r) => r.records.some((c) => matches(c, term))) : numbers;
-  }, [numbers, search]);
+    return numbers.filter(
+      (r) => (!marca || r.client.marca === marca) && (!term || r.records.some((c) => matches(c, term))),
+    );
+  }, [numbers, search, marca]);
   const paged = usePagedRows(visible);
   const selectable = visible.map((r) => r.client).filter((c) => c.celular);
   const selected = selectable.filter((c) => chosen.has(c.cliente_id));
@@ -307,6 +316,16 @@ function CrmComposer() {
                       paged.setPage(1);
                     }}
                     placeholder="Buscar por nombre, cédula o celular…"
+                  />
+                  <Select
+                    aria-label="Marca del teléfono"
+                    placeholder="Todas las marcas"
+                    options={brands}
+                    value={marca}
+                    onChange={(e) => {
+                      setMarca(e.target.value);
+                      paged.setPage(1);
+                    }}
                   />
                 </div>
                 {repeated.length > 0 && (
