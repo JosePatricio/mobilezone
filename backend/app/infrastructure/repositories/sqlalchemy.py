@@ -519,7 +519,7 @@ class SqlAlchemyWorkOrderRepository(SqlAlchemyRepository[WorkOrder], ports.WorkO
         stmt = (
             select(
                 u.id, u.nombre, u.apellido, u.celular,
-                brands_table.c.nombre, models_table.c.nombre, per_client.c.ordenes, last.c.fecha,
+                brands_table.c.nombre, models_table.c.nombre, per_client.c.ordenes, last.c.fecha, u.identificacion,
             )
             .join(per_client, per_client.c.cliente_id == u.id)
             .join(last, last.c.id == per_client.c.last_id)

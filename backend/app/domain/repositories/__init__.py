@@ -270,6 +270,7 @@ class OrderClient:
     modelo: str
     ordenes: int  # number of work orders of the client
     ultima_orden: date  # reception date of the most recent order
+    identificacion: str | None = None  # cédula / RUC, to find the client in Propaganda
 
 
 class WorkOrderRepository(Repository[WorkOrder]):

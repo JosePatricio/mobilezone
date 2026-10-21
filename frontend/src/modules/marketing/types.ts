@@ -9,6 +9,8 @@ export interface OrderClient {
   modelo: string;
   ordenes: number;
   ultima_orden: string;
+  /** Cédula / RUC. */
+  identificacion?: string | null;
 }
 
 export type Channel = 'WHATSAPP' | 'SMS';

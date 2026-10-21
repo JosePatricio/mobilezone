@@ -96,6 +96,28 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     expect(within(list).getByText('*Luis* tu Xiaomi')).toBeInTheDocument();
   });
 
+  it('searches by cédula and by the mobile in any format', async () => {
+    api.recipients.mockResolvedValue([
+      { ...client(1, 'Ana', 'Samsung', '+593960911155'), identificacion: '1712345678' },
+      { ...client(2, 'Luis', 'Xiaomi', '0992222222'), identificacion: '0912345678' },
+    ]);
+    const user = userEvent.setup();
+    renderWithProviders(<MarketingPage />);
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
+    await screen.findByText('Ana Pérez');
+    const search = screen.getByPlaceholderText('Buscar por nombre, cédula o celular…');
+
+    await user.type(search, '1712345678');
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
+    expect(screen.queryByText('Luis Pérez')).not.toBeInTheDocument();
+
+    // Stored as +593960911155, typed as a local number.
+    await user.clear(search);
+    await user.type(search, '0960911155');
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
+    expect(screen.queryByText('Luis Pérez')).not.toBeInTheDocument();
+  });
+
   it('shows one row per number, 10 per page, with the history of the repeated ones', async () => {
     api.recipients.mockResolvedValue([
       ...Array.from({ length: 16 }, (_, i) => client(i + 1, `Cliente${i + 1}`, 'Samsung', `09900000${String(i + 10)}`)),

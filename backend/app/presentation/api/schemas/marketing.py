@@ -19,6 +19,7 @@ class OrderClientResponse(Schema):
     modelo: str
     ordenes: int = Field(description="Órdenes de trabajo del cliente")
     ultima_orden: date = Field(description="Fecha de recepción de su orden más reciente")
+    identificacion: str | None = Field(default=None, description="Cédula / RUC del cliente")
 
 
 class WhatsAppTemplateResponse(Schema):

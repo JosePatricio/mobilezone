@@ -65,8 +65,14 @@ function uniqueNumbers(clients: OrderClient[]): NumberRow[] {
   }));
 }
 
-const matches = (c: OrderClient, term: string) =>
-  fullName(c).toLowerCase().includes(term) || (c.celular ?? '').includes(term);
+/** Name, cédula / RUC or mobile; "0960911155", "960911155" and "+593960911155" find the same phone. */
+function matches(c: OrderClient, term: string): boolean {
+  if (fullName(c).toLowerCase().includes(term) || (c.identificacion ?? '').toLowerCase().includes(term)) return true;
+  if (!c.celular) return false;
+  const digits = term.replace(/\D/g, '');
+  const number = (digits.startsWith('0') ? digits.slice(1) : digits).replace(/^593/, '');
+  return c.celular.includes(term) || (number.length > 0 && phoneKey(c.celular).includes(number));
+}
 
 /** Propaganda: the CRM prepares a WhatsApp message for the clients that came through Órdenes. */
 export function MarketingPage() {
@@ -294,7 +300,7 @@ function CrmComposer() {
                       setSearch(value);
                       paged.setPage(1);
                     }}
-                    placeholder="Buscar por nombre o celular…"
+                    placeholder="Buscar por nombre, cédula o celular…"
                   />
                 </div>
                 {repeated.length > 0 && (
