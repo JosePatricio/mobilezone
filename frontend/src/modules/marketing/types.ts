@@ -100,9 +100,20 @@ export interface CampaignMessage {
   estado: MessageStatus;
   error: string | null;
   updated_at: string;
+  /** [placeholder, value] sent to this phone. */
+  parametros: [string, string][];
+}
+
+/** The campaign with what was sent: the text of the template and its header image. */
+export interface CampaignPreview extends Campaign {
+  /** Text of the template with its placeholders {{1}}; null in campaigns sent before it was kept. */
+  cuerpo: string | null;
+  encabezado: string | null;
+  pie: string | null;
+  imagen_url: string | null;
 }
 
 export interface CampaignDetail {
-  campaign: Campaign;
+  campaign: CampaignPreview;
   messages: CampaignMessage[];
 }

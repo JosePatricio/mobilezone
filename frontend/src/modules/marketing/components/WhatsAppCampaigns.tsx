@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button, Card, ErrorState, Loading, Modal, Pagination, StatusBadge } from '@/shared/components';
 import { formatDateTime } from '@/shared/utils/format';
 import { MARKETING_KEY, marketingApi } from '../services/marketingApi';
-import type { Campaign, CampaignMessage, MessageStatus } from '../types';
+import type { Campaign, CampaignMessage, CampaignPreview, MessageStatus } from '../types';
 import { usePagedRows } from '../usePagedRows';
 
 /** While a campaign is being sent (or Meta reports its states) the lists refresh by themselves. */
@@ -112,9 +112,32 @@ function CampaignModal({ id, summary, onClose }: { id: number; summary?: Campaig
       ) : query.isError ? (
         <ErrorState error={query.error} onRetry={() => query.refetch()} />
       ) : (
-        <CampaignMessages messages={query.data!.messages} />
+        <>
+          <CampaignPreviewBubble campaign={query.data!.campaign} sample={query.data!.messages[0]} />
+          <CampaignMessages messages={query.data!.messages} />
+        </>
       )}
     </Modal>
+  );
+}
+
+/** What was sent, with the values of the first message (as that client received it). */
+function CampaignPreviewBubble({ campaign, sample }: { campaign: CampaignPreview; sample?: CampaignMessage }) {
+  if (!campaign.cuerpo) return null; // sent before the preview was kept
+  const values = new Map(sample?.parametros ?? []);
+  const text = campaign.cuerpo.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, name: string) => values.get(name) ?? match);
+  return (
+    <div className="wa-campaign-preview">
+      {sample && <p className="muted crm-count">Así lo recibió {sample.cliente ?? `+${sample.telefono}`}</p>}
+      <div className="wa-bubble" aria-label="Vista previa de la promoción">
+        {campaign.imagen_url && (
+          <img src={campaign.imagen_url} alt="Imagen de la promoción" className="message-media" />
+        )}
+        {campaign.encabezado && <strong>{campaign.encabezado}</strong>}
+        <p>{text}</p>
+        {campaign.pie && <small className="muted">{campaign.pie}</small>}
+      </div>
+    </div>
   );
 }
 

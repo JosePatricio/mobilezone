@@ -25,7 +25,7 @@ from app.domain.entities import User
 from app.domain.exceptions import AuthenticationError, ConflictError, ValidationError
 from app.domain.value_objects.permissions import Perm
 from app.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
-from app.presentation.api.dependencies import UowDep, require_permissions
+from app.presentation.api.dependencies import StorageDep, UowDep, require_permissions
 from app.presentation.api.schemas.marketing import (
     OrderClientResponse,
     WhatsAppCampaignCreatedResponse,
@@ -105,6 +105,7 @@ def create_whatsapp_campaign(
     uow: UowDep,
     actor: CanManage,
     gateway: WhatsAppDep,
+    storage: StorageDep,
     data: Annotated[str, Form(description="WhatsAppCampaignRequest como JSON")],
     file: Annotated[UploadFile | None, File(description="Imagen / video / PDF del encabezado")] = None,
 ):
@@ -125,7 +126,7 @@ def create_whatsapp_campaign(
         media = MediaFile(content, file.content_type or "application/octet-stream", file.filename or "archivo")
 
     settings = request.app.state.settings
-    created = CreateWhatsAppCampaignUseCase(uow, gateway, settings.whatsapp_country_code).execute(
+    created = CreateWhatsAppCampaignUseCase(uow, gateway, settings.whatsapp_country_code, storage).execute(
         actor,
         plantilla=body.plantilla,
         idioma=body.idioma,

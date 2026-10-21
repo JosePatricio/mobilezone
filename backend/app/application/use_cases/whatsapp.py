@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 
+from app.application.services.files import FileStorage
 from app.application.services.whatsapp import (
     MEDIA_HEADERS,
     OutgoingTemplate,
@@ -30,6 +31,9 @@ logger = logging.getLogger(__name__)
 
 # File types of each media header (the MIME type of the upload must start with / be one of these).
 MEDIA_MIME = {"IMAGE": ("image/jpeg", "image/png"), "VIDEO": ("video/mp4", "video/3gpp"), "DOCUMENT": ("application/pdf",)}
+# Header images are kept for the preview of the campaign (folder under media/).
+CAMPAIGN_IMAGES_FOLDER = "campaigns"
+IMAGE_EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png"}
 # Largest file Meta accepts for each media header, in MB (the upload itself is capped at 10 MB by the API).
 MEDIA_MAX_MB = {"IMAGE": 5, "VIDEO": 16, "DOCUMENT": 100}
 
@@ -108,10 +112,13 @@ class ListWhatsAppTemplatesQuery:
 class CreateWhatsAppCampaignUseCase(UseCase):
     """Queues one approved template for the chosen clients of Órdenes; the sender delivers it."""
 
-    def __init__(self, uow: UnitOfWork, gateway: WhatsAppGateway, country_code: str) -> None:
+    def __init__(
+        self, uow: UnitOfWork, gateway: WhatsAppGateway, country_code: str, storage: FileStorage | None = None
+    ) -> None:
         super().__init__(uow)
         self.gateway = gateway
         self.country_code = country_code
+        self.storage = storage  # keeps the header image for the preview; None = not kept
 
     def _template(self, name: str, language: str) -> WhatsAppTemplate:
         for template in self.gateway.templates():
@@ -185,11 +192,26 @@ class CreateWhatsAppCampaignUseCase(UseCase):
         if media is not None:
             header_media = (template.header_format, self.gateway.upload_media(media.content, media.mime_type, media.filename))
 
-        with self.uow.transaction():
-            campaign_id = self.uow.whatsapp.create_campaign(
-                plantilla=template.name, idioma=template.language, categoria=template.category, created_by=actor.id
-            )
-            self.uow.whatsapp.add_messages(campaign_id, queue)
+        imagen = None
+        if self.storage is not None and media is not None and template.header_format == "IMAGE":
+            imagen = self.storage.save(CAMPAIGN_IMAGES_FOLDER, media.content, IMAGE_EXTENSIONS[media.mime_type])
+        try:
+            with self.uow.transaction():
+                campaign_id = self.uow.whatsapp.create_campaign(
+                    plantilla=template.name,
+                    idioma=template.language,
+                    categoria=template.category,
+                    created_by=actor.id,
+                    cuerpo=template.body,
+                    encabezado=template.header_text if template.header_format == "TEXT" else None,
+                    pie=template.footer,
+                    imagen=imagen,
+                )
+                self.uow.whatsapp.add_messages(campaign_id, queue)
+        except Exception:
+            if imagen:
+                self.storage.delete(imagen)
+            raise
         return CampaignCreated(
             campaign_id=campaign_id,
             encolados=len(queue),

@@ -970,4 +970,6 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .wa-bubble { background: #dcf8c6; color: #111b21; border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 6px; font-size: 0.9rem; }
 .wa-bubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .wa-bubble .muted { color: #54656f; }
+.wa-campaign-preview { max-width: 360px; margin-bottom: 16px; }
+.wa-campaign-preview .crm-count { margin: 0 0 6px; }
 .wa-error { max-width: 320px; overflow-wrap: anywhere; font-size: 0.85rem; }

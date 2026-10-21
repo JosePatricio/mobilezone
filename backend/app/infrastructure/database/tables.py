@@ -485,6 +485,11 @@ whatsapp_campaigns_table = Table(
     Column("plantilla", String(512), nullable=False),  # template name in Meta
     Column("idioma", String(15), nullable=False),
     Column("categoria", String(20), nullable=False),  # MARKETING | UTILITY (price per message)
+    # What was sent, for the preview of the campaign: the template may change or be deleted in Meta.
+    Column("cuerpo", Text),
+    Column("encabezado", String(1024)),
+    Column("pie", String(1024)),
+    Column("imagen", String(255)),  # header image, path under media/
     Column("created_by", ForeignKey("users.id", ondelete="SET NULL"), index=True),
     Column("created_at", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
 )

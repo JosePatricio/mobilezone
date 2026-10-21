@@ -57,6 +57,9 @@ def test_campaign_is_sent_in_the_background_and_tracked(client, admin_headers, f
     detail = client.get(f"{CAMPAIGNS}/{campaigns[0]['id']}", headers=admin_headers).json()
     assert [(m["cliente_id"], m["estado"]) for m in detail["messages"]] == [(ana.id, "ENVIADO"), (failing.id, "FALLIDO")]
     assert "allowed list" in detail["messages"][1]["error"]
+    # Preview of "Ver": the text of the template and the values sent to each phone.
+    assert (detail["campaign"]["cuerpo"], detail["campaign"]["imagen_url"]) == (PROMO.body, None)
+    assert detail["messages"][0]["parametros"] == [["1", ana.nombre], ["2", "Promo"]]
 
 
 def test_webhook_states_only_move_forward_and_replies_opt_out(client, admin_headers, factory, gateway):

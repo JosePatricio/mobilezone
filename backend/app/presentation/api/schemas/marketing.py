@@ -3,11 +3,11 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Annotated
 
-from pydantic import Field, StringConstraints, model_validator
+from pydantic import Field, StringConstraints, computed_field, model_validator
 
 from app.application.use_cases.whatsapp import ParamSource
 from app.domain.value_objects.whatsapp import WhatsAppMessageStatus
-from app.presentation.api.schemas.common import RequestSchema, Schema
+from app.presentation.api.schemas.common import RequestSchema, Schema, media_url
 
 
 class OrderClientResponse(Schema):
@@ -77,6 +77,20 @@ class WhatsAppCampaignResponse(Schema):
     fallidos: int
 
 
+class WhatsAppCampaignPreviewResponse(WhatsAppCampaignResponse):
+    """The campaign with what was sent: text of the template and header image."""
+
+    cuerpo: str | None = Field(description="Texto de la plantilla con sus variables {{1}}")
+    encabezado: str | None = Field(description="Encabezado de texto de la plantilla")
+    pie: str | None = Field(description="Pie de la plantilla")
+    imagen: str | None = Field(default=None, exclude=True)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def imagen_url(self) -> str | None:
+        return media_url(self.imagen)
+
+
 class WhatsAppMessageResponse(Schema):
     id: int
     cliente_id: int | None
@@ -85,8 +99,9 @@ class WhatsAppMessageResponse(Schema):
     estado: WhatsAppMessageStatus
     error: str | None
     updated_at: datetime
+    parametros: list[tuple[str, str]] = Field(description="(variable, valor) enviados a este número")
 
 
 class WhatsAppCampaignDetailResponse(Schema):
-    campaign: WhatsAppCampaignResponse
+    campaign: WhatsAppCampaignPreviewResponse
     messages: list[WhatsAppMessageResponse]

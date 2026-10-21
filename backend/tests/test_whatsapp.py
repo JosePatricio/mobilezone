@@ -10,6 +10,7 @@ from datetime import date
 import httpx
 import pytest
 
+from app.application.services.files import FileStorage
 from app.application.services.whatsapp import OutgoingTemplate, WhatsAppError, WhatsAppGateway, WhatsAppTemplate
 from app.application.use_cases.whatsapp import (
     CreateWhatsAppCampaignUseCase,
@@ -243,7 +244,22 @@ class FakeGateway(WhatsAppGateway):
         return True
 
 
-PROMO = WhatsAppTemplate("promo", "es", "MARKETING", "APPROVED", "Hola {{1}}, tu {{2}}", body_params=["1", "2"])
+class FakeStorage(FileStorage):
+    def __init__(self) -> None:
+        self.files: dict[str, bytes] = {}
+
+    def save(self, folder, content, extension):
+        path = f"{folder}/{len(self.files) + 1}.{extension}"
+        self.files[path] = content
+        return path
+
+    def delete(self, path):
+        self.files.pop(path, None)
+
+
+PROMO = WhatsAppTemplate(
+    "promo", "es", "MARKETING", "APPROVED", "Hola {{1}}, tu {{2}}", footer="Responde STOP", body_params=["1", "2"]
+)
 WITH_IMAGE = WhatsAppTemplate("promo_img", "es", "MARKETING", "APPROVED", "Hola", header_format="IMAGE")
 ADMIN = User(email="admin@example.com", nombre="Admin", apellido="Sistema", id=1)
 NAME_AND_BRAND = [TemplateParam(ParamSource.NOMBRE), TemplateParam(ParamSource.MARCA)]
@@ -269,7 +285,11 @@ def test_campaign_skips_invalid_repeated_and_opted_out_numbers():
         ADMIN, plantilla="promo", idioma="es", cliente_ids=[1, 2, 3, 4, 5, 6], parametros=NAME_AND_BRAND
     )
     assert (created.encolados, created.sin_numero, created.dados_de_baja) == (2, 3, 1)
-    assert uow.whatsapp.campaigns == [{"plantilla": "promo", "idioma": "es", "categoria": "MARKETING", "created_by": 1}]
+    # What was sent is kept for the preview of the campaign.
+    assert uow.whatsapp.campaigns == [{
+        "plantilla": "promo", "idioma": "es", "categoria": "MARKETING", "created_by": 1,
+        "cuerpo": "Hola {{1}}, tu {{2}}", "encabezado": None, "pie": "Responde STOP", "imagen": None,
+    }]
     assert [(m["telefono"], m["parametros"]) for m in uow.whatsapp.messages.values()] == [
         ("593991234567", [("1", "Ana"), ("2", "Samsung")]),
         ("593987654321", [("1", "Luis"), ("2", "Xiaomi")]),
@@ -320,6 +340,29 @@ def test_campaign_uploads_the_header_file_once():
     )
     assert gateway.uploads == ["image/png"]
     assert created.header_media == ("IMAGE", "MEDIA1")
+
+
+def test_campaign_keeps_the_header_image_for_its_preview():
+    uow = FakeUow([_client(1, "0991234567")])
+    storage = FakeStorage()
+    CreateWhatsAppCampaignUseCase(uow, FakeGateway([WITH_IMAGE]), "593", storage).execute(
+        ADMIN, plantilla="promo_img", idioma="es", cliente_ids=[1], parametros=[],
+        media=MediaFile(b"jpg", "image/jpeg", "promo.jpg"),
+    )
+    assert storage.files == {"campaigns/1.jpg": b"jpg"}
+    assert uow.whatsapp.campaigns[0]["imagen"] == "campaigns/1.jpg"
+
+
+def test_campaign_image_is_removed_when_the_campaign_is_not_saved():
+    uow = FakeUow([_client(1, "0991234567")])
+    uow.whatsapp.add_messages = lambda *_: (_ for _ in ()).throw(RuntimeError("db down"))
+    storage = FakeStorage()
+    with pytest.raises(RuntimeError):
+        CreateWhatsAppCampaignUseCase(uow, FakeGateway([WITH_IMAGE]), "593", storage).execute(
+            ADMIN, plantilla="promo_img", idioma="es", cliente_ids=[1], parametros=[],
+            media=MediaFile(b"png", "image/png", "promo.png"),
+        )
+    assert storage.files == {}
 
 
 def test_campaign_without_valid_recipients_is_rejected():

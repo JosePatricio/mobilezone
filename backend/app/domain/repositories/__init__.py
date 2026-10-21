@@ -371,6 +371,11 @@ class WhatsAppCampaignSummary:
     entregados: int
     leidos: int
     fallidos: int
+    # What was sent (preview of the campaign).
+    cuerpo: str | None = None
+    encabezado: str | None = None
+    pie: str | None = None
+    imagen: str | None = None  # header image, path under media/
 
 
 @dataclass(frozen=True)
@@ -382,6 +387,7 @@ class WhatsAppMessageRow:
     estado: WhatsAppMessageStatus
     error: str | None
     updated_at: datetime
+    parametros: list[tuple[str, str]] = field(default_factory=list)  # (placeholder, value) sent to this phone
 
 
 @dataclass(frozen=True)
@@ -395,7 +401,18 @@ class WhatsAppRepository(ABC):
     """Campaigns, messages and opt-outs of the WhatsApp Cloud API."""
 
     @abstractmethod
-    def create_campaign(self, *, plantilla: str, idioma: str, categoria: str, created_by: int | None) -> int: ...
+    def create_campaign(
+        self,
+        *,
+        plantilla: str,
+        idioma: str,
+        categoria: str,
+        created_by: int | None,
+        cuerpo: str | None = None,
+        encabezado: str | None = None,
+        pie: str | None = None,
+        imagen: str | None = None,
+    ) -> int: ...
 
     @abstractmethod
     def add_messages(self, campaign_id: int, messages: list[tuple[int, str, list[tuple[str, str]]]]) -> None:

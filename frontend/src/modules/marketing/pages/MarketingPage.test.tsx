@@ -225,5 +225,40 @@ describe('MarketingPage (Promoción › CRM)', () => {
       '1',
       '1',
     ]);
+
+    // "Ver": the promotion as the first client received it, then the state of each message.
+    api.campaign.mockResolvedValue({
+      campaign: {
+        ...campaign,
+        cuerpo: '¡Hola {{1}}! llegaron MICAS para tu {{2}}',
+        encabezado: null,
+        pie: 'Responde STOP',
+        imagen_url: '/media/campaigns/micas.jpg',
+      },
+      messages: [
+        {
+          id: 1,
+          cliente_id: 1,
+          cliente: 'Ana Pérez',
+          telefono: '593991111111',
+          estado: 'LEIDO',
+          error: null,
+          updated_at: '2026-10-14T15:01:00Z',
+          parametros: [
+            ['1', 'Ana'],
+            ['2', 'Samsung'],
+          ],
+        },
+      ],
+    });
+    await userEvent.setup().click(within(row).getByRole('button', { name: 'Ver' }));
+    const preview = await screen.findByLabelText('Vista previa de la promoción');
+    expect(within(preview).getByText('¡Hola Ana! llegaron MICAS para tu Samsung')).toBeInTheDocument();
+    expect(within(preview).getByText('Responde STOP')).toBeInTheDocument();
+    expect(within(preview).getByRole('img', { name: 'Imagen de la promoción' })).toHaveAttribute(
+      'src',
+      '/media/campaigns/micas.jpg',
+    );
+    expect(screen.getByText('Así lo recibió Ana Pérez')).toBeInTheDocument();
   });
 });

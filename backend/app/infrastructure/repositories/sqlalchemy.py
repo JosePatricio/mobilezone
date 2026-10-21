@@ -669,10 +669,13 @@ class SqlAlchemyWhatsAppRepository(ports.WhatsAppRepository):
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def create_campaign(self, *, plantilla, idioma, categoria, created_by):
+    def create_campaign(
+        self, *, plantilla, idioma, categoria, created_by, cuerpo=None, encabezado=None, pie=None, imagen=None
+    ):
         result = self.session.execute(
             whatsapp_campaigns_table.insert().values(
-                plantilla=plantilla, idioma=idioma, categoria=categoria, created_by=created_by
+                plantilla=plantilla, idioma=idioma, categoria=categoria, created_by=created_by,
+                cuerpo=cuerpo, encabezado=encabezado, pie=pie, imagen=imagen,
             )
         )
         return int(result.inserted_primary_key[0])
@@ -747,6 +750,7 @@ class SqlAlchemyWhatsAppRepository(ports.WhatsAppRepository):
                     WhatsAppMessageStatus.LEIDO,
                     WhatsAppMessageStatus.FALLIDO,
                 )),
+                k.cuerpo, k.encabezado, k.pie, k.imagen,
             )
             .select_from(whatsapp_campaigns_table)
             .outerjoin(whatsapp_messages_table, m.campaign_id == k.id)
@@ -767,12 +771,18 @@ class SqlAlchemyWhatsAppRepository(ports.WhatsAppRepository):
     def campaign_messages(self, campaign_id):
         m, u = whatsapp_messages_table.c, users_table.c
         rows = self.session.execute(
-            select(m.id, m.cliente_id, func.concat(u.nombre, " ", u.apellido), m.telefono, m.estado, m.error, m.updated_at)
+            select(
+                m.id, m.cliente_id, func.concat(u.nombre, " ", u.apellido), m.telefono, m.estado, m.error, m.updated_at,
+                m.parametros,
+            )
             .outerjoin(users_table, u.id == m.cliente_id)
             .where(m.campaign_id == campaign_id)
             .order_by(m.id)
         ).all()
-        return [ports.WhatsAppMessageRow(*row) for row in rows]
+        return [
+            ports.WhatsAppMessageRow(*row[:-1], parametros=[tuple(p) for p in json.loads(row[-1] or "[]")])
+            for row in rows
+        ]
 
     def opted_out(self, telefonos):
         if not telefonos:
