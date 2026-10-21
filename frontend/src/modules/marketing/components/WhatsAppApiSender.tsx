@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, ErrorState, Loading, Select, useConfirm, useToast } from '@/shared/components';
 import { getErrorMessage, toApiError } from '@/shared/services/apiError';
@@ -74,6 +74,7 @@ interface Props {
 export function WhatsAppApiSender({ recipients, media = null }: Props) {
   const toast = useToast();
   const confirm = useConfirm();
+  const queryClient = useQueryClient();
   const templates = useQuery({ queryKey: [MARKETING_KEY, 'templates'], queryFn: marketingApi.templates, retry: false });
   const [selectedKey, setSelectedKey] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +107,7 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
         },
         headerUpload,
       ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [MARKETING_KEY, 'campaigns'] }),
   });
 
   const send = async () => {
@@ -174,10 +176,6 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
 
   return (
     <Card title="Enviar por WhatsApp Business">
-      <p className="field-hint">
-        WhatsApp solo permite iniciar conversaciones con plantillas aprobadas por Meta. Créelas en el administrador de
-        WhatsApp y aparecerán aquí.
-      </p>
       <Select
         label="Plantilla"
         placeholder={options.length ? 'Elija una plantilla' : 'No hay plantillas aprobadas'}
@@ -204,9 +202,6 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
             <p>{fillTemplate(template, params, sample)}</p>
             {template.footer && <small className="muted">{template.footer}</small>}
           </div>
-          <p className="muted crm-count">
-            {total} destinatario(s) · costo aprox. {formatUsd(total * price)}
-          </p>
         </div>
       )}
 

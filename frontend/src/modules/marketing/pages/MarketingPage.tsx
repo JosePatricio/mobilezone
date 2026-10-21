@@ -15,16 +15,13 @@ import {
 } from '@/shared/components';
 import { formatDate, fullName } from '@/shared/utils/format';
 import { MediaPicker } from '../components/MediaPicker';
-import { MessagePreview } from '../components/MessagePreview';
 import { WhatsAppApiSender } from '../components/WhatsAppApiSender';
+import { WhatsAppCampaigns } from '../components/WhatsAppCampaigns';
 import { RichTextEditor } from '../components/RichTextEditor';
-import { clientVariables, forChannel, type Line, personalize, VARIABLES } from '../message';
+import { VARIABLES } from '../message';
 import { MARKETING_KEY, marketingApi } from '../services/marketingApi';
-import type { Channel, MessageMedia, OrderClient } from '../types';
+import type { MessageMedia, OrderClient } from '../types';
 import { usePagedRows } from '../usePagedRows';
-
-/** Promotions go out by WhatsApp only. */
-const CHANNEL: Channel = 'WHATSAPP';
 
 /** Text of the approved promo template, with its {{1}} / {{2}} as the variables of the editor. */
 const DEFAULT_TEXT =
@@ -71,24 +68,36 @@ export function MarketingPage() {
 
   return (
     <>
-      <PageHeader title="Promoción">
+      <PageHeader
+        title="Promoción"
+        actions={
+          composing && (
+            <Button variant="secondary" onClick={() => setComposing(false)}>
+              ← Volver
+            </Button>
+          )
+        }
+      >
         Mensajes de promoción para los clientes que hicieron una orden de trabajo.
       </PageHeader>
 
       {composing ? (
         <CrmComposer />
       ) : (
-        <Card>
-          <div className="crm-start">
-            <Button
-              className="btn-whatsapp"
-              icon={<WhatsAppIcon fill="currentColor" />}
-              onClick={() => setComposing(true)}
-            >
-              Enviar propaganda
-            </Button>
-          </div>
-        </Card>
+        <>
+          <Card>
+            <div className="crm-start">
+              <Button
+                className="btn-whatsapp"
+                icon={<WhatsAppIcon fill="currentColor" />}
+                onClick={() => setComposing(true)}
+              >
+                Enviar promoción
+              </Button>
+            </div>
+          </Card>
+          <WhatsAppCampaigns />
+        </>
       )}
     </>
   );
@@ -168,7 +177,6 @@ function CrmComposer() {
   const clients = useMemo(() => query.data ?? [], [query.data]);
 
   const [media, setMediaState] = useState<MessageMedia | null>(null);
-  const [lines, setLines] = useState<Line[]>([[]]);
   const [search, setSearch] = useState('');
   const [marca, setMarca] = useState('');
   const [showRepeated, setShowRepeated] = useState(false);
@@ -229,9 +237,6 @@ function CrmComposer() {
     });
   };
 
-  const sample = selected[0] ?? clients[0];
-  const sampleLines = forChannel(sample ? personalize(lines, clientVariables(sample)) : lines, CHANNEL);
-
   return (
     <div className="crm">
       <div className="crm-grid">
@@ -243,7 +248,7 @@ function CrmComposer() {
           <Card title="2. Texto">
             <RichTextEditor
               label="Mensaje"
-              onChange={setLines}
+              onChange={() => undefined}
               defaultText={DEFAULT_TEXT}
               placeholder="Hola @NOMBRE, tienes una promoción para comprar tu teléfono @TELEFONO a este precio 430$."
             />
@@ -355,14 +360,6 @@ function CrmComposer() {
         </div>
 
         <aside className="crm-side">
-          <Card title="Vista previa">
-            {sample && (
-              <p className="muted crm-sample">
-                Así lo verá {fullName(sample)} ({sample.marca})
-              </p>
-            )}
-            <MessagePreview lines={sampleLines} media={media} channel={CHANNEL} />
-          </Card>
           <WhatsAppApiSender recipients={selected} media={media} />
         </aside>
       </div>

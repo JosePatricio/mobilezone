@@ -1,8 +1,8 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/utils';
-import type { OrderClient, WhatsAppTemplate } from '../types';
+import type { Campaign, OrderClient, WhatsAppTemplate } from '../types';
 import { MarketingPage } from './MarketingPage';
 
 const api = vi.hoisted(() => ({
@@ -51,19 +51,12 @@ const promo: WhatsAppTemplate = {
   unsupported_params: false,
 };
 
-/** jsdom has no editing commands: the text is written into the editor as the browser would. */
-function write(html: string) {
-  const editor = screen.getByRole('textbox', { name: 'Mensaje' });
-  editor.innerHTML = html;
-  fireEvent.input(editor);
-}
-
 describe('MarketingPage (Promoción › CRM)', () => {
-  it('opens with "Enviar propaganda" and previews the message with the selected client', async () => {
+  it('opens with "Enviar promoción" and goes back to the list', async () => {
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar promoción' }));
 
     expect(screen.getByRole('group', { name: 'Agregar imagen' })).toBeInTheDocument();
     expect(await screen.findByText('Luis Pérez')).toBeInTheDocument();
@@ -72,16 +65,11 @@ describe('MarketingPage (Promoción › CRM)', () => {
     expect(screen.getByRole('textbox', { name: 'Mensaje' })).toHaveTextContent(
       '¡Hola @NOMBRE! 📱 llegaron MICAS con DISEÑO para tu @TELEFONO',
     );
-
-    write('Hola <b>@NOMBRE</b>, promo para tu @TELEFONO a 430$.');
-    const preview = screen.getByLabelText('Vista previa del mensaje');
-    expect(within(preview).getByText('Ana')).toBeInTheDocument();
-
-    // Nobody is checked at first; the preview follows the first selected client.
-    expect(screen.getByRole('checkbox', { name: 'Incluir a Luis Pérez' })).not.toBeChecked();
-    await user.click(screen.getByRole('checkbox', { name: 'Incluir a Luis Pérez' }));
-    expect(within(preview).getByText('Luis')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Preparar mensajes' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '← Volver' }));
+    expect(screen.getByRole('button', { name: 'Enviar promoción' })).toBeInTheDocument();
+    expect(screen.queryByText('Luis Pérez')).not.toBeInTheDocument();
   });
 
   it('searches by cédula and by the mobile in any format', async () => {
@@ -91,7 +79,7 @@ describe('MarketingPage (Promoción › CRM)', () => {
     ]);
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar promoción' }));
     await screen.findByText('Ana Pérez');
     const search = screen.getByPlaceholderText('Buscar por nombre, cédula o celular…');
 
@@ -114,7 +102,7 @@ describe('MarketingPage (Promoción › CRM)', () => {
     ]);
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar promoción' }));
 
     expect(await screen.findByText('Cliente1 Pérez')).toBeInTheDocument();
     expect(screen.queryByText('Cliente11 Pérez')).not.toBeInTheDocument();
@@ -143,20 +131,22 @@ describe('MarketingPage (Promoción › CRM)', () => {
     api.createCampaign.mockResolvedValue({ campaign_id: 7, encolados: 2, sin_numero: 0, dados_de_baja: 0 });
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar promoción' }));
     await screen.findByText('Ana Pérez');
     await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todos' }));
 
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Plantilla' }), 'promo_octubre|es');
     // {{1}} = name, {{2}} = brand of the phone by default; previewed with the first client.
     expect(screen.getByText('Hola Ana, oferta para tu Samsung.')).toBeInTheDocument();
-    expect(screen.getByText('2 destinatario(s) · costo aprox. $0.15')).toBeInTheDocument();
     // No test inputs: every placeholder takes the data of each client.
     expect(screen.queryByLabelText('@nombre')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('@telefono')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
-    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Enviar' }));
+    const confirmation = await screen.findByRole('alertdialog');
+    expect(confirmation).toHaveTextContent('a 2 cliente(s)');
+    expect(confirmation).toHaveTextContent('Costo aproximado: $0.15');
+    await user.click(within(confirmation).getByRole('button', { name: 'Enviar' }));
 
     expect(api.createCampaign).toHaveBeenCalledWith(
       {
@@ -176,7 +166,7 @@ describe('MarketingPage (Promoción › CRM)', () => {
     api.createCampaign.mockResolvedValue({ campaign_id: 8, encolados: 1, sin_numero: 0, dados_de_baja: 0 });
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar promoción' }));
     await user.click(await screen.findByRole('checkbox', { name: 'Incluir a Ana Pérez' }));
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Plantilla' }), 'promo_img|es');
     expect(screen.queryByLabelText(/Imagen del encabezado/)).not.toBeInTheDocument(); // no file input of its own
@@ -197,7 +187,7 @@ describe('MarketingPage (Promoción › CRM)', () => {
   it('filters the clients by the brand of the phone', async () => {
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar promoción' }));
     await screen.findByText('Ana Pérez');
     await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todos' }));
 
@@ -207,10 +197,33 @@ describe('MarketingPage (Promoción › CRM)', () => {
     expect(screen.getByText('1 de 3 número(s) seleccionado(s)')).toBeInTheDocument();
   });
 
-  it('does not list the sent campaigns any more', async () => {
+  it('lists the WhatsApp campaigns under "Enviar promoción"', async () => {
+    const campaign: Campaign = {
+      id: 7,
+      plantilla: 'promo_octubre',
+      idioma: 'es',
+      categoria: 'MARKETING',
+      created_at: '2026-10-14T15:00:00Z',
+      creado_por: 'Admin Sistema',
+      total: 3,
+      pendientes: 0,
+      enviados: 0,
+      entregados: 1,
+      leidos: 1,
+      fallidos: 1,
+    };
+    api.campaigns.mockResolvedValue([campaign]);
     renderWithProviders(<MarketingPage />);
-    expect(await screen.findByRole('heading', { name: 'Promoción' })).toBeInTheDocument();
-    expect(screen.queryByText('Campañas de WhatsApp')).not.toBeInTheDocument();
-    expect(api.campaigns).not.toHaveBeenCalled();
+
+    expect(screen.getByRole('heading', { name: 'Promoción' })).toBeInTheDocument();
+    const row = (await screen.findByText('Admin Sistema')).closest('tr')!;
+    // total, pendientes, entregados (delivered + read), leídos, fallidos
+    expect([...row.querySelectorAll('td.text-right')].slice(0, 5).map((td) => td.textContent)).toEqual([
+      '3',
+      '0',
+      '2',
+      '1',
+      '1',
+    ]);
   });
 });

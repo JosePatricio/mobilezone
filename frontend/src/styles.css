@@ -954,8 +954,7 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .rte-separator { width: 1px; height: 22px; margin: 0 4px; background: var(--border); }
 .rte-content { min-height: 140px; height: auto; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; }
 .rte-content:empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
-.crm-count, .crm-sample { margin: 8px 0 0; font-size: 0.85rem; }
-.crm-sample { margin: 0 0 8px; }
+.crm-count { margin: 8px 0 0; font-size: 0.85rem; }
 .message-bubble { padding: 8px 10px; border-radius: 10px; border-top-left-radius: 2px; background: #ffffff; color: #111b21; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12); overflow-wrap: anywhere; }
 .message-bubble-whatsapp { background: #e7fcd8; }
 .message-bubble-sms { background: #e9e9eb; }
