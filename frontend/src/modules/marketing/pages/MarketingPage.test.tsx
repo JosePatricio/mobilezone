@@ -5,7 +5,13 @@ import { renderWithProviders } from '@/test/utils';
 import type { OrderClient, WhatsAppTemplate } from '../types';
 import { MarketingPage } from './MarketingPage';
 
-const api = vi.hoisted(() => ({ recipients: vi.fn(), templates: vi.fn(), campaigns: vi.fn(), campaign: vi.fn(), createCampaign: vi.fn() }));
+const api = vi.hoisted(() => ({
+  recipients: vi.fn(),
+  templates: vi.fn(),
+  campaigns: vi.fn(),
+  campaign: vi.fn(),
+  createCampaign: vi.fn(),
+}));
 vi.mock('../services/marketingApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../services/marketingApi')>()),
   marketingApi: api,
@@ -53,7 +59,7 @@ function write(html: string) {
 }
 
 describe('MarketingPage (Promoción › CRM)', () => {
-  it('opens with "Enviar propaganda" and prepares one WhatsApp message per client of the orders', async () => {
+  it('opens with "Enviar propaganda" and previews the message with the selected client', async () => {
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
 
@@ -62,43 +68,20 @@ describe('MarketingPage (Promoción › CRM)', () => {
     expect(screen.getByRole('group', { name: 'Agregar imagen' })).toBeInTheDocument();
     expect(await screen.findByText('Luis Pérez')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Incluir a Eva Pérez' })).toBeDisabled(); // no celular
-
-    write('Hola <b>@NOMBRE</b>, promo para tu @TELEFONO a 430$.');
-    expect(within(screen.getByLabelText('Vista previa del mensaje')).getByText('Ana')).toBeInTheDocument();
-
-    // Nobody is checked at first.
-    expect(screen.getByRole('checkbox', { name: 'Incluir a Luis Pérez' })).not.toBeChecked();
-    await user.click(screen.getByRole('checkbox', { name: 'Incluir a Ana Pérez' }));
-    await user.click(screen.getByRole('button', { name: 'Preparar mensajes' }));
-
-    expect(screen.getByText('Mensajes preparados (1)')).toBeInTheDocument();
-    expect(screen.getByText('Hola *Ana*, promo para tu Samsung a 430$.')).toBeInTheDocument();
-  });
-
-  it('rejects an empty text and selects every client of the list', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
-    await screen.findByText('Ana Pérez');
-
     // Starts with the text of the promo template.
     expect(screen.getByRole('textbox', { name: 'Mensaje' })).toHaveTextContent(
       '¡Hola @NOMBRE! 📱 llegaron MICAS con DISEÑO para tu @TELEFONO',
     );
-    write('');
-    await user.click(screen.getByRole('button', { name: 'Preparar mensajes' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Escriba el texto del mensaje.');
 
-    write('<b>@NOMBRE</b> tu @TELEFONO');
-    await user.click(screen.getByRole('button', { name: 'Preparar mensajes' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('Seleccione al menos un cliente con celular.');
+    write('Hola <b>@NOMBRE</b>, promo para tu @TELEFONO a 430$.');
+    const preview = screen.getByLabelText('Vista previa del mensaje');
+    expect(within(preview).getByText('Ana')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todos' }));
-    await user.click(screen.getByRole('button', { name: 'Preparar mensajes' }));
-    expect(screen.getByText('Mensajes preparados (2)')).toBeInTheDocument();
-    const list = screen.getByRole('list');
-    expect(within(list).getByText('*Ana* tu Samsung')).toBeInTheDocument();
-    expect(within(list).getByText('*Luis* tu Xiaomi')).toBeInTheDocument();
+    // Nobody is checked at first; the preview follows the first selected client.
+    expect(screen.getByRole('checkbox', { name: 'Incluir a Luis Pérez' })).not.toBeChecked();
+    await user.click(screen.getByRole('checkbox', { name: 'Incluir a Luis Pérez' }));
+    expect(within(preview).getByText('Luis')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Preparar mensajes' })).not.toBeInTheDocument();
   });
 
   it('searches by cédula and by the mobile in any format', async () => {
@@ -168,7 +151,9 @@ describe('MarketingPage (Promoción › CRM)', () => {
     // {{1}} = name, {{2}} = brand of the phone by default; previewed with the first client.
     expect(screen.getByText('Hola Ana, oferta para tu Samsung.')).toBeInTheDocument();
     expect(screen.getByText('2 destinatario(s) · costo aprox. $0.15')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Números de prueba')).not.toBeInTheDocument();
+    // No test inputs: every placeholder takes the data of each client.
+    expect(screen.queryByLabelText('@nombre')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('@telefono')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Enviar' }));
@@ -193,11 +178,15 @@ describe('MarketingPage (Promoción › CRM)', () => {
     renderWithProviders(<MarketingPage />);
     await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
     await user.click(await screen.findByRole('checkbox', { name: 'Incluir a Ana Pérez' }));
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Plantilla' }), 'promo_img|es');
+    expect(screen.queryByLabelText(/Imagen del encabezado/)).not.toBeInTheDocument(); // no file input of its own
+
+    // Without the image of step 1 it cannot be sent.
+    await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('La plantilla lleva una imagen');
 
     const image = new File(['png'], 'micas.png', { type: 'image/png' });
     await user.upload(screen.getByTestId('image-input'), image);
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'Plantilla' }), 'promo_img|es');
-    expect(screen.getByText(/Se usará "micas.png" del paso 1/)).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Imagen del encabezado' })).toHaveAttribute('src', 'blob:micas');
 
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));

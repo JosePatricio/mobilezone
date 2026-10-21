@@ -11,7 +11,6 @@ import {
   Pagination,
   SearchInput,
   Select,
-  useToast,
   WhatsAppIcon,
 } from '@/shared/components';
 import { formatDate, fullName } from '@/shared/utils/format';
@@ -19,15 +18,7 @@ import { MediaPicker } from '../components/MediaPicker';
 import { MessagePreview } from '../components/MessagePreview';
 import { WhatsAppApiSender } from '../components/WhatsAppApiSender';
 import { RichTextEditor } from '../components/RichTextEditor';
-import {
-  clientVariables,
-  formatMessage,
-  forChannel,
-  isEmptyMessage,
-  type Line,
-  personalize,
-  VARIABLES,
-} from '../message';
+import { clientVariables, forChannel, type Line, personalize, VARIABLES } from '../message';
 import { MARKETING_KEY, marketingApi } from '../services/marketingApi';
 import type { Channel, MessageMedia, OrderClient } from '../types';
 import { usePagedRows } from '../usePagedRows';
@@ -39,11 +30,6 @@ const CHANNEL: Channel = 'WHATSAPP';
 const DEFAULT_TEXT =
   '¡Hola @NOMBRE! 📱 llegaron MICAS con DISEÑO para tu @TELEFONO, reservalo antes que se agoten.\n' +
   'Responde STOP para no recibir más mensajes';
-
-interface PreparedMessage {
-  client: OrderClient;
-  text: string;
-}
 
 /** One row per mobile: the client of the latest order stands for every record with that number. */
 interface NumberRow {
@@ -79,7 +65,7 @@ function matches(c: OrderClient, term: string): boolean {
   return c.celular.includes(term) || (number.length > 0 && phoneKey(c.celular).includes(number));
 }
 
-/** Promoción: the CRM prepares a WhatsApp message for the clients that came through Órdenes. */
+/** Promoción: WhatsApp messages for the clients that came through Órdenes. */
 export function MarketingPage() {
   const [composing, setComposing] = useState(false);
 
@@ -175,7 +161,6 @@ function NumberHistoryDialog({ row, onClose }: { row: NumberRow; onClose: () => 
 }
 
 function CrmComposer() {
-  const toast = useToast();
   const query = useQuery({
     queryKey: [MARKETING_KEY, 'recipients'],
     queryFn: marketingApi.recipients,
@@ -190,8 +175,6 @@ function CrmComposer() {
   const [history, setHistory] = useState<NumberRow | null>(null);
   // Nobody is checked at first: messages only go to the clients picked by hand.
   const [chosen, setChosen] = useState<Set<number>>(new Set());
-  const [prepared, setPrepared] = useState<PreparedMessage[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   // Frees the preview URL of the replaced / removed file (and on leaving the page).
   const mediaRef = useRef<MessageMedia | null>(null);
@@ -206,11 +189,6 @@ function CrmComposer() {
     },
     [],
   );
-
-  const onTextChange = useCallback((next: Line[]) => {
-    setLines(next);
-    setPrepared(null);
-  }, []);
 
   const numbers = useMemo(() => uniqueNumbers(clients), [clients]);
   const repeated = useMemo(() => numbers.filter((r) => r.records.length > 1), [numbers]);
@@ -235,7 +213,6 @@ function CrmComposer() {
   const allSelected = selectable.length > 0 && selected.length === selectable.length;
 
   const toggle = (id: number, on: boolean) => {
-    setPrepared(null);
     setChosen((prev) => {
       const next = new Set(prev);
       if (on) next.add(id);
@@ -245,7 +222,6 @@ function CrmComposer() {
   };
   // Every number of the search, on all the pages.
   const toggleAll = (on: boolean) => {
-    setPrepared(null);
     setChosen((prev) => {
       const next = new Set(prev);
       selectable.forEach((c) => (on ? next.add(c.cliente_id) : next.delete(c.cliente_id)));
@@ -255,28 +231,6 @@ function CrmComposer() {
 
   const sample = selected[0] ?? clients[0];
   const sampleLines = forChannel(sample ? personalize(lines, clientVariables(sample)) : lines, CHANNEL);
-
-  const prepare = () => {
-    if (isEmptyMessage(lines)) return setError('Escriba el texto del mensaje.');
-    if (selected.length === 0) return setError('Seleccione al menos un cliente con celular.');
-    setError(null);
-    setPrepared(
-      selected.map((client) => ({
-        client,
-        text: formatMessage(personalize(lines, clientVariables(client)), CHANNEL),
-      })),
-    );
-    toast.success(`${selected.length} mensaje(s) preparado(s) para copiar.`);
-  };
-
-  const copy = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success('Mensaje copiado.');
-    } catch {
-      toast.error('No se pudo copiar el mensaje.');
-    }
-  };
 
   return (
     <div className="crm">
@@ -289,7 +243,7 @@ function CrmComposer() {
           <Card title="2. Texto">
             <RichTextEditor
               label="Mensaje"
-              onChange={onTextChange}
+              onChange={setLines}
               defaultText={DEFAULT_TEXT}
               placeholder="Hola @NOMBRE, tienes una promoción para comprar tu teléfono @TELEFONO a este precio 430$."
             />
@@ -408,41 +362,10 @@ function CrmComposer() {
               </p>
             )}
             <MessagePreview lines={sampleLines} media={media} channel={CHANNEL} />
-            {error && (
-              <div className="alert alert-error" role="alert">
-                {error}
-              </div>
-            )}
-            <Button className="crm-prepare" onClick={prepare} disabled={query.isLoading}>
-              Preparar mensajes
-            </Button>
           </Card>
           <WhatsAppApiSender recipients={selected} media={media} />
         </aside>
       </div>
-
-      {prepared && (
-        <Card title={`Mensajes preparados (${prepared.length})`}>
-          <div className="alert alert-info">
-            Los mensajes están listos con el formato de WhatsApp
-            {media ? ' y la imagen adjunta' : ''}. Cópielos y envíelos uno por uno.
-          </div>
-          <ul className="prepared-list">
-            {prepared.map(({ client, text }) => (
-              <li key={client.cliente_id} className="prepared-item">
-                <div className="prepared-head">
-                  <strong>{fullName(client)}</strong>
-                  <span className="muted">{client.celular}</span>
-                  <Button variant="ghost" size="sm" onClick={() => copy(text)}>
-                    Copiar
-                  </Button>
-                </div>
-                <pre className="prepared-text">{text}</pre>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
     </div>
   );
 }

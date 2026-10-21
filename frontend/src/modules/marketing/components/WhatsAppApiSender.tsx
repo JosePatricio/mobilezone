@@ -1,12 +1,11 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, ErrorState, Input, Loading, Select, useConfirm, useToast } from '@/shared/components';
+import { Button, Card, ErrorState, Loading, Select, useConfirm, useToast } from '@/shared/components';
 import { getErrorMessage, toApiError } from '@/shared/services/apiError';
 import { fullName } from '@/shared/utils/format';
 import { MARKETING_KEY, marketingApi } from '../services/marketingApi';
 import {
   PARAM_SOURCE_LABELS,
-  type MediaKind,
   type MessageMedia,
   type OrderClient,
   type ParamSource,
@@ -22,35 +21,21 @@ const PRICE_PER_MESSAGE: Record<string, number> = { MARKETING: 0.074, UTILITY: 0
 
 const MB = 1024 * 1024;
 
-/** File of each media header: the image / video of step 1 is used when its kind and type fit. */
-const HEADER_FILES: Record<string, { accept: string; label: string; maxMb: number; kind?: MediaKind }> = {
-  IMAGE: {
-    accept: 'image/jpeg,image/png',
-    label: 'Imagen del encabezado (JPG o PNG, máx. 5 MB)',
-    maxMb: 5,
-    kind: 'image',
-  },
-  VIDEO: { accept: 'video/mp4', label: 'Video del encabezado (MP4, máx. 10 MB)', maxMb: 10, kind: 'video' },
-  DOCUMENT: { accept: 'application/pdf', label: 'PDF del encabezado (máx. 10 MB)', maxMb: 10 },
-};
+/** The header image is the one of step 1 ("¿Agregar imagen?"): JPG or PNG, up to 5 MB. */
+const HEADER_IMAGE_TYPES = ['image/jpeg', 'image/png'];
+const HEADER_IMAGE_MAX_MB = 5;
+
+/** Video / PDF headers: the page has no way to attach them. */
+const canUse = (t: WhatsAppTemplate) =>
+  !t.unsupported_params && t.header_format !== 'VIDEO' && t.header_format !== 'DOCUMENT';
 
 /** Template chosen when the list loads; Meta's sample template is not offered. */
 const DEFAULT_TEMPLATE = 'mobilezone_promo_img';
 const HIDDEN_TEMPLATES = new Set(['hello_world']);
 
-/** Each placeholder in order: its label and the client data used when its input is left empty. */
-const PARAMS: { label: string; source: ParamSource; empty: string }[] = [
-  { label: '@nombre', source: 'NOMBRE', empty: 'el nombre de cada cliente' },
-  { label: '@telefono', source: 'MARCA', empty: 'la marca del teléfono de cada cliente' },
-];
-const paramOf = (index: number) => PARAMS[index] ?? { ...PARAMS[1], label: `@variable${index + 1}` };
-
-/** A typed value is sent as is; an empty input takes the data of each client. */
-function toParams(texts: string[]): TemplateParam[] {
-  return texts.map((text, i) =>
-    text.trim() ? { source: 'TEXTO', texto: text.trim() } : { source: paramOf(i).source },
-  );
-}
+/** Each placeholder in order takes the data of each client: {{1}} the name, the next ones the brand of the phone. */
+const PARAM_SOURCES: ParamSource[] = ['NOMBRE', 'MARCA'];
+const toParams = (names: string[]): TemplateParam[] => names.map((_, i) => ({ source: PARAM_SOURCES[i] ?? 'MARCA' }));
 
 const keyOf = (t: WhatsAppTemplate) => `${t.name}|${t.language}`;
 
@@ -91,36 +76,22 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
   const confirm = useConfirm();
   const templates = useQuery({ queryKey: [MARKETING_KEY, 'templates'], queryFn: marketingApi.templates, retry: false });
   const [selectedKey, setSelectedKey] = useState('');
-  const [texts, setTexts] = useState<string[]>([]);
-  const params = useMemo(() => toParams(texts), [texts]);
-  const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const total = recipients.length;
 
   const template = useMemo(() => templates.data?.find((t) => keyOf(t) === selectedKey), [templates.data, selectedKey]);
-  const headerFile = template?.header_format ? HEADER_FILES[template.header_format] : undefined;
-  // A file chosen here wins over the one of step 1.
-  const stepMedia =
-    headerFile?.kind && media?.kind === headerFile.kind && headerFile.accept.split(',').includes(media.file.type)
-      ? media
-      : null;
-  const headerUpload = file ?? stepMedia?.file ?? null;
-  const fileUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
-  useEffect(() => () => void (fileUrl && URL.revokeObjectURL(fileUrl)), [fileUrl]);
-  const headerUrl = fileUrl ?? stepMedia?.url;
+  const params = useMemo(() => toParams(template?.body_params ?? []), [template]);
+  const needsImage = template?.header_format === 'IMAGE';
+  const headerUpload = needsImage && media && HEADER_IMAGE_TYPES.includes(media.file.type) ? media.file : null;
   const price = template ? (PRICE_PER_MESSAGE[template.category] ?? PRICE_PER_MESSAGE.MARKETING) : 0;
 
   const choose = (key: string) => {
-    const next = templates.data?.find((t) => keyOf(t) === key);
     setSelectedKey(key);
-    setFile(null);
     setError(null);
-    setTexts((next?.body_params ?? []).map(() => ''));
   };
-  const setText = (index: number, value: string) => setTexts((prev) => prev.map((t, i) => (i === index ? value : t)));
 
   useEffect(() => {
-    const preferred = templates.data?.find((t) => t.name === DEFAULT_TEMPLATE && !t.unsupported_params);
+    const preferred = templates.data?.find((t) => t.name === DEFAULT_TEMPLATE && canUse(t));
     if (!selectedKey && preferred) choose(keyOf(preferred));
   }, [templates.data]); // only when the templates arrive
 
@@ -139,9 +110,10 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
 
   const send = async () => {
     if (!template) return setError('Elija una plantilla.');
-    if (headerFile && !headerUpload) return setError('La plantilla necesita un archivo para el encabezado.');
-    if (headerFile && headerUpload && headerUpload.size > headerFile.maxMb * MB)
-      return setError(`El archivo del encabezado supera los ${headerFile.maxMb} MB que permite WhatsApp.`);
+    if (needsImage && !headerUpload)
+      return setError('La plantilla lleva una imagen: agréguela en "1. ¿Agregar imagen?".');
+    if (headerUpload && headerUpload.size > HEADER_IMAGE_MAX_MB * MB)
+      return setError(`La imagen supera los ${HEADER_IMAGE_MAX_MB} MB que permite WhatsApp.`);
     if (total === 0) return setError('Seleccione al menos un cliente con celular.');
     setError(null);
     const ok = await confirm({
@@ -195,9 +167,9 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
 
   const all = templates.data ?? [];
   const options = all
-    .filter((t) => !t.unsupported_params && !HIDDEN_TEMPLATES.has(t.name))
+    .filter((t) => canUse(t) && !HIDDEN_TEMPLATES.has(t.name))
     .map((t) => ({ value: keyOf(t), label: `${t.name} (${t.language})` }));
-  const unsupported = all.filter((t) => t.unsupported_params).map((t) => t.name);
+  const unsupported = all.filter((t) => !canUse(t)).map((t) => t.name);
   const sample = recipients[0];
 
   return (
@@ -214,51 +186,20 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
         onChange={(e) => choose(e.target.value)}
         hint={
           unsupported.length
-            ? `No se pueden usar (tienen variables en el encabezado o botones): ${unsupported.join(', ')}.`
+            ? `No se pueden usar (llevan video, PDF o variables en el encabezado o botones): ${unsupported.join(', ')}.`
             : undefined
         }
       />
 
       {template && (
         <div className="wa-template">
-          {template.body_params.map((name, i) => (
-            <Input
-              key={name}
-              label={paramOf(i).label}
-              value={texts[i] ?? ''}
-              maxLength={500}
-              onChange={(e) => setText(i, e.target.value)}
-              hint={`Vacío: se usa ${paramOf(i).empty}.`}
-            />
-          ))}
-
-          {headerFile && (
-            <Input
-              type="file"
-              label={headerFile.label}
-              accept={headerFile.accept}
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              hint={
-                file
-                  ? undefined
-                  : stepMedia
-                    ? `Se usará "${stepMedia.file.name}" del paso 1; elija otro archivo para cambiarlo.`
-                    : media && headerFile.kind
-                      ? `El archivo del paso 1 no sirve para esta plantilla: elija ${headerFile.label.toLowerCase()}.`
-                      : undefined
-              }
-            />
-          )}
-
           <div className="wa-bubble" aria-label="Vista previa de la plantilla">
             {template.header_format === 'TEXT' && template.header_text && <strong>{template.header_text}</strong>}
-            {headerFile &&
-              (headerUrl && headerFile.kind === 'image' ? (
-                <img src={headerUrl} alt="Imagen del encabezado" className="message-media" />
-              ) : headerUrl && headerFile.kind === 'video' ? (
-                <video src={headerUrl} className="message-media" controls aria-label="Video del encabezado" />
+            {needsImage &&
+              (headerUpload ? (
+                <img src={media!.url} alt="Imagen del encabezado" className="message-media" />
               ) : (
-                <span className="muted">[{headerUpload ? headerUpload.name : 'archivo del encabezado'}]</span>
+                <span className="muted">[sin imagen: agréguela en el paso 1]</span>
               ))}
             <p>{fillTemplate(template, params, sample)}</p>
             {template.footer && <small className="muted">{template.footer}</small>}
