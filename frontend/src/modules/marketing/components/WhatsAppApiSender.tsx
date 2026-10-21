@@ -29,10 +29,21 @@ const HEADER_FILES: Record<string, { accept: string; label: string; maxMb: numbe
   DOCUMENT: { accept: 'application/pdf', label: 'PDF del encabezado (máx. 10 MB)', maxMb: 10 },
 };
 
-const SOURCE_OPTIONS = (Object.keys(PARAM_SOURCE_LABELS) as ParamSource[]).map((s) => ({
-  value: s,
-  label: PARAM_SOURCE_LABELS[s],
-}));
+/** Template chosen when the list loads; Meta's sample template is not offered. */
+const DEFAULT_TEMPLATE = 'mobilezone_promo_img';
+const HIDDEN_TEMPLATES = new Set(['hello_world']);
+
+/** Each placeholder in order: its label and the client data used when its input is left empty. */
+const PARAMS: { label: string; source: ParamSource; empty: string }[] = [
+  { label: '@nombre', source: 'NOMBRE', empty: 'el nombre de cada cliente' },
+  { label: '@telefono', source: 'MARCA', empty: 'la marca del teléfono de cada cliente' },
+];
+const paramOf = (index: number) => PARAMS[index] ?? { ...PARAMS[1], label: `@variable${index + 1}` };
+
+/** A typed value is sent as is; an empty input takes the data of each client. */
+function toParams(texts: string[]): TemplateParam[] {
+  return texts.map((text, i) => (text.trim() ? { source: 'TEXTO', texto: text.trim() } : { source: paramOf(i).source }));
+}
 
 const keyOf = (t: WhatsAppTemplate) => `${t.name}|${t.language}`;
 
@@ -82,7 +93,8 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
   const queryClient = useQueryClient();
   const templates = useQuery({ queryKey: [MARKETING_KEY, 'templates'], queryFn: marketingApi.templates, retry: false });
   const [selectedKey, setSelectedKey] = useState('');
-  const [params, setParams] = useState<TemplateParam[]>([]);
+  const [texts, setTexts] = useState<string[]>([]);
+  const params = useMemo(() => toParams(texts), [texts]);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Numbers typed by hand (e.g. your own phone to test a template before sending it to clients).
@@ -121,11 +133,14 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
     setSelectedKey(key);
     setFile(null);
     setError(null);
-    // Sensible start: {{1}} = name of the client, the rest = brand of the phone.
-    setParams((next?.body_params ?? []).map((_, i) => ({ source: i === 0 ? 'NOMBRE' : 'MARCA' })));
+    setTexts((next?.body_params ?? []).map(() => ''));
   };
-  const setParam = (index: number, value: TemplateParam) =>
-    setParams((prev) => prev.map((p, i) => (i === index ? value : p)));
+  const setText = (index: number, value: string) => setTexts((prev) => prev.map((t, i) => (i === index ? value : t)));
+
+  useEffect(() => {
+    const preferred = templates.data?.find((t) => t.name === DEFAULT_TEMPLATE && !t.unsupported_params);
+    if (!selectedKey && preferred) choose(keyOf(preferred));
+  }, [templates.data]); // only when the templates arrive
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -144,7 +159,6 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
 
   const send = async () => {
     if (!template) return setError('Elija una plantilla.');
-    if (params.some((p) => p.source === 'TEXTO' && !p.texto?.trim())) return setError('Escriba el texto fijo.');
     if (headerFile && !headerUpload) return setError('La plantilla necesita un archivo para el encabezado.');
     if (headerFile && headerUpload && headerUpload.size > headerFile.maxMb * MB)
       return setError(`El archivo del encabezado supera los ${headerFile.maxMb} MB que permite WhatsApp.`);
@@ -201,7 +215,9 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
   }
 
   const all = templates.data ?? [];
-  const options = all.filter((t) => !t.unsupported_params).map((t) => ({ value: keyOf(t), label: `${t.name} (${t.language})` }));
+  const options = all
+    .filter((t) => !t.unsupported_params && !HIDDEN_TEMPLATES.has(t.name))
+    .map((t) => ({ value: keyOf(t), label: `${t.name} (${t.language})` }));
   const unsupported = all.filter((t) => t.unsupported_params).map((t) => t.name);
   const sample = recipients[0];
 
@@ -260,22 +276,14 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
       {template && (
         <div className="wa-template">
           {template.body_params.map((name, i) => (
-            <div key={name} className="wa-param">
-              <Select
-                label={`Variable {{${name}}}`}
-                options={SOURCE_OPTIONS}
-                value={params[i]?.source ?? 'NOMBRE'}
-                onChange={(e) => setParam(i, { source: e.target.value as ParamSource })}
-              />
-              {params[i]?.source === 'TEXTO' && (
-                <Input
-                  aria-label={`Texto de {{${name}}}`}
-                  value={params[i].texto ?? ''}
-                  maxLength={500}
-                  onChange={(e) => setParam(i, { source: 'TEXTO', texto: e.target.value })}
-                />
-              )}
-            </div>
+            <Input
+              key={name}
+              label={paramOf(i).label}
+              value={texts[i] ?? ''}
+              maxLength={500}
+              onChange={(e) => setText(i, e.target.value)}
+              hint={`Vacío: se usa ${paramOf(i).empty}.`}
+            />
           ))}
 
           {headerFile && (
