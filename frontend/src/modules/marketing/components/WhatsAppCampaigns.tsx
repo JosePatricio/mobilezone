@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Button, Card, ErrorState, Loading, Modal, StatusBadge } from '@/shared/components';
+import { Button, Card, ErrorState, Loading, Modal, Pagination, StatusBadge } from '@/shared/components';
 import { formatDateTime } from '@/shared/utils/format';
 import { MARKETING_KEY, marketingApi } from '../services/marketingApi';
-import type { Campaign, MessageStatus } from '../types';
+import type { Campaign, CampaignMessage, MessageStatus } from '../types';
+import { usePagedRows } from '../usePagedRows';
 
 /** While a campaign is being sent (or Meta reports its states) the lists refresh by themselves. */
 const REFRESH_MS = 4000;
@@ -24,6 +25,8 @@ export function WhatsAppCampaigns() {
     queryFn: marketingApi.campaigns,
     refetchInterval: (q) => (q.state.data?.some((c) => c.pendientes > 0) ? REFRESH_MS : false),
   });
+  const campaigns = query.data ?? [];
+  const paged = usePagedRows(campaigns);
 
   if (query.isLoading) return null;
   if (query.isError) {
@@ -33,7 +36,6 @@ export function WhatsAppCampaigns() {
       </Card>
     );
   }
-  const campaigns = query.data ?? [];
   if (campaigns.length === 0) return null;
 
   return (
@@ -61,7 +63,7 @@ export function WhatsAppCampaigns() {
             </tr>
           </thead>
           <tbody>
-            {campaigns.map((c) => (
+            {paged.rows.map((c) => (
               <tr key={c.id}>
                 <td>{formatDateTime(c.created_at)}</td>
                 <td>
@@ -84,6 +86,7 @@ export function WhatsAppCampaigns() {
           </tbody>
         </table>
       </div>
+      <Pagination page={paged.page} pages={paged.pages} total={paged.total} onChange={paged.setPage} />
       <p className="field-hint">
         Entregado y leído llegan desde WhatsApp unos segundos después del envío (requiere el webhook configurado). Los
         clientes que responden BAJA no reciben más campañas; con ALTA vuelven a recibirlas.
@@ -109,33 +112,43 @@ function CampaignModal({ id, summary, onClose }: { id: number; summary?: Campaig
       ) : query.isError ? (
         <ErrorState error={query.error} onRetry={() => query.refetch()} />
       ) : (
-        <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Celular</th>
-                <th>Estado</th>
-                <th>Detalle</th>
-              </tr>
-            </thead>
-            <tbody>
-              {query.data!.messages.map((m) => (
-                <tr key={m.id}>
-                  <td>
-                    {m.cliente ?? <span className="muted">{m.cliente_id ? 'Cliente eliminado' : 'Número manual'}</span>}
-                  </td>
-                  <td>+{m.telefono}</td>
-                  <td>
-                    <StatusBadge label={STATUS[m.estado].label} tone={STATUS[m.estado].tone} />
-                  </td>
-                  <td className="wa-error">{m.error ?? <span className="muted">{formatDateTime(m.updated_at)}</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <CampaignMessages messages={query.data!.messages} />
       )}
     </Modal>
+  );
+}
+
+function CampaignMessages({ messages }: { messages: CampaignMessage[] }) {
+  const paged = usePagedRows(messages);
+  return (
+    <>
+      <div className="table-wrapper">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Celular</th>
+              <th>Estado</th>
+              <th>Detalle</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paged.rows.map((m) => (
+              <tr key={m.id}>
+                <td>
+                  {m.cliente ?? <span className="muted">{m.cliente_id ? 'Cliente eliminado' : 'Número manual'}</span>}
+                </td>
+                <td>+{m.telefono}</td>
+                <td>
+                  <StatusBadge label={STATUS[m.estado].label} tone={STATUS[m.estado].tone} />
+                </td>
+                <td className="wa-error">{m.error ?? <span className="muted">{formatDateTime(m.updated_at)}</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={paged.page} pages={paged.pages} total={paged.total} onChange={paged.setPage} />
+    </>
   );
 }

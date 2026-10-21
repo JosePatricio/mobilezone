@@ -96,27 +96,36 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     expect(within(list).getByText('*Luis* tu Xiaomi')).toBeInTheDocument();
   });
 
-  it('shows the clients 15 per page and lists the repeated numbers', async () => {
+  it('shows one row per number, 10 per page, with the history of the repeated ones', async () => {
     api.recipients.mockResolvedValue([
       ...Array.from({ length: 16 }, (_, i) => client(i + 1, `Cliente${i + 1}`, 'Samsung', `09900000${String(i + 10)}`)),
       client(17, 'Ana', 'Samsung', '0991111111'),
-      client(18, 'Luis', 'Xiaomi', '+593991111111'),
+      { ...client(18, 'Luis', 'Xiaomi', '+593991111111'), ultima_orden: '2026-10-05' },
     ]);
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
     await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
 
     expect(await screen.findByText('Cliente1 Pérez')).toBeInTheDocument();
-    expect(screen.queryByText('Cliente16 Pérez')).not.toBeInTheDocument();
-    expect(screen.getByText(/Página 1 de 2/)).toBeInTheDocument();
+    expect(screen.queryByText('Cliente11 Pérez')).not.toBeInTheDocument();
+    expect(screen.getByText(/17 registros · Página 1 de 2/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Siguiente ›' }));
-    expect(screen.getByText('Cliente16 Pérez')).toBeInTheDocument();
+    expect(screen.getByText('Cliente11 Pérez')).toBeInTheDocument();
     expect(screen.queryByText('Cliente1 Pérez')).not.toBeInTheDocument();
 
-    // 0991111111 and +593991111111 are the same phone.
+    // 0991111111 and +593991111111 are the same phone: one row, for the client of the latest order.
+    expect(screen.getByText('Luis Pérez')).toBeInTheDocument();
+    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Historial de +593991111111' }));
+    const history = screen.getByRole('dialog', { name: 'Historial de +593991111111' });
+    expect(within(history).getByText('Ana Pérez')).toBeInTheDocument();
+    expect(within(history).getByText('Luis Pérez')).toBeInTheDocument();
+    await user.click(within(history).getByRole('button', { name: /cerrar/i }));
+
     await user.click(screen.getByRole('button', { name: /^Hay 1 número\(s\) repetido\(s\)/ }));
     const dialog = screen.getByRole('dialog', { name: 'Números repetidos' });
-    expect(within(dialog).getByText('Ana Pérez, Luis Pérez')).toBeInTheDocument();
+    const row = within(dialog).getByText('Ana Pérez, Luis Pérez').closest('tr')!;
+    expect(within(row).getByText('2')).toBeInTheDocument();
   });
 
   it('sends an approved template through the WhatsApp API to the selected clients', async () => {

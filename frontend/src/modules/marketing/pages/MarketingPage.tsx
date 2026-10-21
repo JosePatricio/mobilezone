@@ -30,19 +30,20 @@ import {
 } from '../message';
 import { MARKETING_KEY, marketingApi } from '../services/marketingApi';
 import type { Channel, MessageMedia, OrderClient } from '../types';
+import { usePagedRows } from '../usePagedRows';
 
 /** Propaganda goes out by WhatsApp only. */
 const CHANNEL: Channel = 'WHATSAPP';
-const PAGE_SIZE = 15;
 
 interface PreparedMessage {
   client: OrderClient;
   text: string;
 }
 
-interface RepeatedNumber {
-  celular: string;
-  clients: OrderClient[];
+/** One row per mobile: the client of the latest order stands for every record with that number. */
+interface NumberRow {
+  client: OrderClient;
+  records: OrderClient[];
 }
 
 /** Same number however it was typed: "099 111 1111" and "+593991111111" are one phone. */
@@ -51,16 +52,21 @@ function phoneKey(celular: string): string {
   return !celular.trim().startsWith('+') && digits.startsWith('0') ? `593${digits.slice(1)}` : digits;
 }
 
-/** Mobiles shared by two or more clients of the list. */
-function repeatedNumbers(clients: OrderClient[]): RepeatedNumber[] {
+/** Groups the clients by mobile, in the order of the list; clients without one stay on their own. */
+function uniqueNumbers(clients: OrderClient[]): NumberRow[] {
   const groups = new Map<string, OrderClient[]>();
   for (const c of clients) {
-    if (!c.celular) continue;
-    const key = phoneKey(c.celular);
+    const key = c.celular ? phoneKey(c.celular) : `id:${c.cliente_id}`;
     groups.set(key, [...(groups.get(key) ?? []), c]);
   }
-  return [...groups.values()].filter((g) => g.length > 1).map((g) => ({ celular: g[0].celular!, clients: g }));
+  return [...groups.values()].map((records) => ({
+    client: records.reduce((a, b) => (b.ultima_orden > a.ultima_orden ? b : a)),
+    records,
+  }));
 }
+
+const matches = (c: OrderClient, term: string) =>
+  fullName(c).toLowerCase().includes(term) || (c.celular ?? '').includes(term);
 
 /** Propaganda: the CRM prepares a WhatsApp message for the clients that came through Órdenes. */
 export function MarketingPage() {
@@ -68,14 +74,20 @@ export function MarketingPage() {
 
   return (
     <>
-      <PageHeader title="Propaganda">Mensajes de promoción para los clientes que hicieron una orden de trabajo.</PageHeader>
+      <PageHeader title="Propaganda">
+        Mensajes de promoción para los clientes que hicieron una orden de trabajo.
+      </PageHeader>
 
       {composing ? (
         <CrmComposer />
       ) : (
         <Card>
           <div className="crm-start">
-            <Button className="btn-whatsapp" icon={<WhatsAppIcon fill="currentColor" />} onClick={() => setComposing(true)}>
+            <Button
+              className="btn-whatsapp"
+              icon={<WhatsAppIcon fill="currentColor" />}
+              onClick={() => setComposing(true)}
+            >
               Enviar propaganda
             </Button>
           </div>
@@ -87,50 +99,85 @@ export function MarketingPage() {
   );
 }
 
-function RepeatedNumbersDialog({
-  open,
-  repeated,
-  onClose,
-}: {
-  open: boolean;
-  repeated: RepeatedNumber[];
-  onClose: () => void;
-}) {
+function RepeatedNumbersDialog({ repeated, onClose }: { repeated: NumberRow[]; onClose: () => void }) {
+  const paged = usePagedRows(repeated);
   return (
-    <Modal open={open} title="Números repetidos" onClose={onClose}>
+    <Modal open title="Números repetidos" onClose={onClose}>
       <p className="muted">Cada número recibe un solo mensaje aunque lo tengan varios clientes.</p>
       <div className="table-wrapper">
         <table className="table">
           <thead>
             <tr>
               <th>Celular</th>
+              <th className="text-right">Veces</th>
               <th>Clientes</th>
             </tr>
           </thead>
           <tbody>
-            {repeated.map((r) => (
-              <tr key={r.celular}>
-                <td>{r.celular}</td>
-                <td>{r.clients.map((c) => fullName(c)).join(', ')}</td>
+            {paged.rows.map((r) => (
+              <tr key={r.client.cliente_id}>
+                <td>{r.client.celular}</td>
+                <td className="text-right">{r.records.length}</td>
+                <td>{r.records.map((c) => fullName(c)).join(', ')}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <Pagination page={paged.page} pages={paged.pages} total={paged.total} onChange={paged.setPage} />
+    </Modal>
+  );
+}
+
+/** "Historial": every record of the list with one mobile. */
+function NumberHistoryDialog({ row, onClose }: { row: NumberRow; onClose: () => void }) {
+  const paged = usePagedRows(row.records);
+  return (
+    <Modal open title={`Historial de ${row.client.celular}`} onClose={onClose} size="lg">
+      <div className="table-wrapper">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Celular</th>
+              <th>Teléfono</th>
+              <th className="text-right">Órdenes</th>
+              <th>Última orden</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paged.rows.map((c) => (
+              <tr key={c.cliente_id}>
+                <td>{fullName(c)}</td>
+                <td>{c.celular}</td>
+                <td>
+                  {c.marca} <span className="muted">{c.modelo}</span>
+                </td>
+                <td className="text-right">{c.ordenes}</td>
+                <td>{formatDate(c.ultima_orden)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={paged.page} pages={paged.pages} total={paged.total} onChange={paged.setPage} />
     </Modal>
   );
 }
 
 function CrmComposer() {
   const toast = useToast();
-  const query = useQuery({ queryKey: [MARKETING_KEY, 'recipients'], queryFn: marketingApi.recipients });
+  const query = useQuery({
+    queryKey: [MARKETING_KEY, 'recipients'],
+    queryFn: marketingApi.recipients,
+  });
   const clients = useMemo(() => query.data ?? [], [query.data]);
 
   const [media, setMediaState] = useState<MessageMedia | null>(null);
   const [lines, setLines] = useState<Line[]>([[]]);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
   const [showRepeated, setShowRepeated] = useState(false);
+  const [history, setHistory] = useState<NumberRow | null>(null);
   // Nobody is checked at first: messages only go to the clients picked by hand.
   const [chosen, setChosen] = useState<Set<number>>(new Set());
   const [prepared, setPrepared] = useState<PreparedMessage[] | null>(null);
@@ -155,15 +202,15 @@ function CrmComposer() {
     setPrepared(null);
   }, []);
 
+  const numbers = useMemo(() => uniqueNumbers(clients), [clients]);
+  const repeated = useMemo(() => numbers.filter((r) => r.records.length > 1), [numbers]);
+  // A number shows when any of its records matches the search.
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return clients.filter((c) => !term || fullName(c).toLowerCase().includes(term) || (c.celular ?? '').includes(term));
-  }, [clients, search]);
-  const pages = Math.ceil(visible.length / PAGE_SIZE);
-  const currentPage = Math.min(page, Math.max(pages, 1));
-  const pageRows = visible.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const repeated = useMemo(() => repeatedNumbers(clients), [clients]);
-  const selectable = visible.filter((c) => c.celular);
+    return term ? numbers.filter((r) => r.records.some((c) => matches(c, term))) : numbers;
+  }, [numbers, search]);
+  const paged = usePagedRows(visible);
+  const selectable = visible.map((r) => r.client).filter((c) => c.celular);
   const selected = selectable.filter((c) => chosen.has(c.cliente_id));
   const allSelected = selectable.length > 0 && selected.length === selectable.length;
 
@@ -176,7 +223,7 @@ function CrmComposer() {
       return next;
     });
   };
-  // Every client of the search, on all the pages.
+  // Every number of the search, on all the pages.
   const toggleAll = (on: boolean) => {
     setPrepared(null);
     setChosen((prev) => {
@@ -193,7 +240,12 @@ function CrmComposer() {
     if (isEmptyMessage(lines)) return setError('Escriba el texto del mensaje.');
     if (selected.length === 0) return setError('Seleccione al menos un cliente con celular.');
     setError(null);
-    setPrepared(selected.map((client) => ({ client, text: formatMessage(personalize(lines, clientVariables(client)), CHANNEL) })));
+    setPrepared(
+      selected.map((client) => ({
+        client,
+        text: formatMessage(personalize(lines, clientVariables(client)), CHANNEL),
+      })),
+    );
     toast.success(`${selected.length} mensaje(s) preparado(s) para copiar.`);
   };
 
@@ -240,7 +292,7 @@ function CrmComposer() {
                     value={search}
                     onChange={(value) => {
                       setSearch(value);
-                      setPage(1);
+                      paged.setPage(1);
                     }}
                     placeholder="Buscar por nombre o celular…"
                   />
@@ -271,7 +323,7 @@ function CrmComposer() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pageRows.map((c) => (
+                      {paged.rows.map(({ client: c, records }) => (
                         <tr key={c.cliente_id}>
                           <td className="text-center">
                             <input
@@ -283,7 +335,19 @@ function CrmComposer() {
                             />
                           </td>
                           <td>{fullName(c)}</td>
-                          <td>{c.celular ?? <span className="badge badge-neutral">Sin celular</span>}</td>
+                          <td>
+                            {c.celular ?? <span className="badge badge-neutral">Sin celular</span>}
+                            {records.length > 1 && (
+                              <button
+                                type="button"
+                                className="link-button crm-history"
+                                aria-label={`Historial de ${c.celular}`}
+                                onClick={() => setHistory({ client: c, records })}
+                              >
+                                historial
+                              </button>
+                            )}
+                          </td>
                           <td>
                             {c.marca} <span className="muted">{c.modelo}</span>
                           </td>
@@ -294,11 +358,12 @@ function CrmComposer() {
                     </tbody>
                   </table>
                 </div>
-                <Pagination page={currentPage} pages={pages} total={visible.length} onChange={setPage} />
+                <Pagination page={paged.page} pages={paged.pages} total={paged.total} onChange={paged.setPage} />
                 <p className="muted crm-count">
-                  {selected.length} de {clients.length} cliente(s) seleccionado(s)
+                  {selected.length} de {numbers.length} número(s) seleccionado(s)
                 </p>
-                <RepeatedNumbersDialog open={showRepeated} repeated={repeated} onClose={() => setShowRepeated(false)} />
+                {showRepeated && <RepeatedNumbersDialog repeated={repeated} onClose={() => setShowRepeated(false)} />}
+                {history && <NumberHistoryDialog row={history} onClose={() => setHistory(null)} />}
               </>
             )}
           </Card>
@@ -328,8 +393,8 @@ function CrmComposer() {
       {prepared && (
         <Card title={`Mensajes preparados (${prepared.length})`}>
           <div className="alert alert-info">
-            Los mensajes están listos con el formato de WhatsApp{media ? ' y la imagen adjunta' : ''}. Cópielos y envíelos
-            uno por uno.
+            Los mensajes están listos con el formato de WhatsApp
+            {media ? ' y la imagen adjunta' : ''}. Cópielos y envíelos uno por uno.
           </div>
           <ul className="prepared-list">
             {prepared.map(({ client, text }) => (

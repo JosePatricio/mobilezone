@@ -935,6 +935,7 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .btn-whatsapp:hover:not(:disabled) { background: #1da851; }
 .btn-whatsapp svg { width: 24px; height: 24px; }
 .crm-repeated { display: block; margin: -6px 0 12px; padding: 0; border: 0; background: none; color: var(--warning); font: inherit; font-size: 0.9rem; text-decoration: underline; cursor: pointer; }
+.crm-history { margin-left: 8px; font-size: 0.8rem; }
 .crm-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
 /* Scrolls on its own when taller than the screen, so its last button stays reachable. */
 .crm-side { position: sticky; top: calc(var(--header-h) + 16px); max-height: calc(100vh - var(--header-h) - 32px); overflow-y: auto; overscroll-behavior: contain; }
