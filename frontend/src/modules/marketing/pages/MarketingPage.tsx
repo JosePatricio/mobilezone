@@ -8,8 +8,8 @@ import {
   Loading,
   Modal,
   PageHeader,
+  Pagination,
   SearchInput,
-  Select,
   useToast,
   WhatsAppIcon,
 } from '@/shared/components';
@@ -29,40 +29,56 @@ import {
   VARIABLES,
 } from '../message';
 import { MARKETING_KEY, marketingApi } from '../services/marketingApi';
-import { CHANNEL_LABELS, type Channel, type MessageMedia, type OrderClient } from '../types';
+import type { Channel, MessageMedia, OrderClient } from '../types';
+
+/** Propaganda goes out by WhatsApp only. */
+const CHANNEL: Channel = 'WHATSAPP';
+const PAGE_SIZE = 15;
 
 interface PreparedMessage {
   client: OrderClient;
   text: string;
 }
 
-/** Propaganda: the CRM prepares a WhatsApp / SMS message for the clients that came through Órdenes. */
+interface RepeatedNumber {
+  celular: string;
+  clients: OrderClient[];
+}
+
+/** Same number however it was typed: "099 111 1111" and "+593991111111" are one phone. */
+function phoneKey(celular: string): string {
+  const digits = celular.replace(/\D/g, '');
+  return !celular.trim().startsWith('+') && digits.startsWith('0') ? `593${digits.slice(1)}` : digits;
+}
+
+/** Mobiles shared by two or more clients of the list. */
+function repeatedNumbers(clients: OrderClient[]): RepeatedNumber[] {
+  const groups = new Map<string, OrderClient[]>();
+  for (const c of clients) {
+    if (!c.celular) continue;
+    const key = phoneKey(c.celular);
+    groups.set(key, [...(groups.get(key) ?? []), c]);
+  }
+  return [...groups.values()].filter((g) => g.length > 1).map((g) => ({ celular: g[0].celular!, clients: g }));
+}
+
+/** Propaganda: the CRM prepares a WhatsApp message for the clients that came through Órdenes. */
 export function MarketingPage() {
-  const [choosing, setChoosing] = useState(false);
-  const [channel, setChannel] = useState<Channel | null>(null);
+  const [composing, setComposing] = useState(false);
 
   return (
     <>
-      <PageHeader title="Propaganda" actions={<Button onClick={() => setChoosing(true)}>CRM</Button>}>
-        Mensajes de promoción para los clientes que hicieron una orden de trabajo.
-      </PageHeader>
+      <PageHeader title="Propaganda">Mensajes de promoción para los clientes que hicieron una orden de trabajo.</PageHeader>
 
-      <ChannelDialog
-        open={choosing}
-        onClose={() => setChoosing(false)}
-        onChoose={(c) => {
-          setChannel(c);
-          setChoosing(false);
-        }}
-      />
-
-      {channel ? (
-        <CrmComposer channel={channel} onChangeChannel={() => setChoosing(true)} />
+      {composing ? (
+        <CrmComposer />
       ) : (
         <Card>
-          <EmptyState title="Prepare un mensaje">
-            Pulse <strong>CRM</strong> y elija si el mensaje irá por WhatsApp o por SMS.
-          </EmptyState>
+          <div className="crm-start">
+            <Button className="btn-whatsapp" icon={<WhatsAppIcon fill="currentColor" />} onClick={() => setComposing(true)}>
+              Enviar propaganda
+            </Button>
+          </div>
         </Card>
       )}
 
@@ -71,35 +87,41 @@ export function MarketingPage() {
   );
 }
 
-function ChannelDialog({
+function RepeatedNumbersDialog({
   open,
+  repeated,
   onClose,
-  onChoose,
 }: {
   open: boolean;
+  repeated: RepeatedNumber[];
   onClose: () => void;
-  onChoose: (channel: Channel) => void;
 }) {
   return (
-    <Modal open={open} title="CRM" onClose={onClose} size="sm">
-      <p>¿Por dónde enviará el mensaje?</p>
-      <div className="channel-options">
-        <button type="button" className="channel-option" onClick={() => onChoose('WHATSAPP')}>
-          <WhatsAppIcon />
-          <span>WhatsApp</span>
-        </button>
-        <button type="button" className="channel-option" onClick={() => onChoose('SMS')}>
-          <span className="channel-sms" aria-hidden>
-            SMS
-          </span>
-          <span>SMS</span>
-        </button>
+    <Modal open={open} title="Números repetidos" onClose={onClose}>
+      <p className="muted">Cada número recibe un solo mensaje aunque lo tengan varios clientes.</p>
+      <div className="table-wrapper">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Celular</th>
+              <th>Clientes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {repeated.map((r) => (
+              <tr key={r.celular}>
+                <td>{r.celular}</td>
+                <td>{r.clients.map((c) => fullName(c)).join(', ')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </Modal>
   );
 }
 
-function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeChannel: () => void }) {
+function CrmComposer() {
   const toast = useToast();
   const query = useQuery({ queryKey: [MARKETING_KEY, 'recipients'], queryFn: marketingApi.recipients });
   const clients = useMemo(() => query.data ?? [], [query.data]);
@@ -107,7 +129,8 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
   const [media, setMediaState] = useState<MessageMedia | null>(null);
   const [lines, setLines] = useState<Line[]>([[]]);
   const [search, setSearch] = useState('');
-  const [marca, setMarca] = useState('');
+  const [page, setPage] = useState(1);
+  const [showRepeated, setShowRepeated] = useState(false);
   // Nobody is checked at first: messages only go to the clients picked by hand.
   const [chosen, setChosen] = useState<Set<number>>(new Set());
   const [prepared, setPrepared] = useState<PreparedMessage[] | null>(null);
@@ -132,18 +155,14 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
     setPrepared(null);
   }, []);
 
-  const brands = useMemo(
-    () => [...new Set(clients.map((c) => c.marca))].sort((a, b) => a.localeCompare(b)).map((m) => ({ value: m, label: m })),
-    [clients],
-  );
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return clients.filter(
-      (c) =>
-        (!marca || c.marca === marca) &&
-        (!term || fullName(c).toLowerCase().includes(term) || (c.celular ?? '').includes(term)),
-    );
-  }, [clients, search, marca]);
+    return clients.filter((c) => !term || fullName(c).toLowerCase().includes(term) || (c.celular ?? '').includes(term));
+  }, [clients, search]);
+  const pages = Math.ceil(visible.length / PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(pages, 1));
+  const pageRows = visible.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const repeated = useMemo(() => repeatedNumbers(clients), [clients]);
   const selectable = visible.filter((c) => c.celular);
   const selected = selectable.filter((c) => chosen.has(c.cliente_id));
   const allSelected = selectable.length > 0 && selected.length === selectable.length;
@@ -157,6 +176,7 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
       return next;
     });
   };
+  // Every client of the search, on all the pages.
   const toggleAll = (on: boolean) => {
     setPrepared(null);
     setChosen((prev) => {
@@ -167,13 +187,13 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
   };
 
   const sample = selected[0] ?? clients[0];
-  const sampleLines = forChannel(sample ? personalize(lines, clientVariables(sample)) : lines, channel);
+  const sampleLines = forChannel(sample ? personalize(lines, clientVariables(sample)) : lines, CHANNEL);
 
   const prepare = () => {
     if (isEmptyMessage(lines)) return setError('Escriba el texto del mensaje.');
     if (selected.length === 0) return setError('Seleccione al menos un cliente con celular.');
     setError(null);
-    setPrepared(selected.map((client) => ({ client, text: formatMessage(personalize(lines, clientVariables(client)), channel) })));
+    setPrepared(selected.map((client) => ({ client, text: formatMessage(personalize(lines, clientVariables(client)), CHANNEL) })));
     toast.success(`${selected.length} mensaje(s) preparado(s) para copiar.`);
   };
 
@@ -188,22 +208,10 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
 
   return (
     <div className="crm">
-      <div className="crm-channel">
-        <span>
-          Canal: <strong>{CHANNEL_LABELS[channel]}</strong>
-        </span>
-        <Button variant="ghost" size="sm" onClick={onChangeChannel}>
-          Cambiar
-        </Button>
-      </div>
-
       <div className="crm-grid">
         <div className="crm-main">
-          <Card title="1. ¿Agregar video o imagen?">
+          <Card title="1. ¿Agregar imagen?">
             <MediaPicker media={media} onChange={setMedia} />
-            {channel === 'SMS' && media && (
-              <p className="field-hint">Por SMS la imagen o el video se envían como MMS (según el operador).</p>
-            )}
           </Card>
 
           <Card title="2. Texto">
@@ -213,10 +221,8 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
               placeholder="Hola @NOMBRE, tienes una promoción para comprar tu teléfono @TELEFONO a este precio 430$."
             />
             <p className="field-hint">
-              Variables: {VARIABLES.map((v) => `${v.token} (${v.hint.toLowerCase()})`).join(', ')}.{' '}
-              {channel === 'WHATSAPP'
-                ? 'WhatsApp muestra negrita, cursiva y tachado; el tamaño de letra no se envía.'
-                : 'El SMS se envía como texto simple, sin formato.'}
+              Variables: {VARIABLES.map((v) => `${v.token} (${v.hint.toLowerCase()})`).join(', ')}. WhatsApp muestra
+              negrita, cursiva y tachado; el tamaño de letra no se envía.
             </p>
           </Card>
 
@@ -230,15 +236,20 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
             ) : (
               <>
                 <div className="toolbar">
-                  <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nombre o celular…" />
-                  <Select
-                    aria-label="Marca del teléfono"
-                    placeholder="Todas las marcas"
-                    options={brands}
-                    value={marca}
-                    onChange={(e) => setMarca(e.target.value)}
+                  <SearchInput
+                    value={search}
+                    onChange={(value) => {
+                      setSearch(value);
+                      setPage(1);
+                    }}
+                    placeholder="Buscar por nombre o celular…"
                   />
                 </div>
+                {repeated.length > 0 && (
+                  <button type="button" className="crm-repeated" onClick={() => setShowRepeated(true)}>
+                    Hay {repeated.length} número(s) repetido(s). Ver cuáles
+                  </button>
+                )}
                 <div className="table-wrapper">
                   <table className="table">
                     <thead>
@@ -260,7 +271,7 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
                       </tr>
                     </thead>
                     <tbody>
-                      {visible.map((c) => (
+                      {pageRows.map((c) => (
                         <tr key={c.cliente_id}>
                           <td className="text-center">
                             <input
@@ -283,9 +294,11 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
                     </tbody>
                   </table>
                 </div>
+                <Pagination page={currentPage} pages={pages} total={visible.length} onChange={setPage} />
                 <p className="muted crm-count">
                   {selected.length} de {clients.length} cliente(s) seleccionado(s)
                 </p>
+                <RepeatedNumbersDialog open={showRepeated} repeated={repeated} onClose={() => setShowRepeated(false)} />
               </>
             )}
           </Card>
@@ -298,7 +311,7 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
                 Así lo verá {fullName(sample)} ({sample.marca})
               </p>
             )}
-            <MessagePreview lines={sampleLines} media={media} channel={channel} />
+            <MessagePreview lines={sampleLines} media={media} channel={CHANNEL} />
             {error && (
               <div className="alert alert-error" role="alert">
                 {error}
@@ -308,15 +321,15 @@ function CrmComposer({ channel, onChangeChannel }: { channel: Channel; onChangeC
               Preparar mensajes
             </Button>
           </Card>
-          {channel === 'WHATSAPP' && <WhatsAppApiSender recipients={selected} media={media} />}
+          <WhatsAppApiSender recipients={selected} media={media} />
         </aside>
       </div>
 
       {prepared && (
         <Card title={`Mensajes preparados (${prepared.length})`}>
           <div className="alert alert-info">
-            Los mensajes están listos con el formato de {CHANNEL_LABELS[channel]}
-            {media ? ` y ${media.kind === 'image' ? 'la imagen' : 'el video'} adjunto` : ''}. Cópielos y envíelos uno por uno.
+            Los mensajes están listos con el formato de WhatsApp{media ? ' y la imagen adjunta' : ''}. Cópielos y envíelos
+            uno por uno.
           </div>
           <ul className="prepared-list">
             {prepared.map(({ client, text }) => (

@@ -53,14 +53,13 @@ function write(html: string) {
 }
 
 describe('MarketingPage (Propaganda › CRM)', () => {
-  it('asks WhatsApp or SMS and prepares one message per client of the orders', async () => {
+  it('opens with "Enviar propaganda" and prepares one WhatsApp message per client of the orders', async () => {
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
 
-    await user.click(screen.getByRole('button', { name: 'CRM' }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'WhatsApp' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
 
-    expect(screen.getByRole('group', { name: 'Agregar video o imagen' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Agregar imagen' })).toBeInTheDocument();
     expect(await screen.findByText('Luis Pérez')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Incluir a Eva Pérez' })).toBeDisabled(); // no celular
 
@@ -76,11 +75,10 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     expect(screen.getByText('Hola *Ana*, promo para tu Samsung a 430$.')).toBeInTheDocument();
   });
 
-  it('SMS messages are plain text and an empty text is rejected', async () => {
+  it('rejects an empty text and selects every client of the list', async () => {
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'CRM' }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'SMS' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
     await screen.findByText('Ana Pérez');
 
     await user.click(screen.getByRole('button', { name: 'Preparar mensajes' }));
@@ -94,21 +92,31 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     await user.click(screen.getByRole('button', { name: 'Preparar mensajes' }));
     expect(screen.getByText('Mensajes preparados (2)')).toBeInTheDocument();
     const list = screen.getByRole('list');
-    expect(within(list).getByText('Ana tu Samsung')).toBeInTheDocument();
-    expect(within(list).getByText('Luis tu Xiaomi')).toBeInTheDocument();
+    expect(within(list).getByText('*Ana* tu Samsung')).toBeInTheDocument();
+    expect(within(list).getByText('*Luis* tu Xiaomi')).toBeInTheDocument();
   });
 
-  it('filters the clients by the brand of the phone', async () => {
+  it('shows the clients 15 per page and lists the repeated numbers', async () => {
+    api.recipients.mockResolvedValue([
+      ...Array.from({ length: 16 }, (_, i) => client(i + 1, `Cliente${i + 1}`, 'Samsung', `09900000${String(i + 10)}`)),
+      client(17, 'Ana', 'Samsung', '0991111111'),
+      client(18, 'Luis', 'Xiaomi', '+593991111111'),
+    ]);
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'CRM' }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'WhatsApp' }));
-    await screen.findByText('Ana Pérez');
-    await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todos' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
 
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Marca del teléfono' }), 'Xiaomi');
-    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument();
-    expect(screen.getByText('1 de 3 cliente(s) seleccionado(s)')).toBeInTheDocument();
+    expect(await screen.findByText('Cliente1 Pérez')).toBeInTheDocument();
+    expect(screen.queryByText('Cliente16 Pérez')).not.toBeInTheDocument();
+    expect(screen.getByText(/Página 1 de 2/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Siguiente ›' }));
+    expect(screen.getByText('Cliente16 Pérez')).toBeInTheDocument();
+    expect(screen.queryByText('Cliente1 Pérez')).not.toBeInTheDocument();
+
+    // 0991111111 and +593991111111 are the same phone.
+    await user.click(screen.getByRole('button', { name: /^Hay 1 número\(s\) repetido\(s\)/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Números repetidos' });
+    expect(within(dialog).getByText('Ana Pérez, Luis Pérez')).toBeInTheDocument();
   });
 
   it('sends an approved template through the WhatsApp API to the selected clients', async () => {
@@ -116,8 +124,7 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     api.createCampaign.mockResolvedValue({ campaign_id: 7, encolados: 2, sin_numero: 0, dados_de_baja: 0 });
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'CRM' }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'WhatsApp' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
     await screen.findByText('Ana Pérez');
     await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todos' }));
 
@@ -159,8 +166,7 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     api.createCampaign.mockResolvedValue({ campaign_id: 8, encolados: 1, sin_numero: 0, dados_de_baja: 0 });
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'CRM' }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'WhatsApp' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
     await user.click(await screen.findByRole('checkbox', { name: 'Incluir a Ana Pérez' }));
 
     const image = new File(['png'], 'micas.png', { type: 'image/png' });

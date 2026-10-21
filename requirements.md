@@ -1,5 +1,11 @@
-En el modulo de ventas
-Primero, en la factura, no esta apareciendo el campo descuento que ponemos en el formulario de confirmacion de venta.
-Segundo, si el valor del producto por ejemplo cuesta 2 usd, y pongo en el campo descuento los 2 usd, no deberia de sumarme en el valor de ventas totales que sale en la parte superior del header, si el valor de la venta es 2usd y pongo descuento 2usd, deberia sumarme 0usd.
+En el modulo Propaganda
+Quitar boton CRM y las opciones whatssapp y sms. y poner en la mitad en lugar del texto Prepare un mensaje
+Pulse CRM y elija si el mensaje irá por WhatsApp o por SMS.  Un boton que se llame, Enviar propaganda (con un icon de whats app y color como verde de whatsapp)
 
-Otra cosa, por defecta en total de ventas de hoy que sale en la parte superior, poner el valor total bruto, y cuando muevan e cursor, ahi si poner el valor calculado menos el valor de los repuestos
+Dentro de propaganda en 
+3. Clientes de órdenes
+Implementa paginacion a la tabla, pueden ir de 15 en 15. Quitar el filtro por marcas. debajo del buscador por  nombre poner un mensaje que diga, hay tantos numeros repetidos (en caso que en esa lista haya numero celulares repetidos), si hago click mostrar en un modal los nombres y numeros repetidos 
+
+
+Por ultimo en la parte de 1. ¿Agregar video o imagen?
+Quitar la opcion de video, solo se permitira imagenes
