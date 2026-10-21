@@ -36,13 +36,15 @@ interface Props {
   label: string;
   onChange: (lines: Line[]) => void;
   placeholder?: string;
+  /** Plain text the editor starts with (one line per "\n"); it can be edited or erased. */
+  defaultText?: string;
 }
 
 /**
  * Text editor with bold, italic, strikethrough and size, plus buttons to insert the variables
  * (@NOMBRE, @TELEFONO). Pasted content goes in as plain text.
  */
-export function RichTextEditor({ label, onChange, placeholder }: Props) {
+export function RichTextEditor({ label, onChange, placeholder, defaultText }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const labelId = useId();
   const [active, setActive] = useState<Record<Format, boolean>>({ bold: false, italic: false, strikeThrough: false });
@@ -58,6 +60,17 @@ export function RichTextEditor({ label, onChange, placeholder }: Props) {
     if (!editor || !selection?.anchorNode || !editor.contains(selection.anchorNode)) return;
     setActive({ bold: commandState('bold'), italic: commandState('italic'), strikeThrough: commandState('strikeThrough') });
   }, []);
+
+  // The starting text goes in once, as if typed, so the page sees it right away.
+  useEffect(() => {
+    const editor = ref.current;
+    if (!editor || !defaultText || editor.hasChildNodes()) return; // StrictMode runs effects twice
+    defaultText.split('\n').forEach((line, i) => {
+      if (i > 0) editor.append(document.createElement('br'));
+      editor.append(document.createTextNode(line));
+    });
+    emit();
+  }, []); // only on mount
 
   useEffect(() => {
     document.addEventListener('selectionchange', refreshToolbar);

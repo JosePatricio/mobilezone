@@ -1,8 +1,5 @@
-3. Clientes de órdenes
-En Hay 49 número(s) repetido(s). Ver cuáles. en el modal tambien poner el numeo de veces que se repite si hay mas de 2 repetidos
+[{"type":"BODY","text":"¡Hola {{1}}! 📱 llegaron MICAS con DISEÑO para tu {{2}}, reservalo antes que se agoten.","example":{"body_text":[["Juan","celulares y accesorios"]]}},{"type":"FOOTER","text":"Responde STOP para no recibir más mensajes"}]
 
-La paginacion hazlo de 10 en 10.
+- usa este json para crear un texto por defecto .
 
-En la tabla por defecto que salga solo numeros unicos, es decir no repetidos. y si hay repetidos , a lado del numero pon un pequeño link texto que se llame historial, y cuando se haga click, lanza un modal de todos los registros con ese numero.
-
-A todas las tablas en este modulos haz el paginado de 10 en 10
+Estoy probando realemente el enviar, estoy seleccionando solo 1 usuario de la tabla para probar con 1, asi que el boton enviar por whatsapp deberia funcionar aqui tambien

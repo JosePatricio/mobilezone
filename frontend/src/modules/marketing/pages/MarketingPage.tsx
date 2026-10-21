@@ -35,6 +35,11 @@ import { usePagedRows } from '../usePagedRows';
 /** Propaganda goes out by WhatsApp only. */
 const CHANNEL: Channel = 'WHATSAPP';
 
+/** Text of the approved promo template, with its {{1}} / {{2}} as the variables of the editor. */
+const DEFAULT_TEXT =
+  '¡Hola @NOMBRE! 📱 llegaron MICAS con DISEÑO para tu @TELEFONO, reservalo antes que se agoten.\n' +
+  'Responde STOP para no recibir más mensajes';
+
 interface PreparedMessage {
   client: OrderClient;
   text: string;
@@ -276,6 +281,7 @@ function CrmComposer() {
             <RichTextEditor
               label="Mensaje"
               onChange={onTextChange}
+              defaultText={DEFAULT_TEXT}
               placeholder="Hola @NOMBRE, tienes una promoción para comprar tu teléfono @TELEFONO a este precio 430$."
             />
             <p className="field-hint">

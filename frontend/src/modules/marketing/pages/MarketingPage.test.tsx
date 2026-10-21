@@ -81,6 +81,11 @@ describe('MarketingPage (Propaganda › CRM)', () => {
     await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
     await screen.findByText('Ana Pérez');
 
+    // Starts with the text of the promo template.
+    expect(screen.getByRole('textbox', { name: 'Mensaje' })).toHaveTextContent(
+      '¡Hola @NOMBRE! 📱 llegaron MICAS con DISEÑO para tu @TELEFONO',
+    );
+    write('');
     await user.click(screen.getByRole('button', { name: 'Preparar mensajes' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Escriba el texto del mensaje.');
 
