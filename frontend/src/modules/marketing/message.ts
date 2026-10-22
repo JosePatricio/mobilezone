@@ -24,6 +24,30 @@ export const VARIABLES = [
   { token: '@TELEFONO', label: 'Teléfono', hint: 'Marca del teléfono de su orden' },
 ] as const;
 
+export interface MessageVariable {
+  token: string;
+  label: string;
+  hint: string;
+}
+
+/** "¿Incluir ruleta?": the single-use link of the wheel, different for each client. */
+export const ROULETTE_VARIABLE: MessageVariable = {
+  token: '@RULETA',
+  label: 'Ruleta',
+  hint: 'Enlace de la ruleta, único por cliente',
+};
+
+/**
+ * Placeholder of the template that takes @RULETA: the variables of the text are the placeholders in order
+ * (@NOMBRE {{1}}, @TELEFONO {{2}}, …). Null when the text has no @RULETA.
+ */
+export function roulettePlaceholder(lines: Line[]): number | null {
+  const text = lines.map((line) => line.map((run) => run.text).join('')).join(' ');
+  const tokens = (text.match(/@(NOMBRE|TELEFONO|RULETA)\b/gi) ?? []).map((t) => t.toUpperCase());
+  const index = tokens.indexOf(ROULETTE_VARIABLE.token);
+  return index >= 0 ? index : null;
+}
+
 export interface MessageVariables {
   nombre: string;
   telefono: string;

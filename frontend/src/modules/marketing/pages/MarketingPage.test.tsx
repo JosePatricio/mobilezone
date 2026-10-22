@@ -212,8 +212,11 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
     expect(api.createCampaign).toHaveBeenCalledWith(expect.objectContaining({ plantilla: 'promo_video' }), video);
   });
 
-  it('"¿Incluir ruleta?" puts a link of the chosen wheel in a placeholder of the template', async () => {
-    api.templates.mockResolvedValue([{ ...promo, body: 'Hola {{1}}, gira la ruleta: {{2}}' }]);
+  it('"¿Incluir ruleta?" adds @RULETA to "2. Texto": its place is the placeholder of the link', async () => {
+    api.templates.mockResolvedValue([
+      { ...promo, body: 'Hola {{1}}, oferta para tu {{2}}. Gira la ruleta: {{3}}', body_params: ['1', '2', '3'] },
+      { ...promo, name: 'promo_corta' },
+    ]);
     api.roulettes.mockResolvedValue([
       { id: 4, nombre: 'Ruleta octubre', fecha_inicio: '2026-01-01', fecha_fin: '2999-12-31' },
       { id: 5, nombre: 'Vencida', fecha_inicio: '2020-01-01', fecha_fin: '2020-01-31' },
@@ -223,12 +226,19 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
     renderWithProviders(<MarketingPage />);
     await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
     await user.click(await screen.findByRole('checkbox', { name: 'Incluir a Ana Pérez' }));
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'Plantilla' }), 'promo_octubre|es');
+    const plantilla = await screen.findByRole('combobox', { name: 'Plantilla' });
+    await user.selectOptions(plantilla, 'promo_octubre|es');
+    const text = screen.getByRole('textbox', { name: 'Mensaje' });
+    const toolbar = screen.getByRole('toolbar', { name: 'Formato del texto' });
 
     const include = screen.getByRole('checkbox', { name: /¿Incluir ruleta\?/ });
     expect(include).not.toBeChecked(); // off by default
+    expect(within(toolbar).queryByRole('button', { name: '@RULETA' })).not.toBeInTheDocument();
     expect(api.roulettes).not.toHaveBeenCalled();
     await user.click(include);
+    expect(within(toolbar).getByRole('button', { name: '@RULETA' })).toBeInTheDocument();
+    expect(text).toHaveTextContent(/STOP para no recibir más mensajes\s*@RULETA$/);
+    expect(screen.queryByRole('combobox', { name: 'Variable del enlace' })).not.toBeInTheDocument();
     const select = await screen.findByRole('combobox', { name: 'Ruleta' });
     await screen.findByRole('option', { name: 'Ruleta octubre' });
     expect(screen.queryByRole('option', { name: 'Vencida' })).not.toBeInTheDocument(); // only the valid ones
@@ -236,22 +246,32 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Elija la ruleta');
     await user.selectOptions(select, '4');
-    // The last placeholder takes the link.
-    expect(screen.getByRole('combobox', { name: 'Variable del enlace' })).toHaveValue('1');
+    // @NOMBRE {{1}}, @TELEFONO {{2}}, @RULETA {{3}}.
     expect(screen.getByLabelText('Vista previa de la plantilla')).toHaveTextContent(
-      `gira la ruleta: ${window.location.origin}/ruleta/…`,
+      `Gira la ruleta: ${window.location.origin}/ruleta/…`,
     );
 
+    // A template without a placeholder for the link cannot carry it.
+    await user.selectOptions(plantilla, 'promo_corta|es');
+    await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('@RULETA es la variable 3 del texto y la plantilla tiene 2');
+
+    await user.selectOptions(plantilla, 'promo_octubre|es');
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Enviar' }));
     expect(api.createCampaign).toHaveBeenCalledWith(
       expect.objectContaining({
-        parametros: [{ source: 'NOMBRE' }, { source: 'RULETA' }],
+        parametros: [{ source: 'NOMBRE' }, { source: 'MARCA' }, { source: 'RULETA' }],
         ruleta_id: 4,
         enlace_base: window.location.origin,
       }),
       null,
     );
+
+    // Unchecking takes @RULETA out of the text again.
+    await user.click(include);
+    expect(text).not.toHaveTextContent('@RULETA');
+    expect(within(toolbar).queryByRole('button', { name: '@RULETA' })).not.toBeInTheDocument();
   });
 
   it('filters the clients by the brand of the phone', async () => {

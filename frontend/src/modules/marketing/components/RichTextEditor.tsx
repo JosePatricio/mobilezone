@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type ClipboardEvent } from 'react';
-import { type Line, parseEditor, VARIABLES } from '../message';
+import { type Line, type MessageVariable, parseEditor, VARIABLES } from '../message';
 
 type Format = 'bold' | 'italic' | 'strikeThrough';
 
@@ -38,13 +38,17 @@ interface Props {
   placeholder?: string;
   /** Plain text the editor starts with (one line per "\n"); it can be edited or erased. */
   defaultText?: string;
+  /** Buttons to insert (default @NOMBRE, @TELEFONO). */
+  variables?: readonly MessageVariable[];
+  /** Added at the end of the text while set (if missing); removed from the text when it is unset. */
+  requiredToken?: string;
 }
 
 /**
  * Text editor with bold, italic, strikethrough and size, plus buttons to insert the variables
  * (@NOMBRE, @TELEFONO). Pasted content goes in as plain text.
  */
-export function RichTextEditor({ label, onChange, placeholder, defaultText }: Props) {
+export function RichTextEditor({ label, onChange, placeholder, defaultText, variables = VARIABLES, requiredToken }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const labelId = useId();
   const [active, setActive] = useState<Record<Format, boolean>>({ bold: false, italic: false, strikeThrough: false });
@@ -71,6 +75,28 @@ export function RichTextEditor({ label, onChange, placeholder, defaultText }: Pr
     });
     emit();
   }, []); // only on mount
+
+  // The token goes in (new line at the end) or out of the text with its option, e.g. "¿Incluir ruleta?".
+  const previousToken = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const editor = ref.current;
+    const removed = previousToken.current;
+    previousToken.current = requiredToken;
+    if (!editor) return;
+    if (requiredToken && !(editor.textContent ?? '').toUpperCase().includes(requiredToken)) {
+      if (editor.hasChildNodes()) editor.append(document.createElement('br'));
+      editor.append(document.createTextNode(requiredToken));
+      emit();
+    } else if (!requiredToken && removed) {
+      const pattern = new RegExp(`\\s?${removed}\\b`, 'gi');
+      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (node.textContent && pattern.test(node.textContent)) node.textContent = node.textContent.replace(pattern, '');
+        pattern.lastIndex = 0;
+      }
+      emit();
+    }
+  }, [requiredToken]); // only when the option changes
 
   useEffect(() => {
     document.addEventListener('selectionchange', refreshToolbar);
@@ -136,7 +162,7 @@ export function RichTextEditor({ label, onChange, placeholder, defaultText }: Pr
           ))}
         </select>
         <span className="rte-separator" aria-hidden />
-        {VARIABLES.map((v) => (
+        {variables.map((v) => (
           <button
             key={v.token}
             type="button"

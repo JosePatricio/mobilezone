@@ -18,7 +18,7 @@ import { MediaPicker } from '../components/MediaPicker';
 import { WhatsAppApiSender } from '../components/WhatsAppApiSender';
 import { WhatsAppCampaigns } from '../components/WhatsAppCampaigns';
 import { RichTextEditor } from '../components/RichTextEditor';
-import { VARIABLES } from '../message';
+import { type Line, ROULETTE_VARIABLE, roulettePlaceholder, VARIABLES } from '../message';
 import { MARKETING_KEY, marketingApi } from '../services/marketingApi';
 import type { MessageMedia, OrderClient } from '../types';
 import { usePagedRows } from '../usePagedRows';
@@ -177,6 +177,10 @@ function CrmComposer() {
   const clients = useMemo(() => query.data ?? [], [query.data]);
 
   const [media, setMediaState] = useState<MessageMedia | null>(null);
+  // "¿Incluir ruleta?" of the sender adds @RULETA to the text: its place is the placeholder of the link.
+  const [includeRoulette, setIncludeRoulette] = useState(false);
+  const [lines, setLines] = useState<Line[]>([]);
+  const variables = includeRoulette ? [...VARIABLES, ROULETTE_VARIABLE] : VARIABLES;
   const [search, setSearch] = useState('');
   const [marca, setMarca] = useState('');
   const [showRepeated, setShowRepeated] = useState(false);
@@ -248,12 +252,14 @@ function CrmComposer() {
           <Card title="2. Texto">
             <RichTextEditor
               label="Mensaje"
-              onChange={() => undefined}
+              onChange={setLines}
+              variables={variables}
+              requiredToken={includeRoulette ? ROULETTE_VARIABLE.token : undefined}
               defaultText={DEFAULT_TEXT}
               placeholder="Hola @NOMBRE, tienes una promoción para comprar tu teléfono @TELEFONO a este precio 430$."
             />
             <p className="field-hint">
-              Variables: {VARIABLES.map((v) => `${v.token} (${v.hint.toLowerCase()})`).join(', ')}. WhatsApp muestra
+              Variables: {variables.map((v) => `${v.token} (${v.hint.toLowerCase()})`).join(', ')}. WhatsApp muestra
               negrita, cursiva y tachado; el tamaño de letra no se envía.
             </p>
           </Card>
@@ -360,7 +366,13 @@ function CrmComposer() {
         </div>
 
         <aside className="crm-side">
-          <WhatsAppApiSender recipients={selected} media={media} />
+          <WhatsAppApiSender
+            recipients={selected}
+            media={media}
+            includeRoulette={includeRoulette}
+            onIncludeRouletteChange={setIncludeRoulette}
+            linkIndex={roulettePlaceholder(lines)}
+          />
         </aside>
       </div>
     </div>

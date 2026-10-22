@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { applyVariables, formatMessage, forChannel, isEmptyMessage, parseEditor, personalize } from './message';
+import {
+  applyVariables,
+  formatMessage,
+  forChannel,
+  isEmptyMessage,
+  parseEditor,
+  personalize,
+  roulettePlaceholder,
+} from './message';
 
 function editor(html: string): HTMLElement {
   return new DOMParser().parseFromString(`<div id="e">${html}</div>`, 'text/html').getElementById('e')!;
@@ -51,5 +59,11 @@ describe('CRM message', () => {
   it('detects an empty message', () => {
     expect(isEmptyMessage(parseEditor(editor('<div><br></div> ')))).toBe(true);
     expect(isEmptyMessage(parseEditor(editor('Hola')))).toBe(false);
+  });
+
+  it('@RULETA takes the placeholder of its place among the variables of the text', () => {
+    expect(roulettePlaceholder(parseEditor(editor('Hola @NOMBRE, tu @TELEFONO<div>@RULETA</div>')))).toBe(2);
+    expect(roulettePlaceholder(parseEditor(editor('@ruleta para @NOMBRE')))).toBe(0);
+    expect(roulettePlaceholder(parseEditor(editor('Hola @NOMBRE')))).toBeNull();
   });
 });
