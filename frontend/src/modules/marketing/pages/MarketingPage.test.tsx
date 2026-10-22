@@ -137,8 +137,10 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todos' }));
 
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Plantilla' }), 'promo_octubre|es');
-    // {{1}} = name, {{2}} = brand of the phone by default; previewed with the first client.
-    expect(screen.getByText('Hola Ana, oferta para tu Samsung.')).toBeInTheDocument();
+    // The preview shows the text of "2. Texto" with the data of the first client (@NOMBRE, @TELEFONO).
+    expect(screen.getByLabelText('Vista previa de la plantilla')).toHaveTextContent(
+      '¡Hola Ana! 📱 llegaron MICAS con DISEÑO para tu Samsung',
+    );
     // No test inputs: every placeholder takes the data of each client.
     expect(screen.queryByLabelText('@nombre')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('@telefono')).not.toBeInTheDocument();
@@ -246,15 +248,13 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Elija la ruleta');
     await user.selectOptions(select, '4');
-    // @NOMBRE {{1}}, @TELEFONO {{2}}, @RULETA {{3}}: the preview shows the text with the link of the client…
+    // @NOMBRE {{1}}, @TELEFONO {{2}}, @RULETA {{3}}: the preview shows the text with the link of the client.
     expect(screen.getByLabelText('Vista previa de la plantilla')).toHaveTextContent(
       `¡Hola Ana! 📱 llegaron MICAS con DISEÑO para tu Samsung`,
     );
     expect(screen.getByLabelText('Vista previa de la plantilla')).toHaveTextContent(
       `no recibir más mensajes${window.location.origin}/ruleta/…`,
     );
-    // …and, as it is not the text of the template, what WhatsApp will really send.
-    expect(screen.getByRole('note')).toHaveTextContent(`Gira la ruleta: ${window.location.origin}/ruleta/…`);
 
     // A template without a placeholder for the link cannot carry it.
     await user.selectOptions(plantilla, 'promo_corta|es');
@@ -292,14 +292,13 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
 
     const preview = screen.getByLabelText('Vista previa de la plantilla');
     expect(preview).toHaveTextContent('¡Hola Ana! 📱 llegaron MICAS con DISEÑO para tu Samsung');
-    expect(screen.queryByRole('note')).not.toBeInTheDocument(); // same text as the template
 
     const text = screen.getByRole('textbox', { name: 'Mensaje' });
     // What the browser does while typing at the end of the text (jsdom has no real editing).
     text.append(document.createTextNode(' ¡Solo hoy @NOMBRE!'));
     fireEvent.input(text);
     expect(preview).toHaveTextContent('¡Solo hoy Ana!');
-    expect(screen.getByRole('note')).toHaveTextContent('WhatsApp solo envía el texto aprobado por Meta');
+    expect(screen.queryByText(/WhatsApp solo envía/)).not.toBeInTheDocument(); // no warning under the preview
   });
 
   it('filters the clients by the brand of the phone', async () => {
