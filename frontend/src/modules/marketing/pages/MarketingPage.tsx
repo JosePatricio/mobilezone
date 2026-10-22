@@ -62,14 +62,14 @@ function matches(c: OrderClient, term: string): boolean {
   return c.celular.includes(term) || (number.length > 0 && phoneKey(c.celular).includes(number));
 }
 
-/** Promoción: WhatsApp messages for the clients that came through Órdenes. */
+/** Propaganda › Campaña: WhatsApp messages for the clients that came through Órdenes. */
 export function MarketingPage() {
   const [composing, setComposing] = useState(false);
 
   return (
     <>
       <PageHeader
-        title="Promoción"
+        title="Campaña"
         actions={
           composing && (
             <Button variant="secondary" onClick={() => setComposing(false)}>
@@ -78,7 +78,7 @@ export function MarketingPage() {
           )
         }
       >
-        Mensajes de promoción para los clientes que hicieron una orden de trabajo.
+        Mensajes de propaganda para los clientes que hicieron una orden de trabajo.
       </PageHeader>
 
       {composing ? (
@@ -92,7 +92,7 @@ export function MarketingPage() {
                 icon={<WhatsAppIcon fill="currentColor" />}
                 onClick={() => setComposing(true)}
               >
-                Enviar promoción
+                Enviar propaganda
               </Button>
             </div>
           </Card>
@@ -241,7 +241,7 @@ function CrmComposer() {
     <div className="crm">
       <div className="crm-grid">
         <div className="crm-main">
-          <Card title="1. ¿Agregar imagen?">
+          <Card title="1. ¿Agregar imagen o video?">
             <MediaPicker media={media} onChange={setMedia} />
           </Card>
 

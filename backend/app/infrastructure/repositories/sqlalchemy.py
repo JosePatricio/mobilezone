@@ -44,6 +44,9 @@ from app.infrastructure.database.tables import (
     permissions_table,
     products_table,
     roles_table,
+    roulette_items_table,
+    roulette_plays_table,
+    roulettes_table,
     sales_table,
     settings_table,
     spare_parts_table,
@@ -796,3 +799,122 @@ class SqlAlchemyWhatsAppRepository(ports.WhatsAppRepository):
         else:
             c = whatsapp_opt_outs_table.c
             self.session.execute(whatsapp_opt_outs_table.delete().where(c.telefono == telefono))
+
+
+class SqlAlchemyRouletteRepository(ports.RouletteRepository):
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def create(self, *, nombre, fecha_inicio, fecha_fin, created_by, items):
+        result = self.session.execute(
+            roulettes_table.insert().values(
+                nombre=nombre, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, created_by=created_by
+            )
+        )
+        roulette_id = int(result.inserted_primary_key[0])
+        self.session.execute(
+            roulette_items_table.insert(),
+            [
+                {"roulette_id": roulette_id, "posicion": i, "nombre": item_nombre, "imagen": imagen, "premio": premio}
+                for i, (item_nombre, imagen, premio) in enumerate(items)
+            ],
+        )
+        return roulette_id
+
+    def _summaries(self) -> Select:
+        r, u = roulettes_table.c, users_table.c
+        items = (
+            select(func.count(roulette_items_table.c.id))
+            .where(roulette_items_table.c.roulette_id == r.id)
+            .scalar_subquery()
+        )
+        p = roulette_plays_table.c
+
+        def count(condition):
+            return cast(func.coalesce(func.sum(case((condition, 1), else_=0)), 0), Integer)
+
+        return (
+            select(
+                r.id, r.nombre, r.fecha_inicio, r.fecha_fin, r.created_at,
+                func.concat(u.nombre, " ", u.apellido),
+                items,
+                func.count(p.id),
+                count(p.abierto_at.is_not(None)),
+                count(p.jugado_at.is_not(None)),
+                count(p.gano.is_(True)),
+            )
+            .select_from(roulettes_table)
+            .outerjoin(roulette_plays_table, p.roulette_id == r.id)
+            .outerjoin(users_table, u.id == r.created_by)
+            .group_by(r.id, u.nombre, u.apellido)
+        )
+
+    def summaries(self, limit=100):
+        rows = self.session.execute(self._summaries().order_by(roulettes_table.c.id.desc()).limit(limit)).all()
+        return [ports.RouletteSummary(*row) for row in rows]
+
+    def get(self, roulette_id):
+        row = self.session.execute(self._summaries().where(roulettes_table.c.id == roulette_id)).first()
+        return ports.RouletteSummary(*row) if row else None
+
+    def items(self, roulette_id):
+        i = roulette_items_table.c
+        rows = self.session.execute(
+            select(i.id, i.nombre, i.imagen, i.premio).where(i.roulette_id == roulette_id).order_by(i.posicion, i.id)
+        ).all()
+        return [ports.RouletteItemRow(id, nombre, imagen, bool(premio)) for id, nombre, imagen, premio in rows]
+
+    def delete(self, roulette_id):
+        self.session.execute(roulettes_table.delete().where(roulettes_table.c.id == roulette_id))
+
+    def add_links(self, roulette_id, campaign_id, links):
+        if not links:
+            return
+        self.session.execute(
+            roulette_plays_table.insert(),
+            [
+                {
+                    "roulette_id": roulette_id,
+                    "campaign_id": campaign_id,
+                    "cliente_id": cliente_id,
+                    "telefono": telefono,
+                    "token": token,
+                }
+                for token, cliente_id, telefono in links
+            ],
+        )
+
+    def links(self, roulette_id):
+        p, u = roulette_plays_table.c, users_table.c
+        rows = self.session.execute(
+            select(
+                p.id, p.cliente_id, func.concat(u.nombre, " ", u.apellido), p.telefono, p.campaign_id, p.created_at,
+                p.abierto_at, p.jugado_at, p.resultado, p.gano,
+            )
+            .outerjoin(users_table, u.id == p.cliente_id)
+            .where(p.roulette_id == roulette_id)
+            .order_by(p.id.desc())
+        ).all()
+        return [ports.RoulettePlayRow(*row[:-1], gano=bool(row[-1])) for row in rows]
+
+    def link_by_token(self, token, *, for_update=False):
+        p = roulette_plays_table.c
+        query = select(p.id, p.roulette_id, p.abierto_at, p.jugado_at, p.item_id, p.resultado, p.gano).where(
+            p.token == token
+        )
+        row = self.session.execute(query.with_for_update() if for_update else query).first()
+        return ports.RouletteLink(*row[:-1], gano=bool(row[-1])) if row else None
+
+    def mark_opened(self, link_id, when):
+        p = roulette_plays_table.c
+        self.session.execute(
+            update(roulette_plays_table).where(p.id == link_id, p.abierto_at.is_(None)).values(abierto_at=when)
+        )
+
+    def mark_played(self, link_id, when, item):
+        p = roulette_plays_table.c
+        self.session.execute(
+            update(roulette_plays_table)
+            .where(p.id == link_id)
+            .values(jugado_at=when, item_id=item.id, resultado=item.nombre, gano=item.premio)
+        )

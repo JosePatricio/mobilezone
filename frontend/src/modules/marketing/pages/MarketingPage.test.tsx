@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({
   campaigns: vi.fn(),
   campaign: vi.fn(),
   createCampaign: vi.fn(),
+  roulettes: vi.fn(),
 }));
 vi.mock('../services/marketingApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../services/marketingApi')>()),
@@ -51,14 +52,14 @@ const promo: WhatsAppTemplate = {
   unsupported_params: false,
 };
 
-describe('MarketingPage (Promoción › CRM)', () => {
-  it('opens with "Enviar promoción" and goes back to the list', async () => {
+describe('MarketingPage (Propaganda › Campaña)', () => {
+  it('opens with "Enviar propaganda" and goes back to the list', async () => {
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Enviar promoción' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
 
-    expect(screen.getByRole('group', { name: 'Agregar imagen' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Agregar imagen o video' })).toBeInTheDocument();
     expect(await screen.findByText('Luis Pérez')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Incluir a Eva Pérez' })).toBeDisabled(); // no celular
     // Starts with the text of the promo template.
@@ -68,7 +69,7 @@ describe('MarketingPage (Promoción › CRM)', () => {
     expect(screen.queryByRole('button', { name: 'Preparar mensajes' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '← Volver' }));
-    expect(screen.getByRole('button', { name: 'Enviar promoción' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enviar propaganda' })).toBeInTheDocument();
     expect(screen.queryByText('Luis Pérez')).not.toBeInTheDocument();
   });
 
@@ -79,7 +80,7 @@ describe('MarketingPage (Promoción › CRM)', () => {
     ]);
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'Enviar promoción' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
     await screen.findByText('Ana Pérez');
     const search = screen.getByPlaceholderText('Buscar por nombre, cédula o celular…');
 
@@ -102,7 +103,7 @@ describe('MarketingPage (Promoción › CRM)', () => {
     ]);
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'Enviar promoción' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
 
     expect(await screen.findByText('Cliente1 Pérez')).toBeInTheDocument();
     expect(screen.queryByText('Cliente11 Pérez')).not.toBeInTheDocument();
@@ -131,7 +132,7 @@ describe('MarketingPage (Promoción › CRM)', () => {
     api.createCampaign.mockResolvedValue({ campaign_id: 7, encolados: 2, sin_numero: 0, dados_de_baja: 0 });
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'Enviar promoción' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
     await screen.findByText('Ana Pérez');
     await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todos' }));
 
@@ -166,7 +167,7 @@ describe('MarketingPage (Promoción › CRM)', () => {
     api.createCampaign.mockResolvedValue({ campaign_id: 8, encolados: 1, sin_numero: 0, dados_de_baja: 0 });
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'Enviar promoción' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
     await user.click(await screen.findByRole('checkbox', { name: 'Incluir a Ana Pérez' }));
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Plantilla' }), 'promo_img|es');
     expect(screen.queryByLabelText(/Imagen del encabezado/)).not.toBeInTheDocument(); // no file input of its own
@@ -176,7 +177,7 @@ describe('MarketingPage (Promoción › CRM)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('La plantilla lleva una imagen');
 
     const image = new File(['png'], 'micas.png', { type: 'image/png' });
-    await user.upload(screen.getByTestId('image-input'), image);
+    await user.upload(screen.getByTestId('media-input'), image);
     expect(screen.getByRole('img', { name: 'Imagen del encabezado' })).toHaveAttribute('src', 'blob:micas');
 
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
@@ -184,10 +185,79 @@ describe('MarketingPage (Promoción › CRM)', () => {
     expect(api.createCampaign).toHaveBeenCalledWith(expect.objectContaining({ plantilla: 'promo_img' }), image);
   });
 
+  it('sends the video of step 1 as the header of a template with a video', async () => {
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:promo', revokeObjectURL: () => undefined }));
+    api.templates.mockResolvedValue([
+      { ...promo, name: 'promo_img', header_format: 'IMAGE' },
+      { ...promo, name: 'promo_video', header_format: 'VIDEO' },
+    ]);
+    api.createCampaign.mockResolvedValue({ campaign_id: 9, encolados: 1, sin_numero: 0, dados_de_baja: 0 });
+    const user = userEvent.setup();
+    renderWithProviders(<MarketingPage />);
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Incluir a Ana Pérez' }));
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Plantilla' }), 'promo_video|es');
+
+    // An image does not fill the header of a video template.
+    await user.upload(screen.getByTestId('media-input'), new File(['png'], 'micas.png', { type: 'image/png' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('La plantilla lleva un video');
+
+    const video = new File(['mp4'], 'promo.mp4', { type: 'video/mp4' });
+    await user.upload(screen.getByTestId('media-input'), video);
+    expect(screen.getByLabelText('Video del encabezado')).toHaveAttribute('src', 'blob:promo');
+
+    await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Enviar' }));
+    expect(api.createCampaign).toHaveBeenCalledWith(expect.objectContaining({ plantilla: 'promo_video' }), video);
+  });
+
+  it('"¿Incluir ruleta?" puts a link of the chosen wheel in a placeholder of the template', async () => {
+    api.templates.mockResolvedValue([{ ...promo, body: 'Hola {{1}}, gira la ruleta: {{2}}' }]);
+    api.roulettes.mockResolvedValue([
+      { id: 4, nombre: 'Ruleta octubre', fecha_inicio: '2026-01-01', fecha_fin: '2999-12-31' },
+      { id: 5, nombre: 'Vencida', fecha_inicio: '2020-01-01', fecha_fin: '2020-01-31' },
+    ]);
+    api.createCampaign.mockResolvedValue({ campaign_id: 3, encolados: 1, sin_numero: 0, dados_de_baja: 0 });
+    const user = userEvent.setup();
+    renderWithProviders(<MarketingPage />);
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Incluir a Ana Pérez' }));
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Plantilla' }), 'promo_octubre|es');
+
+    const include = screen.getByRole('checkbox', { name: /¿Incluir ruleta\?/ });
+    expect(include).not.toBeChecked(); // off by default
+    expect(api.roulettes).not.toHaveBeenCalled();
+    await user.click(include);
+    const select = await screen.findByRole('combobox', { name: 'Ruleta' });
+    await screen.findByRole('option', { name: 'Ruleta octubre' });
+    expect(screen.queryByRole('option', { name: 'Vencida' })).not.toBeInTheDocument(); // only the valid ones
+
+    await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Elija la ruleta');
+    await user.selectOptions(select, '4');
+    // The last placeholder takes the link.
+    expect(screen.getByRole('combobox', { name: 'Variable del enlace' })).toHaveValue('1');
+    expect(screen.getByLabelText('Vista previa de la plantilla')).toHaveTextContent(
+      `gira la ruleta: ${window.location.origin}/ruleta/…`,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Enviar' }));
+    expect(api.createCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parametros: [{ source: 'NOMBRE' }, { source: 'RULETA' }],
+        ruleta_id: 4,
+        enlace_base: window.location.origin,
+      }),
+      null,
+    );
+  });
+
   it('filters the clients by the brand of the phone', async () => {
     const user = userEvent.setup();
     renderWithProviders(<MarketingPage />);
-    await user.click(screen.getByRole('button', { name: 'Enviar promoción' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
     await screen.findByText('Ana Pérez');
     await user.click(screen.getByRole('checkbox', { name: 'Seleccionar todos' }));
 
@@ -197,7 +267,7 @@ describe('MarketingPage (Promoción › CRM)', () => {
     expect(screen.getByText('1 de 3 número(s) seleccionado(s)')).toBeInTheDocument();
   });
 
-  it('lists the WhatsApp campaigns under "Enviar promoción"', async () => {
+  it('lists the WhatsApp campaigns under "Enviar propaganda"', async () => {
     const campaign: Campaign = {
       id: 7,
       plantilla: 'promo_octubre',
@@ -215,7 +285,7 @@ describe('MarketingPage (Promoción › CRM)', () => {
     api.campaigns.mockResolvedValue([campaign]);
     renderWithProviders(<MarketingPage />);
 
-    expect(screen.getByRole('heading', { name: 'Promoción' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Campaña' })).toBeInTheDocument();
     const row = (await screen.findByText('Admin Sistema')).closest('tr')!;
     // total, pendientes, entregados (delivered + read), leídos, fallidos
     expect([...row.querySelectorAll('td.text-right')].slice(0, 5).map((td) => td.textContent)).toEqual([
@@ -252,10 +322,10 @@ describe('MarketingPage (Promoción › CRM)', () => {
       ],
     });
     await userEvent.setup().click(within(row).getByRole('button', { name: 'Ver' }));
-    const preview = await screen.findByLabelText('Vista previa de la promoción');
+    const preview = await screen.findByLabelText('Vista previa de la propaganda');
     expect(within(preview).getByText('¡Hola Ana! llegaron MICAS para tu Samsung')).toBeInTheDocument();
     expect(within(preview).getByText('Responde STOP')).toBeInTheDocument();
-    expect(within(preview).getByRole('img', { name: 'Imagen de la promoción' })).toHaveAttribute(
+    expect(within(preview).getByRole('img', { name: 'Imagen de la propaganda' })).toHaveAttribute(
       'src',
       '/media/campaigns/micas.jpg',
     );

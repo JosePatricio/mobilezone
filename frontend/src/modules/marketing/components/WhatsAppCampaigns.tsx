@@ -129,10 +129,13 @@ function CampaignPreviewBubble({ campaign, sample }: { campaign: CampaignPreview
   return (
     <div className="wa-campaign-preview">
       {sample && <p className="muted crm-count">Así lo recibió {sample.cliente ?? `+${sample.telefono}`}</p>}
-      <div className="wa-bubble" aria-label="Vista previa de la promoción">
-        {campaign.imagen_url && (
-          <img src={campaign.imagen_url} alt="Imagen de la promoción" className="message-media" />
-        )}
+      <div className="wa-bubble" aria-label="Vista previa de la propaganda">
+        {campaign.imagen_url &&
+          (/\.(mp4|3gp)$/i.test(campaign.imagen_url) ? (
+            <video src={campaign.imagen_url} className="message-media" controls aria-label="Video de la propaganda" />
+          ) : (
+            <img src={campaign.imagen_url} alt="Imagen de la propaganda" className="message-media" />
+          ))}
         {campaign.encabezado && <strong>{campaign.encabezado}</strong>}
         <p>{text}</p>
         {campaign.pie && <small className="muted">{campaign.pie}</small>}

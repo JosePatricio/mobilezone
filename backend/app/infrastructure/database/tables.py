@@ -489,7 +489,7 @@ whatsapp_campaigns_table = Table(
     Column("cuerpo", Text),
     Column("encabezado", String(1024)),
     Column("pie", String(1024)),
-    Column("imagen", String(255)),  # header image, path under media/
+    Column("imagen", String(255)),  # header image or video, path under media/
     Column("created_by", ForeignKey("users.id", ondelete="SET NULL"), index=True),
     Column("created_at", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
 )
@@ -520,6 +520,48 @@ whatsapp_opt_outs_table = Table(
     "whatsapp_opt_outs",
     metadata,
     Column("telefono", String(20), primary_key=True),
+    Column("created_at", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
+)
+
+# Propaganda → Ruleta: a prize wheel valid between two dates, played once through a link of a campaign.
+roulettes_table = Table(
+    "roulettes",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("nombre", String(100), nullable=False),
+    Column("fecha_inicio", Date, nullable=False),  # local days of the shop, both included
+    Column("fecha_fin", Date, nullable=False),
+    Column("created_by", ForeignKey("users.id", ondelete="SET NULL"), index=True),
+    Column("created_at", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
+    CheckConstraint("fecha_fin >= fecha_inicio", name="fechas_valid"),
+)
+
+roulette_items_table = Table(
+    "roulette_items",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("roulette_id", ForeignKey("roulettes.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("posicion", Integer, nullable=False),  # order of the slices on the wheel
+    Column("nombre", String(100), nullable=False),
+    Column("imagen", String(255)),  # path under media/
+    Column("premio", Boolean, nullable=False, default=True, server_default=TRUE),  # False = "Sigue intentando"
+)
+
+# One link per recipient of a campaign: opened / played once, with what the client won.
+roulette_plays_table = Table(
+    "roulette_plays",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("roulette_id", ForeignKey("roulettes.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("campaign_id", ForeignKey("whatsapp_campaigns.id", ondelete="SET NULL"), index=True),
+    Column("cliente_id", ForeignKey("users.id", ondelete="SET NULL"), index=True),
+    Column("telefono", String(20), nullable=False),
+    Column("token", String(64), nullable=False, unique=True),  # unguessable code of the public link
+    Column("abierto_at", TIMESTAMP),  # first time the link was opened
+    Column("jugado_at", TIMESTAMP),  # when the wheel was spun: the link stops working
+    Column("item_id", ForeignKey("roulette_items.id", ondelete="SET NULL"), index=True),
+    Column("resultado", String(100)),  # name of the slice it stopped on (kept if the item is deleted)
+    Column("gano", Boolean, nullable=False, default=False, server_default=FALSE),
     Column("created_at", TIMESTAMP, nullable=False, default=utcnow, server_default=text("CURRENT_TIMESTAMP(6)")),
 )
 

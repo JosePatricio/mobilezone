@@ -375,7 +375,7 @@ class WhatsAppCampaignSummary:
     cuerpo: str | None = None
     encabezado: str | None = None
     pie: str | None = None
-    imagen: str | None = None  # header image, path under media/
+    imagen: str | None = None  # header image or video, path under media/
 
 
 @dataclass(frozen=True)
@@ -449,6 +449,104 @@ class WhatsAppRepository(ABC):
     def set_opt_out(self, telefono: str, opted_out: bool) -> None: ...
 
 
+@dataclass(frozen=True)
+class RouletteSummary:
+    """A prize wheel with how many links were sent, opened, played and won."""
+
+    id: int
+    nombre: str
+    fecha_inicio: date
+    fecha_fin: date
+    created_at: datetime
+    creado_por: str | None
+    items: int
+    enlaces: int
+    abiertos: int
+    jugados: int
+    ganadores: int
+
+
+@dataclass(frozen=True)
+class RouletteItemRow:
+    id: int
+    nombre: str
+    imagen: str | None  # path under media/
+    premio: bool
+
+
+@dataclass(frozen=True)
+class RoulettePlayRow:
+    """A link of a wheel sent to one phone, and what happened with it."""
+
+    id: int
+    cliente_id: int | None
+    cliente: str | None  # full name; None for numbers typed by hand or deleted clients
+    telefono: str
+    campaign_id: int | None
+    created_at: datetime
+    abierto_at: datetime | None
+    jugado_at: datetime | None
+    resultado: str | None
+    gano: bool
+
+
+@dataclass(frozen=True)
+class RouletteLink:
+    """State of one public link (looked up by its token)."""
+
+    id: int
+    roulette_id: int
+    abierto_at: datetime | None
+    jugado_at: datetime | None
+    item_id: int | None
+    resultado: str | None
+    gano: bool
+
+
+class RouletteRepository(ABC):
+    """Prize wheels of Propaganda and their single-use links."""
+
+    @abstractmethod
+    def create(
+        self,
+        *,
+        nombre: str,
+        fecha_inicio: date,
+        fecha_fin: date,
+        created_by: int | None,
+        items: list[tuple[str, str | None, bool]],
+    ) -> int:
+        """Items are (nombre, imagen, premio) in the order of the wheel. Returns the id."""
+
+    @abstractmethod
+    def summaries(self, limit: int = 100) -> list[RouletteSummary]: ...
+
+    @abstractmethod
+    def get(self, roulette_id: int) -> RouletteSummary | None: ...
+
+    @abstractmethod
+    def items(self, roulette_id: int) -> list[RouletteItemRow]: ...
+
+    @abstractmethod
+    def delete(self, roulette_id: int) -> None: ...
+
+    @abstractmethod
+    def add_links(self, roulette_id: int, campaign_id: int | None, links: list[tuple[str, int | None, str]]) -> None:
+        """Links are (token, cliente_id, telefono)."""
+
+    @abstractmethod
+    def links(self, roulette_id: int) -> list[RoulettePlayRow]: ...
+
+    @abstractmethod
+    def link_by_token(self, token: str, *, for_update: bool = False) -> RouletteLink | None: ...
+
+    @abstractmethod
+    def mark_opened(self, link_id: int, when: datetime) -> None: ...
+
+    @abstractmethod
+    def mark_played(self, link_id: int, when: datetime, item: RouletteItemRow) -> None: ...
+
+
 class UnitOfWork(ABC):
     """Transaction boundary shared by all repositories of one operation."""
 
@@ -471,6 +569,7 @@ class UnitOfWork(ABC):
     settings: SettingsRepository
     cash_openings: CashOpeningRepository
     whatsapp: WhatsAppRepository
+    roulettes: RouletteRepository
 
     @abstractmethod
     def flush(self) -> None: ...

@@ -76,11 +76,17 @@ describe('navigation', () => {
     const all = Object.values(PERMISSIONS);
     const groups = visibleNavigation(fakeAuth({ permissionCodes: all }).hasAnyPermission);
     expect(groups.map((g) => [g.label ?? null, g.items.map((i) => i.label)])).toEqual([
-      [null, ['Dashboard', 'Órdenes', 'Ventas', 'Promoción', 'Repuestos afiliados']],
+      [null, ['Dashboard', 'Órdenes', 'Ventas', 'Propaganda', 'Repuestos afiliados']],
       ['Comercial', ['Productos', 'Proveedores', 'Inventario', 'Categorías', 'Marcas', 'Clientes']],
       ['Configuración', ['Usuarios', 'Sucursales', 'Roles', 'Permisos', 'Metas de venta']],
     ]);
     expect(groups.filter((g) => g.collapsible).map((g) => g.label)).toEqual(['Comercial', 'Configuración']);
+    // Propaganda is a submenu: Campaña (WhatsApp) and Ruleta.
+    const propaganda = groups[0].items.find((i) => i.label === 'Propaganda');
+    expect(propaganda?.children?.map((i) => [i.label, i.to, i.icon])).toEqual([
+      ['Campaña', '/marketing/campaign', 'whatsapp'],
+      ['Ruleta', '/marketing/roulette', undefined],
+    ]);
     // Removed from the menu: Repuestos, Mi perfil (opened from the header) and "vaciar datos".
     expect(labels(all)).not.toContain('Repuestos');
     expect(labels(all)).not.toContain('Mi perfil');

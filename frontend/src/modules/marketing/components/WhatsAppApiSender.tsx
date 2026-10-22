@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, ErrorState, Loading, Select, useConfirm, useToast } from '@/shared/components';
+import { Button, Card, Checkbox, ErrorState, Loading, Select, useConfirm, useToast } from '@/shared/components';
 import { getErrorMessage, toApiError } from '@/shared/services/apiError';
-import { fullName } from '@/shared/utils/format';
-import { MARKETING_KEY, marketingApi } from '../services/marketingApi';
+import { fullName, todayIso } from '@/shared/utils/format';
+import { publicBaseUrl } from '../paths';
+import { MARKETING_KEY, ROULETTES_KEY, marketingApi } from '../services/marketingApi';
+import { MEDIA_MAX_MB } from './MediaPicker';
 import {
   PARAM_SOURCE_LABELS,
+  type MediaKind,
   type MessageMedia,
   type OrderClient,
   type ParamSource,
@@ -19,15 +22,18 @@ import {
  */
 const PRICE_PER_MESSAGE: Record<string, number> = { MARKETING: 0.074, UTILITY: 0.0113, AUTHENTICATION: 0.0113 };
 
-const MB = 1024 * 1024;
+/** The header file is the one of step 1 ("¿Agregar imagen o video?"), checked there against WhatsApp's limits. */
+const HEADER_KINDS: Partial<Record<NonNullable<WhatsAppTemplate['header_format']>, MediaKind>> = {
+  IMAGE: 'image',
+  VIDEO: 'video',
+};
+const KIND_LABELS: Record<MediaKind, { name: string; missing: string }> = {
+  image: { name: 'una imagen', missing: 'sin imagen' },
+  video: { name: 'un video', missing: 'sin video' },
+};
 
-/** The header image is the one of step 1 ("¿Agregar imagen?"): JPG or PNG, up to 5 MB. */
-const HEADER_IMAGE_TYPES = ['image/jpeg', 'image/png'];
-const HEADER_IMAGE_MAX_MB = 5;
-
-/** Video / PDF headers: the page has no way to attach them. */
-const canUse = (t: WhatsAppTemplate) =>
-  !t.unsupported_params && t.header_format !== 'VIDEO' && t.header_format !== 'DOCUMENT';
+/** PDF headers: the page has no way to attach them. */
+const canUse = (t: WhatsAppTemplate) => !t.unsupported_params && t.header_format !== 'DOCUMENT';
 
 /** Template chosen when the list loads; Meta's sample template is not offered. */
 const DEFAULT_TEMPLATE = 'mobilezone_promo_img';
@@ -37,10 +43,15 @@ const HIDDEN_TEMPLATES = new Set(['hello_world']);
 const PARAM_SOURCES: ParamSource[] = ['NOMBRE', 'MARCA'];
 const toParams = (names: string[]): TemplateParam[] => names.map((_, i) => ({ source: PARAM_SOURCES[i] ?? 'MARCA' }));
 
+/** "¿Incluir ruleta?": the chosen placeholder takes the link of the wheel, different for each client. */
+const withLink = (params: TemplateParam[], index: number | null): TemplateParam[] =>
+  index === null ? params : params.map((p, i) => (i === index ? { source: 'RULETA' } : p));
+
 const keyOf = (t: WhatsAppTemplate) => `${t.name}|${t.language}`;
 
 function sampleValue(param: TemplateParam, client: OrderClient | undefined): string {
   if (param.source === 'TEXTO') return param.texto?.trim() || '…';
+  if (param.source === 'RULETA') return `${publicBaseUrl()}/ruleta/…`;
   if (!client) return `[${PARAM_SOURCE_LABELS[param.source]}]`;
   return {
     NOMBRE: client.nombre,
@@ -66,7 +77,7 @@ export function formatUsd(value: number): string {
 interface Props {
   /** Selected clients with a mobile number. */
   recipients: OrderClient[];
-  /** Image chosen in "1. ¿Agregar imagen?": the header of templates with media. */
+  /** Image / video chosen in "1. ¿Agregar imagen o video?": the header of templates with media. */
   media?: MessageMedia | null;
 }
 
@@ -78,16 +89,26 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
   const templates = useQuery({ queryKey: [MARKETING_KEY, 'templates'], queryFn: marketingApi.templates, retry: false });
   const [selectedKey, setSelectedKey] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [includeRoulette, setIncludeRoulette] = useState(false);
+  const [rouletteId, setRouletteId] = useState('');
+  const [linkParam, setLinkParam] = useState('');
+  const roulettes = useQuery({ queryKey: ROULETTES_KEY, queryFn: marketingApi.roulettes, enabled: includeRoulette });
+  const today = todayIso();
+  const activeRoulettes = (roulettes.data ?? []).filter((r) => r.fecha_fin >= today);
   const total = recipients.length;
 
   const template = useMemo(() => templates.data?.find((t) => keyOf(t) === selectedKey), [templates.data, selectedKey]);
-  const params = useMemo(() => toParams(template?.body_params ?? []), [template]);
-  const needsImage = template?.header_format === 'IMAGE';
-  const headerUpload = needsImage && media && HEADER_IMAGE_TYPES.includes(media.file.type) ? media.file : null;
+  const bodyParams = template?.body_params ?? [];
+  // The link goes in the last placeholder unless another one is chosen.
+  const linkIndex = includeRoulette && bodyParams.length ? (linkParam ? Number(linkParam) : bodyParams.length - 1) : null;
+  const params = useMemo(() => withLink(toParams(template?.body_params ?? []), linkIndex), [template, linkIndex]);
+  const headerKind = template?.header_format ? HEADER_KINDS[template.header_format] : undefined;
+  const headerUpload = headerKind && media?.kind === headerKind ? media.file : null;
   const price = template ? (PRICE_PER_MESSAGE[template.category] ?? PRICE_PER_MESSAGE.MARKETING) : 0;
 
   const choose = (key: string) => {
     setSelectedKey(key);
+    setLinkParam('');
     setError(null);
   };
 
@@ -104,6 +125,7 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
           idioma: template!.language,
           cliente_ids: recipients.map((c) => c.cliente_id),
           parametros: params,
+          ...(includeRoulette ? { ruleta_id: Number(rouletteId), enlace_base: publicBaseUrl() } : {}),
         },
         headerUpload,
       ),
@@ -112,17 +134,21 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
 
   const send = async () => {
     if (!template) return setError('Elija una plantilla.');
-    if (needsImage && !headerUpload)
-      return setError('La plantilla lleva una imagen: agréguela en "1. ¿Agregar imagen?".');
-    if (headerUpload && headerUpload.size > HEADER_IMAGE_MAX_MB * MB)
-      return setError(`La imagen supera los ${HEADER_IMAGE_MAX_MB} MB que permite WhatsApp.`);
+    if (headerKind && !headerUpload)
+      return setError(
+        `La plantilla lleva ${KIND_LABELS[headerKind].name} (hasta ${MEDIA_MAX_MB[headerKind]} MB): agréguelo en "1. ¿Agregar imagen o video?".`,
+      );
     if (total === 0) return setError('Seleccione al menos un cliente con celular.');
+    if (includeRoulette && !rouletteId) return setError('Elija la ruleta que se envía.');
+    if (includeRoulette && linkIndex === null)
+      return setError('La plantilla no tiene variables: elija una con una variable para el enlace de la ruleta.');
     setError(null);
     const ok = await confirm({
       title: 'Enviar por WhatsApp',
       message: (
         <>
           Se enviará la plantilla <strong>{template.name}</strong> a {recipients.length} cliente(s).
+          {includeRoulette && <> Cada uno recibe su propio enlace de la ruleta (un solo uso).</>}
           <br />
           Costo aproximado: <strong>{formatUsd(total * price)}</strong> ({formatUsd(price)} por mensaje de{' '}
           {template.category.toLowerCase()}).
@@ -184,20 +210,57 @@ export function WhatsAppApiSender({ recipients, media = null }: Props) {
         onChange={(e) => choose(e.target.value)}
         hint={
           unsupported.length
-            ? `No se pueden usar (llevan video, PDF o variables en el encabezado o botones): ${unsupported.join(', ')}.`
+            ? `No se pueden usar (llevan PDF o variables en el encabezado o botones): ${unsupported.join(', ')}.`
             : undefined
         }
       />
+
+      <Checkbox
+        label="¿Incluir ruleta?"
+        description="Agrega al mensaje un enlace único por cliente para jugar la ruleta una vez."
+        checked={includeRoulette}
+        onChange={(e) => {
+          setIncludeRoulette(e.target.checked);
+          setError(null);
+        }}
+      />
+      {includeRoulette && (
+        <div className="wa-roulette">
+          <Select
+            label="Ruleta"
+            placeholder={
+              roulettes.isLoading ? 'Cargando…' : activeRoulettes.length ? 'Elija una ruleta' : 'No hay ruletas vigentes'
+            }
+            options={activeRoulettes.map((r) => ({ value: String(r.id), label: r.nombre }))}
+            value={rouletteId}
+            onChange={(e) => setRouletteId(e.target.value)}
+          />
+          {template && bodyParams.length > 0 && (
+            <Select
+              label="Variable del enlace"
+              options={bodyParams.map((name, i) => ({ value: String(i), label: `{{${name}}}` }))}
+              value={String(linkIndex)}
+              onChange={(e) => setLinkParam(e.target.value)}
+              hint="Variable de la plantilla que se reemplaza por el enlace de la ruleta."
+            />
+          )}
+          {template && bodyParams.length === 0 && (
+            <p className="field-hint">La plantilla no tiene variables: use una con una variable para el enlace.</p>
+          )}
+        </div>
+      )}
 
       {template && (
         <div className="wa-template">
           <div className="wa-bubble" aria-label="Vista previa de la plantilla">
             {template.header_format === 'TEXT' && template.header_text && <strong>{template.header_text}</strong>}
-            {needsImage &&
-              (headerUpload ? (
+            {headerKind &&
+              (!headerUpload ? (
+                <span className="muted">[{KIND_LABELS[headerKind].missing}: agréguelo en el paso 1]</span>
+              ) : headerKind === 'image' ? (
                 <img src={media!.url} alt="Imagen del encabezado" className="message-media" />
               ) : (
-                <span className="muted">[sin imagen: agréguela en el paso 1]</span>
+                <video src={media!.url} className="message-media" controls aria-label="Video del encabezado" />
               ))}
             <p>{fillTemplate(template, params, sample)}</p>
             {template.footer && <small className="muted">{template.footer}</small>}

@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import json
 from contextlib import contextmanager
-from datetime import date
+from datetime import date, datetime, timezone
 
 import httpx
 import pytest
@@ -23,7 +23,13 @@ from app.application.use_cases.whatsapp import (
 )
 from app.domain.entities import User
 from app.domain.exceptions import NotFoundError, ValidationError
-from app.domain.repositories import OrderClient, PendingWhatsAppMessage
+from app.domain.repositories import (
+    OrderClient,
+    PendingWhatsAppMessage,
+    RouletteItemRow,
+    RouletteLink,
+    RouletteSummary,
+)
 from app.domain.value_objects.whatsapp import WhatsAppMessageStatus, normalize_keyword, whatsapp_number
 from app.infrastructure.whatsapp.cloud_api import CloudApiWhatsAppGateway, parse_template, template_payload
 
@@ -205,9 +211,75 @@ class FakeWorkOrders:
         return self.clients
 
 
+class FakeRouletteRepo:
+    """In memory: wheels, their options and their links (see tests/test_roulette.py)."""
+
+    def __init__(self) -> None:
+        self.roulettes: dict[int, dict] = {}
+        self.items_: dict[int, list[RouletteItemRow]] = {}
+        self.links_: dict[int, dict] = {}
+
+    def create(self, *, nombre, fecha_inicio, fecha_fin, created_by, items):
+        rid = len(self.roulettes) + 1
+        self.roulettes[rid] = {"nombre": nombre, "fecha_inicio": fecha_inicio, "fecha_fin": fecha_fin}
+        start = sum(len(v) for v in self.items_.values())
+        self.items_[rid] = [RouletteItemRow(start + i + 1, n, img, premio) for i, (n, img, premio) in enumerate(items)]
+        return rid
+
+    def get(self, roulette_id):
+        r = self.roulettes.get(roulette_id)
+        if r is None:
+            return None
+        links = [link for link in self.links_.values() if link["roulette_id"] == roulette_id]
+        return RouletteSummary(
+            roulette_id, r["nombre"], r["fecha_inicio"], r["fecha_fin"], datetime(2026, 10, 1, tzinfo=timezone.utc),
+            "Admin Sistema", len(self.items_[roulette_id]), len(links),
+            sum(1 for link in links if link["abierto_at"]), sum(1 for link in links if link["jugado_at"]),
+            sum(1 for link in links if link["gano"]),
+        )
+
+    def summaries(self, limit=100):
+        return [self.get(rid) for rid in sorted(self.roulettes, reverse=True)]
+
+    def items(self, roulette_id):
+        return list(self.items_.get(roulette_id, []))
+
+    def delete(self, roulette_id):
+        self.roulettes.pop(roulette_id)
+        self.items_.pop(roulette_id)
+
+    def add_links(self, roulette_id, campaign_id, links):
+        for token, cliente_id, telefono in links:
+            self.links_[len(self.links_) + 1] = {
+                "roulette_id": roulette_id, "campaign_id": campaign_id, "cliente_id": cliente_id,
+                "telefono": telefono, "token": token, "abierto_at": None, "jugado_at": None,
+                "item_id": None, "resultado": None, "gano": False,
+            }
+
+    def links(self, roulette_id):
+        return [link for link in self.links_.values() if link["roulette_id"] == roulette_id]
+
+    def link_by_token(self, token, *, for_update=False):
+        for lid, link in self.links_.items():
+            if link["token"] == token:
+                return RouletteLink(
+                    lid, link["roulette_id"], link["abierto_at"], link["jugado_at"], link["item_id"],
+                    link["resultado"], link["gano"],
+                )
+        return None
+
+    def mark_opened(self, link_id, when):
+        if self.links_[link_id]["abierto_at"] is None:
+            self.links_[link_id]["abierto_at"] = when
+
+    def mark_played(self, link_id, when, item):
+        self.links_[link_id].update(jugado_at=when, item_id=item.id, resultado=item.nombre, gano=item.premio)
+
+
 class FakeUow:
     def __init__(self, clients=()):
         self.whatsapp = FakeWhatsAppRepo()
+        self.roulettes = FakeRouletteRepo()
         self.work_orders = FakeWorkOrders(list(clients))
         self.commits = 0
 
@@ -261,6 +333,7 @@ PROMO = WhatsAppTemplate(
     "promo", "es", "MARKETING", "APPROVED", "Hola {{1}}, tu {{2}}", footer="Responde STOP", body_params=["1", "2"]
 )
 WITH_IMAGE = WhatsAppTemplate("promo_img", "es", "MARKETING", "APPROVED", "Hola", header_format="IMAGE")
+WITH_VIDEO = WhatsAppTemplate("promo_video", "es", "MARKETING", "APPROVED", "Hola", header_format="VIDEO")
 ADMIN = User(email="admin@example.com", nombre="Admin", apellido="Sistema", id=1)
 NAME_AND_BRAND = [TemplateParam(ParamSource.NOMBRE), TemplateParam(ParamSource.MARCA)]
 
@@ -351,6 +424,19 @@ def test_campaign_keeps_the_header_image_for_its_preview():
     )
     assert storage.files == {"campaigns/1.jpg": b"jpg"}
     assert uow.whatsapp.campaigns[0]["imagen"] == "campaigns/1.jpg"
+
+
+def test_campaign_keeps_the_header_video_for_its_preview():
+    uow = FakeUow([_client(1, "0991234567")])
+    storage = FakeStorage()
+    gateway = FakeGateway([WITH_VIDEO])
+    created = CreateWhatsAppCampaignUseCase(uow, gateway, "593", storage).execute(
+        ADMIN, plantilla="promo_video", idioma="es", cliente_ids=[1], parametros=[],
+        media=MediaFile(b"mp4", "video/mp4", "promo.mp4"),
+    )
+    assert created.header_media == ("VIDEO", "MEDIA1")
+    assert storage.files == {"campaigns/1.mp4": b"mp4"}
+    assert uow.whatsapp.campaigns[0]["imagen"] == "campaigns/1.mp4"
 
 
 def test_campaign_image_is_removed_when_the_campaign_is_not_saved():

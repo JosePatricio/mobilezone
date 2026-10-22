@@ -11,6 +11,9 @@ import { CategoriesPage } from '@/modules/categories/pages/CategoriesPage';
 import { ClientsPage } from '@/modules/clients/pages/ClientsPage';
 import { InventoryPage } from '@/modules/inventory/pages/InventoryPage';
 import { MarketingPage } from '@/modules/marketing/pages/MarketingPage';
+import { PublicRoulettePage } from '@/modules/marketing/pages/PublicRoulettePage';
+import { RoulettePage } from '@/modules/marketing/pages/RoulettePage';
+import { PUBLIC_ROULETTE_PATH } from '@/modules/marketing/paths';
 import { ModelsPage } from '@/modules/models/pages/ModelsPage';
 import { PermissionsPage } from '@/modules/permissions/pages/PermissionsPage';
 import { ProductsPage } from '@/modules/products/pages/ProductsPage';
@@ -34,6 +37,7 @@ import { PublicWorkOrderPage } from '@/modules/work-orders/pages/PublicWorkOrder
 import { EmptyState } from '@/shared/components';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { HomeRoute, PermissionRoute, ProtectedRoute } from './guards';
+import { MARKETING_CAMPAIGN_PATH, MARKETING_ROULETTE_PATH } from './navigation';
 
 export function AppRouter() {
   return (
@@ -47,6 +51,8 @@ export function AppRouter() {
       {/* Public site: landing page and privacy policy; no session needed. */}
       <Route path={SITE_HOME_PATH} element={<HomePage />} />
       <Route path={SITE_PRIVACY_PATH} element={<PrivacyPage />} />
+      {/* Wheel of a WhatsApp campaign: single-use link of one client; no session needed. */}
+      <Route path={PUBLIC_ROULETTE_PATH} element={<PublicRoulettePage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
@@ -95,7 +101,9 @@ export function AppRouter() {
           </Route>
 
           <Route element={<PermissionRoute permission={P.MARKETING_MANAGE} />}>
-            <Route path="marketing" element={<MarketingPage />} />
+            <Route path="marketing" element={<Navigate to={MARKETING_CAMPAIGN_PATH} replace />} />
+            <Route path={MARKETING_CAMPAIGN_PATH} element={<MarketingPage />} />
+            <Route path={MARKETING_ROULETTE_PATH} element={<RoulettePage />} />
           </Route>
           <Route element={<PermissionRoute permission={P.AFFILIATE_PARTS_MANAGE} />}>
             <Route path="affiliate-parts" element={<AffiliatePartsPage />} />

@@ -150,7 +150,7 @@ sudo nano /etc/nginx/sites-available/mobilezone
 server {
     listen 8082;
     server_name _;
-    client_max_body_size 10m;
+    client_max_body_size 17m;
 
     location / {
         proxy_pass http://127.0.0.1:8081;
@@ -218,7 +218,7 @@ sudo nano /etc/nginx/sites-available/pixcell
 server {
     listen 80;
     server_name pixcell.net www.pixcell.net;
-    client_max_body_size 10m;
+    client_max_body_size 17m;
 
     location / {
         proxy_pass http://127.0.0.1:8081;

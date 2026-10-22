@@ -100,6 +100,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         dashboard.router,
         marketing.router,
         marketing.webhook_router,
+        marketing.public_router,
     ):
         api.include_router(router)
     app.include_router(api)

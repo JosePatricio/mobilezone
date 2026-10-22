@@ -34,6 +34,8 @@ constraints), InnoDB and `utf8mb4`. The scripts avoid MySQL-only syntax so they 
 | `upgrades/024_whatsapp_api.sql` | Upgrades a version 23 database: Propaganda through the WhatsApp Cloud API (`whatsapp_campaigns`, `whatsapp_messages`, `whatsapp_opt_outs`) (run once) |
 | `upgrades/025_unificar_sucursales.sql` | Upgrades a version 24 database: the branch Centro is merged into Matriz (stock, users, sales, work orders and cash openings are moved, nothing is deleted) and removed (run once) |
 | `upgrades/026_minimo_recomendado.sql` | Upgrades a version 25 database: products get a recommended minimum stock (`minimo_recomendado`, 0 = no alert) used by the low stock alert of the dashboard (run once) |
+| `upgrades/027_vista_previa_promocion.sql` | Upgrades a version 26 database: each WhatsApp campaign keeps its text and header image for the preview; the campaigns sent so far are deleted (run once) |
+| `upgrades/028_ruleta.sql` | Upgrades a version 27 database: Propaganda → Ruleta, prize wheels (`roulettes`, `roulette_items`) and the single-use links sent in the campaigns (`roulette_plays`) (run once) |
 
 ## Option A — Alembic + Python seed (recommended)
 

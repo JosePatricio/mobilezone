@@ -5,7 +5,14 @@ export interface NavItem {
   label: string;
   /** Any of these permissions shows the item. Empty = always visible. */
   permissions: string[];
+  /** Shown next to the label. */
+  icon?: 'whatsapp';
+  /** Submenu: the label opens / closes these options (`to` is the common prefix of their paths). */
+  children?: NavItem[];
 }
+
+export const MARKETING_CAMPAIGN_PATH = '/marketing/campaign';
+export const MARKETING_ROULETTE_PATH = '/marketing/roulette';
 
 export interface NavGroup {
   label?: string;
@@ -27,7 +34,15 @@ export const NAVIGATION: NavGroup[] = [
       { to: '/', label: 'Dashboard', permissions: DASHBOARD_PERMISSIONS },
       { to: '/work-orders', label: 'Órdenes', permissions: [P.WORK_ORDERS_VIEW] },
       { to: '/sales', label: 'Ventas', permissions: [P.SALES_VIEW, P.SALES_CREATE] },
-      { to: '/marketing', label: 'Promoción', permissions: [P.MARKETING_MANAGE] },
+      {
+        to: '/marketing',
+        label: 'Propaganda',
+        permissions: [P.MARKETING_MANAGE],
+        children: [
+          { to: MARKETING_CAMPAIGN_PATH, label: 'Campaña', icon: 'whatsapp', permissions: [P.MARKETING_MANAGE] },
+          { to: MARKETING_ROULETTE_PATH, label: 'Ruleta', permissions: [P.MARKETING_MANAGE] },
+        ],
+      },
       { to: '/affiliate-parts', label: 'Repuestos afiliados', permissions: [P.AFFILIATE_PARTS_MANAGE] },
     ],
   },
@@ -57,10 +72,19 @@ export const NAVIGATION: NavGroup[] = [
 ];
 
 export function visibleNavigation(hasAny: (codes: string[]) => boolean): NavGroup[] {
-  return NAVIGATION.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => item.permissions.length === 0 || hasAny(item.permissions)),
-  })).filter((group) => group.items.length > 0);
+  const visible = (items: NavItem[]): NavItem[] =>
+    items
+      .filter((item) => item.permissions.length === 0 || hasAny(item.permissions))
+      .map((item) => (item.children ? { ...item, children: visible(item.children) } : item))
+      .filter((item) => !item.children || item.children.length > 0);
+  return NAVIGATION.map((group) => ({ ...group, items: visible(group.items) })).filter(
+    (group) => group.items.length > 0,
+  );
+}
+
+/** The pages of the menu: the options of a submenu instead of the submenu itself. */
+export function navPages(items: NavItem[]): NavItem[] {
+  return items.flatMap((item) => (item.children ? navPages(item.children) : [item]));
 }
 
 /**
@@ -68,6 +92,6 @@ export function visibleNavigation(hasAny: (codes: string[]) => boolean): NavGrou
  * their first module of the menu, else Mi perfil.
  */
 export function homePath(hasAny: (codes: string[]) => boolean): string {
-  const items = visibleNavigation(hasAny).flatMap((group) => group.items);
+  const items = navPages(visibleNavigation(hasAny).flatMap((group) => group.items));
   return items.find((item) => item.to !== '/' && item.to !== '/profile')?.to ?? '/profile';
 }

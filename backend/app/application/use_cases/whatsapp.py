@@ -5,6 +5,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass
+from datetime import date
 from enum import Enum
 
 from app.application.services.files import FileStorage
@@ -16,6 +17,7 @@ from app.application.services.whatsapp import (
     WhatsAppTemplate,
 )
 from app.application.use_cases.base import UseCase
+from app.application.use_cases.roulette import new_token, roulette_active
 from app.domain.entities import User
 from app.domain.exceptions import NotFoundError, ValidationError
 from app.domain.repositories import OrderClient, UnitOfWork, WhatsAppCampaignSummary, WhatsAppMessageRow
@@ -33,7 +35,7 @@ logger = logging.getLogger(__name__)
 MEDIA_MIME = {"IMAGE": ("image/jpeg", "image/png"), "VIDEO": ("video/mp4", "video/3gpp"), "DOCUMENT": ("application/pdf",)}
 # Header images are kept for the preview of the campaign (folder under media/).
 CAMPAIGN_IMAGES_FOLDER = "campaigns"
-IMAGE_EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png"}
+MEDIA_EXTENSIONS = {"image/jpeg": "jpg", "image/png": "png", "video/mp4": "mp4", "video/3gpp": "3gp"}
 # Largest file Meta accepts for each media header, in MB (the upload itself is capped at 10 MB by the API).
 MEDIA_MAX_MB = {"IMAGE": 5, "VIDEO": 16, "DOCUMENT": 100}
 
@@ -47,6 +49,7 @@ class ParamSource(str, Enum):
     MARCA = "MARCA"  # brand of the phone of their most recent order (@TELEFONO of the CRM)
     MODELO = "MODELO"
     TEXTO = "TEXTO"  # same fixed text for everybody
+    RULETA = "RULETA"  # single-use link of the wheel of the campaign, different for each phone
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,19 @@ class MediaFile:
     content: bytes
     mime_type: str
     filename: str
+
+
+@dataclass(frozen=True)
+class RouletteLinkOptions:
+    """"¿Incluir ruleta?": the wheel whose link goes in the RULETA placeholder, and the public page."""
+
+    ruleta_id: int
+    base_url: str  # e.g. https://pixcell.net → https://pixcell.net/ruleta/<token>
+    today: date
+
+
+def roulette_url(base_url: str, token: str) -> str:
+    return f"{base_url.rstrip('/')}/ruleta/{token}"
 
 
 @dataclass(frozen=True)
@@ -82,8 +98,11 @@ def _clean(value: str | None) -> str:
     return re.sub(r"\s+", " ", value or "").strip() or "-"
 
 
-def param_value(param: TemplateParam, client: OrderClient | None) -> str:
-    """Value of a placeholder for one client; None = a number typed by hand (no client data)."""
+def param_value(param: TemplateParam, client: OrderClient | None, link: str | None = None) -> str:
+    """Value of a placeholder for one client; None = a number typed by hand (no client data).
+    ``link``: the roulette link of this phone (RULETA placeholder)."""
+    if param.source == ParamSource.RULETA:
+        return _clean(link)
     if client is None:
         return _clean({ParamSource.TEXTO: param.texto, ParamSource.NOMBRE: "Cliente"}.get(param.source))
     return _clean(
@@ -143,8 +162,10 @@ class CreateWhatsAppCampaignUseCase(UseCase):
         parametros: list[TemplateParam],
         media: MediaFile | None = None,
         numeros: list[str] | None = None,
+        ruleta: RouletteLinkOptions | None = None,
     ) -> CampaignCreated:
-        """`numeros`: extra phone numbers typed by hand (e.g. for a test), sent without client data."""
+        """`numeros`: extra phone numbers typed by hand (e.g. for a test), sent without client data.
+        `ruleta`: each phone gets its own link of the wheel in the RULETA placeholder."""
         template = self._template(plantilla, idioma)
         if len(parametros) != len(template.body_params):
             raise ValidationError(
@@ -153,6 +174,19 @@ class CreateWhatsAppCampaignUseCase(UseCase):
             )
         if any(p.source == ParamSource.TEXTO and not (p.texto or "").strip() for p in parametros):
             raise ValidationError("Escriba el texto de las variables fijas.", code="TEMPLATE_PARAMS")
+        with_link = any(p.source == ParamSource.RULETA for p in parametros)
+        if ruleta is None and with_link:
+            raise ValidationError("Elija la ruleta del enlace.", code="ROULETTE_REQUIRED")
+        if ruleta is not None:
+            if not with_link:
+                raise ValidationError(
+                    "Elija la variable de la plantilla que lleva el enlace de la ruleta.", code="ROULETTE_PARAM"
+                )
+            roulette = self.uow.roulettes.get(ruleta.ruleta_id)
+            if roulette is None:
+                raise NotFoundError("Ruleta no encontrada.", code="ROULETTE_NOT_FOUND")
+            if not roulette_active(roulette, ruleta.today):
+                raise ValidationError("La ruleta ya no está vigente.", code="ROULETTE_EXPIRED")
         if template.header_format in MEDIA_HEADERS:
             if media is None:
                 raise ValidationError("La plantilla necesita un archivo para el encabezado.", code="MEDIA_REQUIRED")
@@ -174,14 +208,19 @@ class CreateWhatsAppCampaignUseCase(UseCase):
             if number and number not in recipients:
                 recipients[number] = client
         opted_out = self.uow.whatsapp.opted_out(list(recipients))
+        sending = [(number, client) for number, client in recipients.items() if number not in opted_out]
+        # One single-use link of the wheel per phone.
+        tokens = {number: new_token() for number, _ in sending} if ruleta else {}
         queue = [
             (
                 client.cliente_id if client else None,
                 number,
-                [(name, param_value(p, client)) for name, p in zip(template.body_params, parametros)],
+                [
+                    (name, param_value(p, client, roulette_url(ruleta.base_url, tokens[number]) if ruleta else None))
+                    for name, p in zip(template.body_params, parametros)
+                ],
             )
-            for number, client in recipients.items()
-            if number not in opted_out
+            for number, client in sending
         ]
         if not queue:
             raise ValidationError(
@@ -193,8 +232,8 @@ class CreateWhatsAppCampaignUseCase(UseCase):
             header_media = (template.header_format, self.gateway.upload_media(media.content, media.mime_type, media.filename))
 
         imagen = None
-        if self.storage is not None and media is not None and template.header_format == "IMAGE":
-            imagen = self.storage.save(CAMPAIGN_IMAGES_FOLDER, media.content, IMAGE_EXTENSIONS[media.mime_type])
+        if self.storage is not None and media is not None and template.header_format in ("IMAGE", "VIDEO"):
+            imagen = self.storage.save(CAMPAIGN_IMAGES_FOLDER, media.content, MEDIA_EXTENSIONS[media.mime_type])
         try:
             with self.uow.transaction():
                 campaign_id = self.uow.whatsapp.create_campaign(
@@ -208,6 +247,12 @@ class CreateWhatsAppCampaignUseCase(UseCase):
                     imagen=imagen,
                 )
                 self.uow.whatsapp.add_messages(campaign_id, queue)
+                if ruleta:
+                    self.uow.roulettes.add_links(
+                        ruleta.ruleta_id,
+                        campaign_id,
+                        [(tokens[number], client.cliente_id if client else None, number) for number, client in sending],
+                    )
         except Exception:
             if imagen:
                 self.storage.delete(imagen)

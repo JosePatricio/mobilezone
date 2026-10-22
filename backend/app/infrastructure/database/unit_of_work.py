@@ -24,6 +24,7 @@ from app.infrastructure.repositories.sqlalchemy import (
     SqlAlchemySupplierRepository,
     SqlAlchemyUserRepository,
     SqlAlchemyWorkOrderRepository,
+    SqlAlchemyRouletteRepository,
     SqlAlchemyWhatsAppRepository,
 )
 
@@ -52,6 +53,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.settings = SqlAlchemySettingsRepository(session)
         self.cash_openings = SqlAlchemyCashOpeningRepository(session)
         self.whatsapp = SqlAlchemyWhatsAppRepository(session)
+        self.roulettes = SqlAlchemyRouletteRepository(session)
 
     def _translate(self, exc: IntegrityError) -> ConflictError:
         return ConflictError(

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, Request, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
@@ -12,11 +14,13 @@ from sqlalchemy.orm import sessionmaker
 
 from app.application.services.whatsapp import WhatsAppGateway
 from app.application.use_cases.marketing import OrderClientsQuery
+from app.application.use_cases.roulette import PublicRouletteUseCases, RouletteItemData, RouletteUseCases
 from app.application.use_cases.whatsapp import (
     CreateWhatsAppCampaignUseCase,
     HandleWhatsAppWebhookUseCase,
     ListWhatsAppTemplatesQuery,
     MediaFile,
+    RouletteLinkOptions,
     SendWhatsAppCampaignUseCase,
     TemplateParam,
     WhatsAppCampaignsQuery,
@@ -25,9 +29,13 @@ from app.domain.entities import User
 from app.domain.exceptions import AuthenticationError, ConflictError, ValidationError
 from app.domain.value_objects.permissions import Perm
 from app.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
-from app.presentation.api.dependencies import StorageDep, UowDep, require_permissions
+from app.presentation.api.dependencies import StorageDep, UowDep, read_upload, require_permissions
 from app.presentation.api.schemas.marketing import (
     OrderClientResponse,
+    PublicRouletteResponse,
+    RouletteDetailResponse,
+    RouletteRequest,
+    RouletteResponse,
     WhatsAppCampaignCreatedResponse,
     WhatsAppCampaignDetailResponse,
     WhatsAppCampaignRequest,
@@ -40,11 +48,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/marketing", tags=["marketing"])
 # Called by Meta (no session): verification of the URL and notifications of the WhatsApp account.
 webhook_router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
+# The wheel opened by the client from the link of the WhatsApp message (no session).
+public_router = APIRouter(prefix="/public/roulette", tags=["public"])
 
 CanManage = Annotated[User, Depends(require_permissions(Perm.MARKETING_MANAGE))]
 
-# Same as client_max_body_size of nginx (Meta itself allows 5 MB images and 16 MB videos).
-MAX_HEADER_BYTES = 10 * 1024 * 1024
+# Meta allows 5 MB images and 16 MB videos; client_max_body_size of nginx leaves room for the form.
+MAX_HEADER_BYTES = 16 * 1024 * 1024
 
 
 def get_whatsapp(request: Request) -> WhatsAppGateway:
@@ -59,6 +69,11 @@ def get_whatsapp(request: Request) -> WhatsAppGateway:
 
 
 WhatsAppDep = Annotated[WhatsAppGateway, Depends(get_whatsapp)]
+
+
+def _today(request: Request):
+    """Local day of the shop: the wheels are valid between two local dates."""
+    return datetime.now(ZoneInfo(request.app.state.settings.timezone)).date()
 
 
 @router.get("/recipients", response_model=list[OrderClientResponse])
@@ -122,7 +137,7 @@ def create_whatsapp_campaign(
         finally:
             file.file.close()
         if len(content) > MAX_HEADER_BYTES:
-            raise ValidationError("El archivo supera los 10 MB.", code="FILE_TOO_LARGE")
+            raise ValidationError("El archivo supera los 16 MB.", code="FILE_TOO_LARGE")
         media = MediaFile(content, file.content_type or "application/octet-stream", file.filename or "archivo")
 
     settings = request.app.state.settings
@@ -134,6 +149,11 @@ def create_whatsapp_campaign(
         numeros=body.numeros,
         parametros=[TemplateParam(p.source, p.texto) for p in body.parametros],
         media=media,
+        ruleta=(
+            RouletteLinkOptions(body.ruleta_id, body.enlace_base, _today(request))
+            if body.ruleta_id is not None
+            else None
+        ),
     )
     background.add_task(
         send_campaign,
@@ -157,6 +177,63 @@ def whatsapp_campaigns(uow: UowDep, _: CanManage):
 @router.get("/whatsapp/campaigns/{campaign_id}", response_model=WhatsAppCampaignDetailResponse)
 def whatsapp_campaign(campaign_id: int, uow: UowDep, _: CanManage):
     return WhatsAppCampaignsQuery(uow).detail(campaign_id)
+
+
+@router.get("/roulettes", response_model=list[RouletteResponse])
+def roulettes(uow: UowDep, _: CanManage):
+    """Prize wheels with how many links were sent, opened, played and won."""
+    return RouletteUseCases(uow).list()
+
+
+@router.post("/roulettes", response_model=RouletteResponse, status_code=status.HTTP_201_CREATED)
+def create_roulette(
+    uow: UowDep,
+    actor: CanManage,
+    storage: StorageDep,
+    data: Annotated[str, Form(description="RouletteRequest como JSON")],
+    images: Annotated[list[UploadFile] | None, File(description="Imágenes de las opciones (JPG, PNG o WEBP, 2 MB)")] = None,
+):
+    """A wheel with N options (name and optional image each), valid from fecha_inicio to fecha_fin.
+    Multipart: each option refers to its image by its position in `images`."""
+    try:
+        body = RouletteRequest.model_validate(json.loads(data))
+    except (json.JSONDecodeError, PydanticValidationError) as exc:
+        raise ValidationError("Datos de la ruleta no válidos.", details=str(exc)) from exc
+    contents = [read_upload(file) for file in images or []]
+    if any(item.imagen is not None and item.imagen >= len(contents) for item in body.items):
+        raise ValidationError("Falta la imagen de una opción.", code="ROULETTE_IMAGE")
+    items = [
+        RouletteItemData(item.nombre, item.premio, contents[item.imagen] if item.imagen is not None else None)
+        for item in body.items
+    ]
+    return RouletteUseCases(uow, storage).create(
+        actor, nombre=body.nombre, fecha_inicio=body.fecha_inicio, fecha_fin=body.fecha_fin, items=items
+    )
+
+
+@router.get("/roulettes/{roulette_id}", response_model=RouletteDetailResponse)
+def roulette(roulette_id: int, uow: UowDep, _: CanManage):
+    """The wheel, its options and every link sent: when it was opened, played and what was won."""
+    return RouletteUseCases(uow).detail(roulette_id)
+
+
+@router.delete("/roulettes/{roulette_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_roulette(roulette_id: int, uow: UowDep, storage: StorageDep, _: CanManage) -> Response:
+    """Only wheels never sent in a campaign."""
+    RouletteUseCases(uow, storage).delete(roulette_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@public_router.get("/{token}", response_model=PublicRouletteResponse)
+def public_roulette(token: str, request: Request, uow: UowDep):
+    """The wheel of one link. The first visit records the date and time it was opened."""
+    return PublicRouletteUseCases(uow, _today(request)).view(token)
+
+
+@public_router.post("/{token}/play", response_model=PublicRouletteResponse)
+def play_roulette(token: str, request: Request, uow: UowDep):
+    """Spins the wheel once: the server picks the option and the link stops working."""
+    return PublicRouletteUseCases(uow, _today(request)).play(token)
 
 
 @webhook_router.get("/webhook", response_class=PlainTextResponse)

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { type NavItem, visibleNavigation } from '@/app/router/navigation';
 import { useAuth } from '@/app/store/AuthProvider';
-import { Avatar, Logo, useConfirm } from '@/shared/components';
+import { Avatar, Logo, WhatsAppIcon, useConfirm } from '@/shared/components';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { fullName } from '@/shared/utils/format';
 import { TodaySales } from './TodaySales';
@@ -60,9 +60,13 @@ export function MainLayout() {
             ) : (
               <div className="nav-group" key={group.label ?? i}>
                 {group.label && <p className="nav-group-label">{group.label}</p>}
-                {group.items.map((item) => (
-                  <NavItemLink key={item.to} item={item} />
-                ))}
+                {group.items.map((item) =>
+                  item.children ? (
+                    <NavTree key={item.to} label={item.label} items={item.children} pathname={location.pathname} />
+                  ) : (
+                    <NavItemLink key={item.to} item={item} />
+                  ),
+                )}
               </div>
             ),
           )}
@@ -86,6 +90,7 @@ export function MainLayout() {
 function NavItemLink({ item }: { item: NavItem }) {
   return (
     <NavLink to={item.to} end={item.to === '/'} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+      {item.icon === 'whatsapp' && <WhatsAppIcon className="nav-icon" width={16} height={16} />}
       {item.label}
     </NavLink>
   );
