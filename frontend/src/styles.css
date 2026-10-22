@@ -1010,3 +1010,5 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .roulette-outcome img { width: 72px; height: 72px; object-fit: cover; border-radius: 50%; }
 .roulette-won { background: var(--success-soft); }
 .wa-roulette { display: grid; gap: 8px; margin: 4px 0 8px; }
+.wa-template-differs { margin: 0; font-size: 0.85rem; }
+.wa-template-sent { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-style: italic; }

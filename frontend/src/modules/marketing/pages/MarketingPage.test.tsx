@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/utils';
@@ -246,10 +246,15 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Elija la ruleta');
     await user.selectOptions(select, '4');
-    // @NOMBRE {{1}}, @TELEFONO {{2}}, @RULETA {{3}}.
+    // @NOMBRE {{1}}, @TELEFONO {{2}}, @RULETA {{3}}: the preview shows the text with the link of the client…
     expect(screen.getByLabelText('Vista previa de la plantilla')).toHaveTextContent(
-      `Gira la ruleta: ${window.location.origin}/ruleta/…`,
+      `¡Hola Ana! 📱 llegaron MICAS con DISEÑO para tu Samsung`,
     );
+    expect(screen.getByLabelText('Vista previa de la plantilla')).toHaveTextContent(
+      `no recibir más mensajes${window.location.origin}/ruleta/…`,
+    );
+    // …and, as it is not the text of the template, what WhatsApp will really send.
+    expect(screen.getByRole('note')).toHaveTextContent(`Gira la ruleta: ${window.location.origin}/ruleta/…`);
 
     // A template without a placeholder for the link cannot carry it.
     await user.selectOptions(plantilla, 'promo_corta|es');
@@ -272,6 +277,29 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
     await user.click(include);
     expect(text).not.toHaveTextContent('@RULETA');
     expect(within(toolbar).queryByRole('button', { name: '@RULETA' })).not.toBeInTheDocument();
+  });
+
+  it('the preview follows the text of "2. Texto" while it is edited', async () => {
+    const body =
+      '¡Hola {{1}}! 📱 llegaron MICAS con DISEÑO para tu {{2}}, reservalo antes que se agoten.\n' +
+      'Responde STOP para no recibir más mensajes';
+    api.templates.mockResolvedValue([{ ...promo, body }]);
+    const user = userEvent.setup();
+    renderWithProviders(<MarketingPage />);
+    await user.click(screen.getByRole('button', { name: 'Enviar propaganda' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Incluir a Ana Pérez' }));
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Plantilla' }), 'promo_octubre|es');
+
+    const preview = screen.getByLabelText('Vista previa de la plantilla');
+    expect(preview).toHaveTextContent('¡Hola Ana! 📱 llegaron MICAS con DISEÑO para tu Samsung');
+    expect(screen.queryByRole('note')).not.toBeInTheDocument(); // same text as the template
+
+    const text = screen.getByRole('textbox', { name: 'Mensaje' });
+    // What the browser does while typing at the end of the text (jsdom has no real editing).
+    text.append(document.createTextNode(' ¡Solo hoy @NOMBRE!'));
+    fireEvent.input(text);
+    expect(preview).toHaveTextContent('¡Solo hoy Ana!');
+    expect(screen.getByRole('note')).toHaveTextContent('WhatsApp solo envía el texto aprobado por Meta');
   });
 
   it('filters the clients by the brand of the phone', async () => {

@@ -1,2 +1,2 @@
 En Campaña
-si el check incluir rulta es checked, poner en 2. Texto , el argumento @RULETA tambien , entonces ya podrias eliminar Variable del enlace de la parte derecha.
+Cuando edito en el textarea Mensaje el texto, en la vista previa no puedo ver en tiempo real el texto que modifico, arregla eso

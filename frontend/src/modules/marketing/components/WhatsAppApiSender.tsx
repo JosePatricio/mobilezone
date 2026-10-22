@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Checkbox, ErrorState, Loading, Select, useConfirm, useToast } from '@/shared/components';
 import { getErrorMessage, toApiError } from '@/shared/services/apiError';
 import { fullName, todayIso } from '@/shared/utils/format';
+import { applyVariables, formatMessage, isEmptyMessage, type Line } from '../message';
 import { publicBaseUrl } from '../paths';
 import { MARKETING_KEY, ROULETTES_KEY, marketingApi } from '../services/marketingApi';
 import { MEDIA_MAX_MB } from './MediaPicker';
@@ -70,6 +71,60 @@ function fillTemplate(template: WhatsAppTemplate, params: TemplateParam[], clien
   });
 }
 
+/** Variable of "2. Texto" that stands for each kind of placeholder. */
+const TOKEN_OF: Partial<Record<ParamSource, string>> = { NOMBRE: '@NOMBRE', MARCA: '@TELEFONO', RULETA: '@RULETA' };
+
+/** The template written with the variables of the editor ({{1}} → @NOMBRE, …), to compare both texts. */
+function templateAsText(template: WhatsAppTemplate, params: TemplateParam[]): string {
+  return template.body.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, name: string) => {
+    const index = template.body_params.indexOf(name);
+    return (index >= 0 && params[index] && TOKEN_OF[params[index].source]) || match;
+  });
+}
+
+const comparable = (text: string) =>
+  text
+    .replace(/@(NOMBRE|TELEFONO|RULETA)\b/gi, (token) => token.toUpperCase())
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/** The text of the editor with the variables filled for one client (sample of the preview). */
+function personalizeText(lines: Line[], client: OrderClient | undefined): Line[] {
+  const vars = client
+    ? { nombre: client.nombre, telefono: client.marca }
+    : { nombre: `[${PARAM_SOURCE_LABELS.NOMBRE}]`, telefono: `[${PARAM_SOURCE_LABELS.MARCA}]` };
+  const link = `${publicBaseUrl()}/ruleta/…`;
+  return lines.map((line) =>
+    line.map((run) => ({ ...run, text: applyVariables(run.text, vars).replace(/@RULETA\b/gi, () => link) })),
+  );
+}
+
+/** Lines with bold / italic / strikethrough, as WhatsApp shows them (no text sizes). */
+function TextLines({ lines }: { lines: Line[] }) {
+  return (
+    <>
+      {lines.map((line, i) => (
+        <p key={i}>
+          {line.length === 0
+            ? '\u00a0'
+            : line.map((run, j) => (
+                <span
+                  key={j}
+                  style={{
+                    fontWeight: run.bold ? 700 : undefined,
+                    fontStyle: run.italic ? 'italic' : undefined,
+                    textDecoration: run.strike ? 'line-through' : undefined,
+                  }}
+                >
+                  {run.text}
+                </span>
+              ))}
+        </p>
+      ))}
+    </>
+  );
+}
+
 export function formatUsd(value: number): string {
   return `$${value.toFixed(2)}`;
 }
@@ -84,6 +139,8 @@ interface Props {
   onIncludeRouletteChange?: (on: boolean) => void;
   /** Placeholder of @RULETA: its position among the variables of "2. Texto" (null = not in the text). */
   linkIndex?: number | null;
+  /** Text of "2. Texto": the preview follows it while it is typed. */
+  lines?: Line[];
 }
 
 /** "Enviar por WhatsApp Business": one approved template, sent by the server through Meta's Cloud API. */
@@ -93,6 +150,7 @@ export function WhatsAppApiSender({
   includeRoulette = false,
   onIncludeRouletteChange,
   linkIndex = null,
+  lines = [],
 }: Props) {
   const toast = useToast();
   const confirm = useConfirm();
@@ -209,6 +267,10 @@ export function WhatsAppApiSender({
     .map((t) => ({ value: keyOf(t), label: `${t.name} (${t.language})` }));
   const unsupported = all.filter((t) => !canUse(t)).map((t) => t.name);
   const sample = recipients[0];
+  // The preview shows the text being edited; WhatsApp only delivers the approved text of the template.
+  const edited = !isEmptyMessage(lines);
+  const differs =
+    !!template && edited && comparable(formatMessage(lines, 'WHATSAPP')) !== comparable(templateAsText(template, params));
 
   return (
     <Card title="Enviar por WhatsApp Business">
@@ -261,9 +323,16 @@ export function WhatsAppApiSender({
               ) : (
                 <video src={media!.url} className="message-media" controls aria-label="Video del encabezado" />
               ))}
-            <p>{fillTemplate(template, params, sample)}</p>
+            {edited ? <TextLines lines={personalizeText(lines, sample)} /> : <p>{fillTemplate(template, params, sample)}</p>}
             {template.footer && <small className="muted">{template.footer}</small>}
           </div>
+          {differs && (
+            <div className="alert alert-warning wa-template-differs" role="note">
+              El texto editado no es el de la plantilla aprobada <strong>{template.name}</strong>. WhatsApp solo
+              envía el texto aprobado por Meta:
+              <p className="wa-template-sent">{fillTemplate(template, params, sample)}</p>
+            </div>
+          )}
         </div>
       )}
 

@@ -372,6 +372,7 @@ function CrmComposer() {
             includeRoulette={includeRoulette}
             onIncludeRouletteChange={setIncludeRoulette}
             linkIndex={roulettePlaceholder(lines)}
+            lines={lines}
           />
         </aside>
       </div>
