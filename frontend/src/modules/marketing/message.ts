@@ -38,14 +38,12 @@ export const ROULETTE_VARIABLE: MessageVariable = {
 };
 
 /**
- * Placeholder of the template that takes @RULETA: the variables of the text are the placeholders in order
- * (@NOMBRE {{1}}, @TELEFONO {{2}}, …). Null when the text has no @RULETA.
+ * The text has @RULETA. It is internal (not a variable of the Meta template): the server adds the link
+ * of each client after the value of the last variable of the approved template.
  */
-export function roulettePlaceholder(lines: Line[]): number | null {
-  const text = lines.map((line) => line.map((run) => run.text).join('')).join(' ');
-  const tokens = (text.match(/@(NOMBRE|TELEFONO|RULETA)\b/gi) ?? []).map((t) => t.toUpperCase());
-  const index = tokens.indexOf(ROULETTE_VARIABLE.token);
-  return index >= 0 ? index : null;
+export function hasRouletteTag(lines: Line[]): boolean {
+  // Line by line: the tag may be split in runs with different formats.
+  return lines.some((line) => /@RULETA\b/i.test(line.map((run) => run.text).join('')));
 }
 
 export interface MessageVariables {

@@ -18,7 +18,7 @@ import { MediaPicker } from '../components/MediaPicker';
 import { WhatsAppApiSender } from '../components/WhatsAppApiSender';
 import { WhatsAppCampaigns } from '../components/WhatsAppCampaigns';
 import { RichTextEditor } from '../components/RichTextEditor';
-import { type Line, ROULETTE_VARIABLE, roulettePlaceholder, VARIABLES } from '../message';
+import { hasRouletteTag, type Line, ROULETTE_VARIABLE, VARIABLES } from '../message';
 import { MARKETING_KEY, marketingApi } from '../services/marketingApi';
 import type { MessageMedia, OrderClient } from '../types';
 import { usePagedRows } from '../usePagedRows';
@@ -177,7 +177,7 @@ function CrmComposer() {
   const clients = useMemo(() => query.data ?? [], [query.data]);
 
   const [media, setMediaState] = useState<MessageMedia | null>(null);
-  // "¿Incluir ruleta?" of the sender adds @RULETA to the text: its place is the placeholder of the link.
+  // "¿Incluir ruleta?" of the sender enables the internal @RULETA tag of the text.
   const [includeRoulette, setIncludeRoulette] = useState(false);
   const [lines, setLines] = useState<Line[]>([]);
   const variables = includeRoulette ? [...VARIABLES, ROULETTE_VARIABLE] : VARIABLES;
@@ -371,7 +371,7 @@ function CrmComposer() {
             media={media}
             includeRoulette={includeRoulette}
             onIncludeRouletteChange={setIncludeRoulette}
-            linkIndex={roulettePlaceholder(lines)}
+            hasRouletteTag={hasRouletteTag(lines)}
             lines={lines}
           />
         </aside>

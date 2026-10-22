@@ -214,11 +214,8 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
     expect(api.createCampaign).toHaveBeenCalledWith(expect.objectContaining({ plantilla: 'promo_video' }), video);
   });
 
-  it('"¿Incluir ruleta?" adds @RULETA to "2. Texto": its place is the placeholder of the link', async () => {
-    api.templates.mockResolvedValue([
-      { ...promo, body: 'Hola {{1}}, oferta para tu {{2}}. Gira la ruleta: {{3}}', body_params: ['1', '2', '3'] },
-      { ...promo, name: 'promo_corta' },
-    ]);
+  it('"¿Incluir ruleta?": @RULETA is an internal tag of "2. Texto", not a variable of the template', async () => {
+    api.templates.mockResolvedValue([promo, { ...promo, name: 'sin_variables', body: 'Hola', body_params: [] }]);
     api.roulettes.mockResolvedValue([
       { id: 4, nombre: 'Ruleta octubre', fecha_inicio: '2026-01-01', fecha_fin: '2999-12-31' },
       { id: 5, nombre: 'Vencida', fecha_inicio: '2020-01-01', fecha_fin: '2020-01-31' },
@@ -257,7 +254,7 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
     expect(api.createCampaign).not.toHaveBeenCalled();
     await user.click(within(toolbar).getByRole('button', { name: '@RULETA' }));
     expect(text).toHaveTextContent(/no recibir más mensajes@RULETA$/);
-    // @NOMBRE {{1}}, @TELEFONO {{2}}, @RULETA {{3}}: the preview shows the text with the link of the client.
+    // The preview shows the text with the link of the client where @RULETA is.
     expect(screen.getByLabelText('Vista previa de la plantilla')).toHaveTextContent(
       `¡Hola Ana! 📱 llegaron MICAS con DISEÑO para tu Samsung`,
     );
@@ -265,17 +262,18 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
       `no recibir más mensajes${window.location.origin}/ruleta/…`,
     );
 
-    // A template without a placeholder for the link cannot carry it.
-    await user.selectOptions(plantilla, 'promo_corta|es');
+    // The link is added to a variable of the template: one without variables cannot carry it.
+    await user.selectOptions(plantilla, 'sin_variables|es');
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('@RULETA es la variable 3 del texto y la plantilla tiene 2');
+    expect(screen.getByRole('alert')).toHaveTextContent('La plantilla no tiene variables donde agregar el enlace');
 
+    // The template with 2 variables keeps them: {{1}} the name, {{2}} the brand (the server adds the link).
     await user.selectOptions(plantilla, 'promo_octubre|es');
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
     await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Enviar' }));
     expect(api.createCampaign).toHaveBeenCalledWith(
       expect.objectContaining({
-        parametros: [{ source: 'NOMBRE' }, { source: 'MARCA' }, { source: 'RULETA' }],
+        parametros: [{ source: 'NOMBRE' }, { source: 'MARCA' }],
         ruleta_id: 4,
         enlace_base: window.location.origin,
       }),

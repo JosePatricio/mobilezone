@@ -178,9 +178,9 @@ class CreateWhatsAppCampaignUseCase(UseCase):
         if ruleta is None and with_link:
             raise ValidationError("Elija la ruleta del enlace.", code="ROULETTE_REQUIRED")
         if ruleta is not None:
-            if not with_link:
+            if not template.body_params:
                 raise ValidationError(
-                    "Elija la variable de la plantilla que lleva el enlace de la ruleta.", code="ROULETTE_PARAM"
+                    "La plantilla no tiene variables donde agregar el enlace de la ruleta.", code="ROULETTE_PARAM"
                 )
             roulette = self.uow.roulettes.get(ruleta.ruleta_id)
             if roulette is None:
@@ -211,17 +211,18 @@ class CreateWhatsAppCampaignUseCase(UseCase):
         sending = [(number, client) for number, client in recipients.items() if number not in opted_out]
         # One single-use link of the wheel per phone.
         tokens = {number: new_token() for number, _ in sending} if ruleta else {}
-        queue = [
-            (
-                client.cliente_id if client else None,
-                number,
-                [
-                    (name, param_value(p, client, roulette_url(ruleta.base_url, tokens[number]) if ruleta else None))
-                    for name, p in zip(template.body_params, parametros)
-                ],
-            )
-            for number, client in sending
-        ]
+
+        def values(number: str, client: OrderClient | None) -> list[tuple[str, str]]:
+            link = roulette_url(ruleta.base_url, tokens[number]) if ruleta else None
+            filled = [(name, param_value(p, client, link)) for name, p in zip(template.body_params, parametros)]
+            if link and not with_link:
+                # @RULETA is internal to the editor: the link goes after the value of the last
+                # placeholder of the approved template (e.g. "Samsung https://…/ruleta/abc").
+                name, value = filled[-1]
+                filled[-1] = (name, f"{value} {link}")
+            return filled
+
+        queue = [(client.cliente_id if client else None, number, values(number, client)) for number, client in sending]
         if not queue:
             raise ValidationError(
                 "Ninguno de los clientes elegidos tiene un celular válido que acepte mensajes.", code="NO_RECIPIENTS"

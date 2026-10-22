@@ -44,10 +44,6 @@ const HIDDEN_TEMPLATES = new Set(['hello_world']);
 const PARAM_SOURCES: ParamSource[] = ['NOMBRE', 'MARCA'];
 const toParams = (names: string[]): TemplateParam[] => names.map((_, i) => ({ source: PARAM_SOURCES[i] ?? 'MARCA' }));
 
-/** "¿Incluir ruleta?": the placeholder of @RULETA takes the link of the wheel, different for each client. */
-const withLink = (params: TemplateParam[], index: number | null): TemplateParam[] =>
-  index === null ? params : params.map((p, i) => (i === index ? { source: 'RULETA' } : p));
-
 const keyOf = (t: WhatsAppTemplate) => `${t.name}|${t.language}`;
 
 function sampleValue(param: TemplateParam, client: OrderClient | undefined): string {
@@ -120,8 +116,8 @@ interface Props {
   /** "¿Incluir ruleta?" (it enables the @RULETA button of "2. Texto"). */
   includeRoulette?: boolean;
   onIncludeRouletteChange?: (on: boolean) => void;
-  /** Placeholder of @RULETA: its position among the variables of "2. Texto" (null = not in the text). */
-  linkIndex?: number | null;
+  /** "2. Texto" has the internal @RULETA tag (the server adds the link after the last variable of the template). */
+  hasRouletteTag?: boolean;
   /** Text of "2. Texto": the preview follows it while it is typed. */
   lines?: Line[];
 }
@@ -132,7 +128,7 @@ export function WhatsAppApiSender({
   media = null,
   includeRoulette = false,
   onIncludeRouletteChange,
-  linkIndex = null,
+  hasRouletteTag = false,
   lines = [],
 }: Props) {
   const toast = useToast();
@@ -149,8 +145,8 @@ export function WhatsAppApiSender({
 
   const template = useMemo(() => templates.data?.find((t) => keyOf(t) === selectedKey), [templates.data, selectedKey]);
   const bodyParams = template?.body_params ?? [];
-  const link = includeRoulette ? linkIndex : null;
-  const params = useMemo(() => withLink(toParams(template?.body_params ?? []), link), [template, link]);
+  // The variables of the approved template stay as they are; the link is not one of them.
+  const params = useMemo(() => toParams(template?.body_params ?? []), [template]);
   const headerKind = template?.header_format ? HEADER_KINDS[template.header_format] : undefined;
   const headerUpload = headerKind && media?.kind === headerKind ? media.file : null;
   const price = template ? (PRICE_PER_MESSAGE[template.category] ?? PRICE_PER_MESSAGE.MARKETING) : 0;
@@ -188,15 +184,13 @@ export function WhatsAppApiSender({
       );
     if (total === 0) return setError('Seleccione al menos un cliente con celular.');
     if (includeRoulette && !rouletteId) return setError('Elija la ruleta que se envía.');
-    if (includeRoulette && link === null)
+    if (includeRoulette && !hasRouletteTag)
       return setError(
         'Marcó "¿Incluir ruleta?" pero el mensaje de "2. Texto" no tiene @RULETA: ponga el cursor donde va el ' +
           'enlace de la ruleta y presione el botón @RULETA de la barra del texto (o desmarque "¿Incluir ruleta?").',
       );
-    if (includeRoulette && link !== null && link >= bodyParams.length)
-      return setError(
-        `@RULETA es la variable ${link + 1} del texto y la plantilla tiene ${bodyParams.length}: use una plantilla con una variable para el enlace.`,
-      );
+    if (includeRoulette && bodyParams.length === 0)
+      return setError('La plantilla no tiene variables donde agregar el enlace de la ruleta: elija otra plantilla.');
     setError(null);
     const ok = await confirm({
       title: 'Enviar por WhatsApp',

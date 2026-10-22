@@ -6,7 +6,7 @@ import {
   isEmptyMessage,
   parseEditor,
   personalize,
-  roulettePlaceholder,
+  hasRouletteTag,
 } from './message';
 
 function editor(html: string): HTMLElement {
@@ -61,9 +61,9 @@ describe('CRM message', () => {
     expect(isEmptyMessage(parseEditor(editor('Hola')))).toBe(false);
   });
 
-  it('@RULETA takes the placeholder of its place among the variables of the text', () => {
-    expect(roulettePlaceholder(parseEditor(editor('Hola @NOMBRE, tu @TELEFONO<div>@RULETA</div>')))).toBe(2);
-    expect(roulettePlaceholder(parseEditor(editor('@ruleta para @NOMBRE')))).toBe(0);
-    expect(roulettePlaceholder(parseEditor(editor('Hola @NOMBRE')))).toBeNull();
+  it('finds the internal @RULETA tag in the text', () => {
+    expect(hasRouletteTag(parseEditor(editor('Hola @NOMBRE, tu @TELEFONO<div>@RULETA</div>')))).toBe(true);
+    expect(hasRouletteTag(parseEditor(editor('@ruleta para @NOMBRE')))).toBe(true);
+    expect(hasRouletteTag(parseEditor(editor('Hola @NOMBRE')))).toBe(false);
   });
 });

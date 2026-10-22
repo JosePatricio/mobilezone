@@ -109,18 +109,35 @@ def test_campaign_sends_a_different_single_use_link_to_each_phone():
     assert uow.whatsapp.messages[1]["parametros"][0] == ("1", "Ana")
 
 
+def test_campaign_link_goes_after_the_last_variable_of_the_approved_template():
+    """@RULETA is internal: the template keeps its own variables ({{1}} name, {{2}} brand)."""
+    promo = WhatsAppTemplate("promo", "es", "MARKETING", "APPROVED", "Hola {{1}}, tu {{2}}", body_params=["1", "2"])
+    uow = FakeUow([_client(1, "0991234567", nombre="Ana", marca="Samsung")])
+    roulette = _create(uow)
+    created = CreateWhatsAppCampaignUseCase(uow, FakeGateway([promo]), "593").execute(
+        ADMIN, plantilla="promo", idioma="es", cliente_ids=[1],
+        parametros=[TemplateParam(ParamSource.NOMBRE), TemplateParam(ParamSource.MARCA)],
+        ruleta=RouletteLinkOptions(roulette.id, "https://pixcell.net", TODAY),
+    )
+    assert created.encolados == 1
+    token = uow.roulettes.links(roulette.id)[0]["token"]
+    assert uow.whatsapp.messages[1]["parametros"] == [
+        ("1", "Ana"), ("2", f"Samsung https://pixcell.net/ruleta/{token}"),
+    ]
+
+
 def test_campaign_with_roulette_is_validated():
     uow = FakeUow([_client(1, "0991234567")])
     roulette = _create(uow, fecha_fin=date(2026, 10, 25))
-    use_case = CreateWhatsAppCampaignUseCase(uow, FakeGateway([WITH_LINK]), "593")
-    run = lambda params, ruleta: use_case.execute(  # noqa: E731
-        ADMIN, plantilla="promo_ruleta", idioma="es", cliente_ids=[1], parametros=params, ruleta=ruleta
+    no_params = WhatsAppTemplate("sin_variables", "es", "MARKETING", "APPROVED", "Hola")
+    use_case = CreateWhatsAppCampaignUseCase(uow, FakeGateway([WITH_LINK, no_params]), "593")
+    run = lambda params, ruleta, plantilla="promo_ruleta": use_case.execute(  # noqa: E731
+        ADMIN, plantilla=plantilla, idioma="es", cliente_ids=[1], parametros=params, ruleta=ruleta
     )
-    name_and_text = [TemplateParam(ParamSource.NOMBRE), TemplateParam(ParamSource.TEXTO, "x")]
     with pytest.raises(ValidationError, match="Elija la ruleta"):
         run(NAME_AND_LINK, None)
-    with pytest.raises(ValidationError, match="variable"):
-        run(name_and_text, RouletteLinkOptions(roulette.id, "https://x.com", TODAY))
+    with pytest.raises(ValidationError, match="no tiene variables"):
+        run([], RouletteLinkOptions(roulette.id, "https://x.com", TODAY), plantilla="sin_variables")
     with pytest.raises(NotFoundError):
         run(NAME_AND_LINK, RouletteLinkOptions(99, "https://x.com", TODAY))
     with pytest.raises(ValidationError, match="vigente"):

@@ -1,2 +1,2 @@
 En Campaña
-Cunado pongo check en Incluir ruleta, el tag @RULETA se esta insertando automaticamente en el textarea, evita eso, solo deberia estar habilitado en la parte de arriba para utilizarlo, en caso de que se seleccione el check de RULETA y el tag @RULETA no aparece en el textarea, y presionan Enviar por whatsapp. lanzar un alerta que detalle esto.
+El argumento @RULETA es un parametro interno, no parte de argumentos de whatssapp meta, incluyelo solo como parte de texto interno, y no como un argumento mas de nuestro ya funcional template
