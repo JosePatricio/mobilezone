@@ -254,7 +254,7 @@ function CrmComposer() {
               label="Mensaje"
               onChange={setLines}
               variables={variables}
-              requiredToken={includeRoulette ? ROULETTE_VARIABLE.token : undefined}
+              optionToken={includeRoulette ? ROULETTE_VARIABLE.token : undefined}
               defaultText={DEFAULT_TEXT}
               placeholder="Hola @NOMBRE, tienes una promoción para comprar tu teléfono @TELEFONO a este precio 430$."
             />

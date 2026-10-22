@@ -117,7 +117,7 @@ interface Props {
   recipients: OrderClient[];
   /** Image / video chosen in "1. ¿Agregar imagen o video?": the header of templates with media. */
   media?: MessageMedia | null;
-  /** "¿Incluir ruleta?" (it also adds @RULETA to "2. Texto"). */
+  /** "¿Incluir ruleta?" (it enables the @RULETA button of "2. Texto"). */
   includeRoulette?: boolean;
   onIncludeRouletteChange?: (on: boolean) => void;
   /** Placeholder of @RULETA: its position among the variables of "2. Texto" (null = not in the text). */
@@ -188,7 +188,11 @@ export function WhatsAppApiSender({
       );
     if (total === 0) return setError('Seleccione al menos un cliente con celular.');
     if (includeRoulette && !rouletteId) return setError('Elija la ruleta que se envía.');
-    if (includeRoulette && link === null) return setError('Agregue @RULETA en "2. Texto".');
+    if (includeRoulette && link === null)
+      return setError(
+        'Marcó "¿Incluir ruleta?" pero el mensaje de "2. Texto" no tiene @RULETA: ponga el cursor donde va el ' +
+          'enlace de la ruleta y presione el botón @RULETA de la barra del texto (o desmarque "¿Incluir ruleta?").',
+      );
     if (includeRoulette && link !== null && link >= bodyParams.length)
       return setError(
         `@RULETA es la variable ${link + 1} del texto y la plantilla tiene ${bodyParams.length}: use una plantilla con una variable para el enlace.`,

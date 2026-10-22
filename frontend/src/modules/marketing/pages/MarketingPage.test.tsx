@@ -239,7 +239,7 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
     expect(api.roulettes).not.toHaveBeenCalled();
     await user.click(include);
     expect(within(toolbar).getByRole('button', { name: '@RULETA' })).toBeInTheDocument();
-    expect(text).toHaveTextContent(/STOP para no recibir más mensajes\s*@RULETA$/);
+    expect(text).not.toHaveTextContent('@RULETA'); // not inserted by itself: only the button is enabled
     expect(screen.queryByRole('combobox', { name: 'Variable del enlace' })).not.toBeInTheDocument();
     const select = await screen.findByRole('combobox', { name: 'Ruleta' });
     await screen.findByRole('option', { name: 'Ruleta octubre' });
@@ -248,6 +248,15 @@ describe('MarketingPage (Propaganda › Campaña)', () => {
     await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Elija la ruleta');
     await user.selectOptions(select, '4');
+
+    // Checked without @RULETA in the text: the alert explains what to do.
+    await user.click(screen.getByRole('button', { name: 'Enviar por WhatsApp' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Marcó "¿Incluir ruleta?" pero el mensaje de "2. Texto" no tiene @RULETA',
+    );
+    expect(api.createCampaign).not.toHaveBeenCalled();
+    await user.click(within(toolbar).getByRole('button', { name: '@RULETA' }));
+    expect(text).toHaveTextContent(/no recibir más mensajes@RULETA$/);
     // @NOMBRE {{1}}, @TELEFONO {{2}}, @RULETA {{3}}: the preview shows the text with the link of the client.
     expect(screen.getByLabelText('Vista previa de la plantilla')).toHaveTextContent(
       `¡Hola Ana! 📱 llegaron MICAS con DISEÑO para tu Samsung`,

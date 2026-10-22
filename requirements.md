@@ -1,6 +1,2 @@
 En Campaña
-Me sale esto:
-El texto editado no es el de la plantilla aprobada mobilezone_promo_img. WhatsApp solo envía el texto aprobado por Meta:
-
-todavia no pruebo nisiquiera incluyendo la ruleta, lo probe y funciona bien por el template ya fue aprovado hace dos dias, por que me sale ese alerta?
-y abajo el texto editado, esto ya no es necesario por que ya lo tengo arriba en vista previo, borralo tambien
+Cunado pongo check en Incluir ruleta, el tag @RULETA se esta insertando automaticamente en el textarea, evita eso, solo deberia estar habilitado en la parte de arriba para utilizarlo, en caso de que se seleccione el check de RULETA y el tag @RULETA no aparece en el textarea, y presionan Enviar por whatsapp. lanzar un alerta que detalle esto.
