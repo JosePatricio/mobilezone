@@ -1,2 +1,2 @@
-En Campaña
-El argumento @RULETA es un parametro interno, no parte de argumentos de whatssapp meta, incluyelo solo como parte de texto interno, y no como un argumento mas de nuestro ya funcional template
+todavia me da error. @RULETA es la variable 3 del texto y la plantilla tiene 2: use una plantilla con una variable para el enlace.
+@RULETA no es una variable de nuestro template de whatssapp, es solo para uso interno
