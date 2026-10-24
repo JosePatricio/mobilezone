@@ -29,7 +29,7 @@ from app.domain.entities import (
     User,
     WorkOrder,
 )
-from app.domain.value_objects.enums import SaleStatus
+from app.domain.value_objects.enums import SaleStatus, WorkOrderStatus
 from app.domain.value_objects.pagination import Page, PageRequest
 from app.domain.value_objects.whatsapp import STATUS_RANK, WhatsAppMessageStatus
 from app.infrastructure.database.tables import (
@@ -506,6 +506,13 @@ class SqlAlchemyWorkOrderRepository(SqlAlchemyRepository[WorkOrder], ports.WorkO
             ) or 0
 
         return recibidas, changed_to(1), changed_to(2)
+
+    def overdue(self, *, now):
+        c = work_orders_table.c
+        stmt = select(WorkOrder).where(
+            c.estado != int(WorkOrderStatus.FINALIZADO), c.fecha_entrega.is_not(None), c.fecha_entrega < _utc_naive(now)
+        )
+        return list(self.session.scalars(stmt.order_by(c.fecha_entrega, c.num_orden)))
 
     def reception_dates(self, *, desde, hasta):
         c = work_orders_table.c

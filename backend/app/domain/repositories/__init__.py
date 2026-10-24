@@ -279,6 +279,10 @@ class WorkOrderRepository(Repository[WorkOrder]):
         """Orders received on ``day`` and orders that changed to En proceso / Finalizado in ``[desde, hasta)``."""
 
     @abstractmethod
+    def overdue(self, *, now: datetime) -> list[WorkOrder]:
+        """Orders not finalized whose ``fecha_entrega`` already passed, the most overdue first."""
+
+    @abstractmethod
     def reception_dates(self, *, desde: date, hasta: date) -> list[date]:
         """Reception date of every order received between ``desde`` and ``hasta`` (inclusive)."""
 

@@ -7,6 +7,7 @@ from decimal import Decimal
 from enum import Enum
 
 from app.application.use_cases.base import UseCase
+from app.domain.entities import WorkOrder
 from app.domain.repositories import UnitOfWork
 
 MONTHS = ("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic")
@@ -148,3 +149,10 @@ class LowStockUseCase(UseCase):
             )
             for p in self.uow.products.below_minimum()
         ]
+
+
+class OverdueOrdersUseCase(UseCase):
+    """Work orders not finalized whose promised delivery time already passed (notifications bell)."""
+
+    def execute(self, now: datetime | None = None) -> list[WorkOrder]:
+        return self.uow.work_orders.overdue(now=now or datetime.now(timezone.utc))

@@ -1010,3 +1010,16 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .roulette-outcome img { width: 72px; height: 72px; object-fit: cover; border-radius: 50%; }
 .roulette-won { background: var(--success-soft); }
 .wa-roulette { display: grid; gap: 8px; margin: 4px 0 8px; }
+
+/* ---------------------------------------------------------------- notifications bell (header) */
+.notif { position: relative; display: inline-flex; }
+.notif-bell { position: relative; color: var(--text); }
+.notif-bell:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.notif-badge { position: absolute; top: -2px; right: -4px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--danger); color: #fff; font-size: 0.7rem; font-weight: 700; line-height: 18px; text-align: center; }
+.notif-panel { position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; width: min(360px, calc(100vw - 24px)); max-height: min(480px, calc(100vh - var(--header-h) - 24px)); overflow-y: auto; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); }
+.notif-section { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 8px 4px; font-size: 0.85rem; }
+.notif-list { list-style: none; margin: 0 0 4px; padding: 0; }
+.notif-item { display: flex; flex-direction: column; gap: 2px; padding: 7px 8px; border-radius: 6px; color: inherit; text-decoration: none; font-size: 0.9rem; }
+.notif-item:hover, .notif-item:focus-visible { background: var(--primary-soft); outline: none; }
+.notif-empty { margin: 0; padding: 12px 8px; text-align: center; }
+@media (max-width: 640px) { .notif-panel { position: fixed; top: calc(var(--header-h) + 4px); right: 12px; } }

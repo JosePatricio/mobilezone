@@ -1,3 +1,4 @@
+import type { WorkOrderListItem } from '@/modules/work-orders/types';
 import { http } from '@/shared/services/httpClient';
 import type { Money } from '@/shared/types/api';
 
@@ -47,4 +48,6 @@ export const dashboardApi = {
   ordersOfTheDay: (fecha: string) =>
     http.get<DayOrders>('/dashboard/orders-day', { params: { fecha } }).then((r) => r.data),
   lowStock: () => http.get<LowStockProduct[]>('/dashboard/low-stock').then((r) => r.data),
+  /** Work orders not finalized whose delivery time already passed, the most overdue first. */
+  overdueOrders: () => http.get<WorkOrderListItem[]>('/dashboard/overdue-orders').then((r) => r.data),
 };

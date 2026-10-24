@@ -1,2 +1,3 @@
-todavia me da error. @RULETA es la variable 3 del texto y la plantilla tiene 2: use una plantilla con una variable para el enlace.
-@RULETA no es una variable de nuestro template de whatssapp, es solo para uso interno
+En la parte superior cerca del nombre de usuario logeado, colocar una Campana de notificaciones.
+El primer tipo de notificaciones sera, las ordenes (del modulo Ordenes) que no han sido finalizados, es decir los que estan atrasados.
+Tambien otro tipo de notificacion poner los productos que estan por de bajo de su cantidad minimo (En el dashboard tenemos ese dato, guiate ahi)

@@ -5,6 +5,7 @@ import { useAuth } from '@/app/store/AuthProvider';
 import { Avatar, Logo, WhatsAppIcon, useConfirm } from '@/shared/components';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { fullName } from '@/shared/utils/format';
+import { NotificationBell } from './NotificationBell';
 import { TodaySales } from './TodaySales';
 
 export function MainLayout() {
@@ -39,6 +40,7 @@ export function MainLayout() {
         </Link>
         <div className="app-user">
           {hasAnyPermission([P.SALES_CREATE, P.SALES_VIEW]) && <TodaySales />}
+          <NotificationBell />
           <Link to="/profile" className="app-user-link" title="Perfil">
             <Avatar src={user?.foto_url} alt={fullName(user)} size="sm" />
             <div className="app-user-info">

@@ -11,7 +11,7 @@ export { SearchInput, DatePicker, MoneyInput } from './Inputs';
 export { Loading, EmptyState, ErrorState, StatusBadge, PageHeader, Card } from './States';
 export { ToastProvider, useToast } from './Toast';
 export { DataList } from './DataList';
-export { SearchIcon, GridIcon, UserIcon, ImageIcon, WhatsAppIcon } from './Icons';
+export { SearchIcon, GridIcon, UserIcon, ImageIcon, WhatsAppIcon, BellIcon } from './Icons';
 export {
   Avatar,
   ProductThumb,
