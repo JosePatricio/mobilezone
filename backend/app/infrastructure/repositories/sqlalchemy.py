@@ -47,6 +47,7 @@ from app.infrastructure.database.tables import (
     roulette_items_table,
     roulette_plays_table,
     roulettes_table,
+    sale_details_table,
     sales_table,
     settings_table,
     spare_parts_table,
@@ -289,6 +290,15 @@ class SqlAlchemyProductRepository(SqlAlchemyRepository[Product], ports.ProductRe
         stmt = select(Product).where(c.estado.is_(True), c.minimo_recomendado > 0, stock < c.minimo_recomendado)
         return list(self.session.scalars(stmt.order_by((c.minimo_recomendado - stock).desc(), c.nombre, c.id)))
 
+    def stock_value(self):
+        c, i = products_table.c, inventory_table.c
+        row = self.session.execute(
+            select(
+                func.coalesce(func.sum(c.precio_venta * i.stock), 0), func.coalesce(func.sum(c.precio_costo * i.stock), 0)
+            ).select_from(inventory_table.join(products_table))
+        ).one()
+        return Decimal(row[0]), Decimal(row[1])
+
 
 class SqlAlchemySupplierRepository(SqlAlchemyRepository[Supplier], ports.SupplierRepository):
     entity = Supplier
@@ -430,6 +440,22 @@ class SqlAlchemySaleRepository(SqlAlchemyRepository[Sale], ports.SaleRepository)
         ).one()
         return int(row[0]), Decimal(row[1]), Decimal(row[2])
 
+    def top_products(self, *, limit):
+        d, p = sale_details_table.c, products_table.c
+        cantidad = func.sum(d.cantidad).label("cantidad")
+        rows = self.session.execute(
+            select(p.id, p.sku, p.nombre, cantidad, func.sum(d.subtotal))
+            .select_from(sale_details_table.join(sales_table).join(products_table))
+            .where(sales_table.c.estado == SaleStatus.CONFIRMADA)
+            .group_by(p.id, p.sku, p.nombre)
+            .order_by(cantidad.desc(), p.nombre, p.id)
+            .limit(limit)
+        ).all()
+        return [
+            ports.TopProduct(id=i, sku=sku, nombre=nombre, cantidad=int(qty), monto=Decimal(monto))
+            for i, sku, nombre, qty, monto in rows
+        ]
+
 
 class SqlAlchemyBrandRepository(SqlAlchemyRepository[Brand], ports.BrandRepository):
     entity = Brand
@@ -513,6 +539,21 @@ class SqlAlchemyWorkOrderRepository(SqlAlchemyRepository[WorkOrder], ports.WorkO
             c.estado != int(WorkOrderStatus.FINALIZADO), c.fecha_entrega.is_not(None), c.fecha_entrega < _utc_naive(now)
         )
         return list(self.session.scalars(stmt.order_by(c.fecha_entrega, c.num_orden)))
+
+    def top_brands(self, *, limit):
+        b = brands_table.c
+        ordenes = func.count(work_orders_table.c.id).label("ordenes")
+        rows = self.session.execute(
+            select(b.id, b.nombre, ordenes)
+            .select_from(work_orders_table.join(brands_table))
+            .group_by(b.id, b.nombre)
+            .order_by(ordenes.desc(), b.nombre)
+            .limit(limit)
+        ).all()
+        return [ports.BrandOrders(id=i, nombre=nombre, ordenes=int(n)) for i, nombre, n in rows]
+
+    def entry_reasons(self):
+        return [list(reasons or []) for reasons in self.session.scalars(select(work_orders_table.c.motivo_ingreso))]
 
     def reception_dates(self, *, desde, hasta):
         c = work_orders_table.c

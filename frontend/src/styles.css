@@ -900,6 +900,27 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
   .dashboard-charts { transition: none; }
 }
 
+/* Statistics (admin): horizontal bar ranking, tabs and the 2 stock value boxes */
+.bar-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.bar-list-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto; align-items: center; gap: 12px; }
+.bar-list-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-list-track { height: 14px; border-radius: 4px; background: var(--surface-alt); overflow: hidden; }
+.bar-list-bar { display: block; height: 100%; border-radius: 0 4px 4px 0; transform-origin: left; animation: bar-list-grow 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.bar-list-value { display: flex; flex-direction: column; align-items: flex-end; min-width: 92px; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) {
+  .bar-list-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .bar-list-track { grid-column: 1 / -1; grid-row: 2; }
+}
+@keyframes bar-list-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) { .bar-list-bar { animation: none; } }
+.tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tabs button { border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--muted); font: inherit; font-weight: 600; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+.tabs button:hover { color: var(--text); }
+.tabs button.active { color: var(--primary-ink); border-bottom-color: var(--primary); }
+.tabs button:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.stat-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 560px) { .stat-grid-2 { grid-template-columns: 1fr; } }
+
 .whatsapp-link { display: inline-flex; padding: 4px; border-radius: 6px; }
 .whatsapp-link:hover { background: rgba(37, 211, 102, 0.12); }
 .whatsapp-link:focus-visible { outline: 2px solid #25d366; outline-offset: 2px; }

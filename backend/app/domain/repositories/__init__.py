@@ -30,6 +30,7 @@ from app.domain.value_objects.affiliate_parts import AffiliatePartStatus, Affili
 from app.domain.value_objects.enums import SaleStatus
 from app.domain.value_objects.pagination import Page, PageRequest
 from app.domain.value_objects.whatsapp import WhatsAppMessageStatus
+from app.domain.value_objects.work_orders import EntryReason
 
 T = TypeVar("T")
 
@@ -43,6 +44,17 @@ class Repository(ABC, Generic[T]):
 
     @abstractmethod
     def delete(self, entity: T) -> None: ...
+
+
+@dataclass(frozen=True)
+class TopProduct:
+    """A product and what was sold of it in confirmed sales (Ventas statistics)."""
+
+    id: int
+    sku: str
+    nombre: str
+    cantidad: int  # units sold
+    monto: Decimal  # sum of the line subtotals
 
 
 @dataclass(frozen=True)
@@ -146,6 +158,10 @@ class ProductRepository(Repository[Product]):
         the biggest shortage first."""
 
     @abstractmethod
+    def stock_value(self) -> tuple[Decimal, Decimal]:
+        """Sum of ``precio_venta * stock`` and of ``precio_costo * stock`` (stock of every branch)."""
+
+    @abstractmethod
     def list(
         self,
         page: PageRequest,
@@ -228,6 +244,10 @@ class SaleRepository(Repository[Sale]):
         """Number of confirmed sales of the user in the range, the amount charged (total_pagar) and the
         spare part cost of the work order sales (costo_repuesto)."""
 
+    @abstractmethod
+    def top_products(self, *, limit: int) -> list[TopProduct]:
+        """Products with the most units sold in confirmed sales, the most sold first."""
+
 
 class BrandRepository(Repository[Brand]):
     @abstractmethod
@@ -258,6 +278,15 @@ class SparePartRepository(Repository[SparePart]):
 
 
 @dataclass(frozen=True)
+class BrandOrders:
+    """A brand and the number of work orders received of its phones (Órdenes statistics)."""
+
+    id: int
+    nombre: str
+    ordenes: int
+
+
+@dataclass(frozen=True)
 class OrderClient:
     """A client that came through Órdenes (has at least one work order), with the phone of
     their most recent order. Recipient of the Propaganda (CRM) messages."""
@@ -277,6 +306,14 @@ class WorkOrderRepository(Repository[WorkOrder]):
     @abstractmethod
     def day_activity(self, *, day: date, desde: datetime, hasta: datetime) -> tuple[int, int, int]:
         """Orders received on ``day`` and orders that changed to En proceso / Finalizado in ``[desde, hasta)``."""
+
+    @abstractmethod
+    def top_brands(self, *, limit: int) -> list[BrandOrders]:
+        """Brands with the most work orders received, the most first."""
+
+    @abstractmethod
+    def entry_reasons(self) -> list[list[EntryReason]]:
+        """The ``motivo_ingreso`` (one or more) of every work order."""
 
     @abstractmethod
     def overdue(self, *, now: datetime) -> list[WorkOrder]:

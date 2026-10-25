@@ -1,6 +1,7 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { usePermission } from '@/modules/auth/components/Can';
+import { useState } from 'react';
+import { useIsAdmin, usePermission } from '@/modules/auth/components/Can';
 import {
   Avatar,
   Button,
@@ -19,6 +20,7 @@ import { formatDateTime, formatOrderNumber, fullName, todayIso } from '@/shared/
 import { formatMoney, toCents } from '@/shared/utils/money';
 import { CashOpeningModal } from '../components/CashOpeningModal';
 import { ReceiptViewer } from '../components/ReceiptViewer';
+import { SalesStatsModal } from '../components/SalesStatsModal';
 import { useDeleteSale } from '../hooks/useDeleteSale';
 import { SALES_KEY, saleApi } from '../services/saleApi';
 import { PAYMENT_METHOD_LABELS, customerName, documentLabel, type Sale } from '../types';
@@ -29,6 +31,8 @@ export function SalesPage() {
   const canCreate = usePermission(P.SALES_CREATE);
   const canUpdate = usePermission(P.SALES_UPDATE);
   const canDelete = usePermission(P.SALES_CANCEL);
+  const isAdmin = useIsAdmin();
+  const [statsOpen, setStatsOpen] = useState(false);
   const { remove } = useDeleteSale();
   // By default only today's sales; the date filters can widen the range.
   const today = todayIso();
@@ -132,7 +136,19 @@ export function SalesPage() {
 
   return (
     <>
-      <PageHeader title="Ventas" actions={canCreate && <Button onClick={() => navigate('/sales/new')}>Nueva venta</Button>} />
+      <PageHeader
+        title="Ventas"
+        actions={
+          <>
+            {isAdmin && (
+              <Button variant="secondary" onClick={() => setStatsOpen(true)}>
+                Estadística
+              </Button>
+            )}
+            {canCreate && <Button onClick={() => navigate('/sales/new')}>Nueva venta</Button>}
+          </>
+        }
+      />
       {canView ? (
         <>
           <div className="toolbar">
@@ -188,6 +204,7 @@ export function SalesPage() {
       )}
       <ReceiptViewer saleId={receiptId} onClose={() => showReceipt(null)} />
       <CashOpeningModal />
+      {isAdmin && <SalesStatsModal open={statsOpen} onClose={() => setStatsOpen(false)} />}
     </>
   );
 }

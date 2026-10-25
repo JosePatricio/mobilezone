@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { usePermission } from '@/modules/auth/components/Can';
+import { useState } from 'react';
+import { useIsAdmin, usePermission } from '@/modules/auth/components/Can';
 import { Button, DataList, DatePicker, Input, PageHeader, SearchInput, Select, type Column } from '@/shared/components';
 import { useListParams } from '@/shared/hooks/useListParams';
 import { PERMISSIONS as P } from '@/shared/types/permissions';
@@ -11,12 +12,15 @@ import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
 import { DeliveryCountdown } from '../components/DeliveryCountdown';
 import { StatusControl } from '../components/StatusControl';
 import { WhatsAppLink } from '../components/WhatsAppLink';
+import { WorkOrderStatsModal } from '../components/WorkOrderStatsModal';
 import { WORK_ORDER_STATUS, type WorkOrderListItem } from '../types';
 
 export function WorkOrdersPage() {
   const navigate = useNavigate();
   const canCreate = usePermission(P.WORK_ORDERS_CREATE);
   const canUpdate = usePermission(P.WORK_ORDERS_UPDATE);
+  const isAdmin = useIsAdmin();
+  const [statsOpen, setStatsOpen] = useState(false);
   const { statuses } = useWorkOrderStatuses();
   const list = useListParams({ num_orden: '', estado: '', fecha_desde: '', fecha_hasta: '' });
   // The search box filters by client (name, email or cédula).
@@ -91,7 +95,16 @@ export function WorkOrdersPage() {
     <>
       <PageHeader
         title="Órdenes de trabajo"
-        actions={canCreate && <Button onClick={() => navigate('/work-orders/new')}>Nueva orden</Button>}
+        actions={
+          <>
+            {isAdmin && (
+              <Button variant="secondary" onClick={() => setStatsOpen(true)}>
+                Estadística
+              </Button>
+            )}
+            {canCreate && <Button onClick={() => navigate('/work-orders/new')}>Nueva orden</Button>}
+          </>
+        }
       />
       <div className="toolbar toolbar-wrap">
         <Input
@@ -119,6 +132,7 @@ export function WorkOrdersPage() {
         onPageChange={list.setPage}
         onRowClick={(r) => navigate(`/work-orders/${r.id}`)}
       />
+      {isAdmin && <WorkOrderStatsModal open={statsOpen} onClose={() => setStatsOpen(false)} />}
     </>
   );
 }

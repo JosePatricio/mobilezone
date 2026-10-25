@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { usePermission } from '@/modules/auth/components/Can';
+import { useIsAdmin, usePermission } from '@/modules/auth/components/Can';
 import {
   ActionsMenu,
   Button,
@@ -24,6 +24,7 @@ import { PERMISSIONS as P } from '@/shared/types/permissions';
 import { formatMoney, toCents } from '@/shared/utils/money';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { StockModal } from '../components/StockModal';
+import { StockValueModal } from '../components/StockValueModal';
 import { PRODUCTS_KEY, productApi } from '../services/productApi';
 import type { Product } from '../types';
 
@@ -32,6 +33,8 @@ export function ProductsPage() {
   const canUpdate = usePermission(P.PRODUCTS_UPDATE);
   const canDelete = usePermission(P.PRODUCTS_DELETE);
   const canViewInventory = usePermission(P.INVENTORY_VIEW);
+  const isAdmin = useIsAdmin();
+  const [summaryOpen, setSummaryOpen] = useState(false);
   // Acquisition cost is only shown to users who manage products.
   const canSeeCost = canCreate || canUpdate;
   const list = useListParams<{ category_id: string; estado: string }>({ category_id: '', estado: '' });
@@ -155,7 +158,16 @@ export function ProductsPage() {
     <>
       <PageHeader
         title="Productos"
-        actions={canCreate && <Button onClick={() => setEditing(null)}>Nuevo producto</Button>}
+        actions={
+          <>
+            {isAdmin && (
+              <Button variant="secondary" onClick={() => setSummaryOpen(true)}>
+                Resumen
+              </Button>
+            )}
+            {canCreate && <Button onClick={() => setEditing(null)}>Nuevo producto</Button>}
+          </>
+        }
       />
       <div className="toolbar">
         <SearchInput value={list.search} onChange={list.setSearch} placeholder="Buscar por nombre o SKU…" />
@@ -198,6 +210,7 @@ export function ProductsPage() {
         />
       )}
       {stockOf && <StockModal product={stockOf} onClose={() => setStockOf(null)} />}
+      {isAdmin && <StockValueModal open={summaryOpen} onClose={() => setSummaryOpen(false)} />}
     </>
   );
 }

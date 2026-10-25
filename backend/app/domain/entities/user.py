@@ -112,6 +112,10 @@ class User(Activatable):
         return role.nombre if role is not None else None
 
     @property
+    def is_admin(self) -> bool:
+        return self.role_name == SystemRole.ADMIN.value
+
+    @property
     def is_technician(self) -> bool:
         return self.role_name == SystemRole.TECNICO.value
 

@@ -12,7 +12,7 @@ from app.application.services.security import PasswordHasher, TokenService
 from app.application.use_cases.auth import GetAuthenticatedUserUseCase
 from app.application.use_cases.base import require_permission
 from app.domain.entities import User
-from app.domain.exceptions import AuthenticationError
+from app.domain.exceptions import AuthenticationError, PermissionDeniedError
 from app.domain.repositories import UnitOfWork
 from app.domain.value_objects.pagination import MAX_PAGE_SIZE, PageRequest
 from app.infrastructure.database.unit_of_work import SqlAlchemyUnitOfWork
@@ -96,6 +96,16 @@ def require_any_permission(*codes: str) -> Callable[..., User]:
         return user
 
     return dependency
+
+
+def require_admin(user: CurrentUser) -> User:
+    """Only users with the ADMIN role (statistics, stock value), whatever permissions other roles hold."""
+    if not user.is_admin:
+        raise PermissionDeniedError("Solo el administrador puede ver esta información.", details={"role": "ADMIN"})
+    return user
+
+
+AdminUser = Annotated[User, Depends(require_admin)]
 
 
 def get_page(

@@ -1,6 +1,7 @@
 """Dashboard charts: sales and work orders grouped by day, week, month or year (shop time zone)."""
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from decimal import Decimal
@@ -8,7 +9,8 @@ from enum import Enum
 
 from app.application.use_cases.base import UseCase
 from app.domain.entities import WorkOrder
-from app.domain.repositories import UnitOfWork
+from app.domain.repositories import BrandOrders, TopProduct, UnitOfWork
+from app.domain.value_objects.work_orders import ENTRY_REASON_LABELS, EntryReason
 
 MONTHS = ("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic")
 
@@ -149,6 +151,58 @@ class LowStockUseCase(UseCase):
             )
             for p in self.uow.products.below_minimum()
         ]
+
+
+TOP_LIMIT = 10  # rankings of the statistics (most sold products, brands with most orders)
+
+
+class TopProductsUseCase(UseCase):
+    """The 10 products with the most units sold in confirmed sales (Ventas statistics, admin)."""
+
+    def execute(self) -> list[TopProduct]:
+        return self.uow.sales.top_products(limit=TOP_LIMIT)
+
+
+@dataclass
+class StockValue:
+    activo_neto: Decimal  # sum of PVP * total stock
+    activo_bruto: Decimal  # sum of cost * total stock
+
+
+class StockValueUseCase(UseCase):
+    """Value of the stock of every branch at sale price and at cost (Productos summary, admin)."""
+
+    def execute(self) -> StockValue:
+        neto, bruto = self.uow.products.stock_value()
+        return StockValue(activo_neto=neto, activo_bruto=bruto)
+
+
+class TopBrandsUseCase(UseCase):
+    """The 10 brands with the most work orders received (Órdenes statistics, admin)."""
+
+    def execute(self) -> list[BrandOrders]:
+        return self.uow.work_orders.top_brands(limit=TOP_LIMIT)
+
+
+@dataclass
+class EntryReasonCount:
+    motivo: EntryReason
+    ordenes: int
+
+    @property
+    def etiqueta(self) -> str:
+        return ENTRY_REASON_LABELS[self.motivo]
+
+
+class EntryReasonsUseCase(UseCase):
+    """Work orders per entry reason (an order with several reasons counts in each), the most first;
+    reasons never used are left out."""
+
+    def execute(self) -> list[EntryReasonCount]:
+        counts = Counter(reason for reasons in self.uow.work_orders.entry_reasons() for reason in reasons)
+        # Ties keep the order of the catalog.
+        ranked = sorted(counts.items(), key=lambda item: (-item[1], list(EntryReason).index(item[0])))
+        return [EntryReasonCount(motivo=reason, ordenes=n) for reason, n in ranked]
 
 
 class OverdueOrdersUseCase(UseCase):

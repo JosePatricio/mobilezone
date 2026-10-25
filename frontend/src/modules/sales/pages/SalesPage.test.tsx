@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { todayIso } from '@/shared/utils/format';
-import { fakeAuth, renderWithProviders } from '@/test/utils';
+import { fakeAuth, renderWithProviders, testUser } from '@/test/utils';
 import { SaleReceipt } from '../components/PrintableSale';
 import type { Sale } from '../types';
 import { SalesPage } from './SalesPage';
@@ -100,6 +100,18 @@ describe('SalesPage', () => {
     await screen.findByRole('table');
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Eliminar' })).not.toBeInTheDocument();
+  });
+
+  it('shows the Estadística button only to the ADMIN role, whatever the permissions', async () => {
+    const all = ['sales.view', 'sales.create', 'sales.update', 'sales.cancel'];
+    const { unmount } = renderWithProviders(<SalesPage />, { auth: fakeAuth({ permissionCodes: all }) });
+    await screen.findByRole('table');
+    expect(screen.queryByRole('button', { name: 'Estadística' })).not.toBeInTheDocument();
+    unmount();
+
+    const admin = { ...testUser, role: { id: 1, nombre: 'ADMIN' } };
+    renderWithProviders(<SalesPage />, { auth: fakeAuth({ user: admin, permissionCodes: all }) });
+    expect(await screen.findByRole('button', { name: 'Estadística' })).toBeInTheDocument();
   });
 
   it("shows only today's sales by default and filters by client cédula", async () => {

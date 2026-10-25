@@ -6,6 +6,7 @@ from decimal import Decimal
 from pydantic import Field
 
 from app.application.use_cases.dashboard import Grouping
+from app.domain.value_objects.work_orders import EntryReason
 from app.presentation.api.schemas.common import Schema
 
 
@@ -36,3 +37,28 @@ class LowStockProductResponse(Schema):
     stock: int = Field(description="Stock total (suma de todas las sucursales)")
     minimo_recomendado: int
     faltante: int = Field(description="Unidades que faltan para llegar al mínimo recomendado")
+
+
+class TopProductResponse(Schema):
+    id: int
+    sku: str
+    nombre: str
+    cantidad: int = Field(description="Unidades vendidas (ventas confirmadas)")
+    monto: Decimal = Field(description="Total vendido del producto (suma de subtotales)")
+
+
+class StockValueResponse(Schema):
+    activo_neto: Decimal = Field(description="Suma de PVP × stock total de todos los productos")
+    activo_bruto: Decimal = Field(description="Suma de costo × stock total de todos los productos")
+
+
+class BrandOrdersResponse(Schema):
+    id: int
+    nombre: str
+    ordenes: int = Field(description="Órdenes de trabajo recibidas de la marca")
+
+
+class EntryReasonCountResponse(Schema):
+    motivo: EntryReason
+    etiqueta: str
+    ordenes: int = Field(description="Órdenes con ese motivo de ingreso (una orden puede tener varios)")

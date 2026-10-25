@@ -9,17 +9,25 @@ from fastapi import APIRouter, Depends, Request
 from app.application.use_cases.dashboard import (
     DashboardChartsUseCase,
     DayOrdersUseCase,
+    EntryReasonsUseCase,
     Grouping,
     LowStockUseCase,
     OverdueOrdersUseCase,
+    StockValueUseCase,
+    TopBrandsUseCase,
+    TopProductsUseCase,
 )
 from app.domain.entities import User
 from app.domain.value_objects.permissions import Perm
-from app.presentation.api.dependencies import UowDep, require_any_permission, require_permissions
+from app.presentation.api.dependencies import AdminUser, UowDep, require_any_permission, require_permissions
 from app.presentation.api.schemas.dashboard import (
+    BrandOrdersResponse,
     DashboardChartsResponse,
     DayOrdersResponse,
+    EntryReasonCountResponse,
     LowStockProductResponse,
+    StockValueResponse,
+    TopProductResponse,
 )
 from app.presentation.api.schemas.work_orders import WorkOrderListItem
 
@@ -66,3 +74,30 @@ def low_stock(uow: UowDep, _: Annotated[User, Depends(require_permissions(Perm.P
 def overdue_orders(uow: UowDep, _: Annotated[User, Depends(require_permissions(Perm.WORK_ORDERS_VIEW))]):
     """Work orders not finalized whose ``fecha_entrega`` already passed (atrasadas), the most overdue first."""
     return [WorkOrderListItem.model_validate(o) for o in OverdueOrdersUseCase(uow).execute()]
+
+
+# Statistics: only the ADMIN role (not a permission other roles could be granted).
+
+
+@router.get("/top-products", response_model=list[TopProductResponse])
+def top_products(uow: UowDep, _: AdminUser):
+    """The 10 products with the most units sold in confirmed sales (Ventas → Estadística)."""
+    return [TopProductResponse.model_validate(p) for p in TopProductsUseCase(uow).execute()]
+
+
+@router.get("/stock-value", response_model=StockValueResponse)
+def stock_value(uow: UowDep, _: AdminUser):
+    """Activo neto (PVP × stock total) and activo bruto (costo × stock total) of every product (Productos → Resumen)."""
+    return StockValueResponse.model_validate(StockValueUseCase(uow).execute())
+
+
+@router.get("/top-brands", response_model=list[BrandOrdersResponse])
+def top_brands(uow: UowDep, _: AdminUser):
+    """The 10 brands with the most work orders received (Órdenes → Estadística)."""
+    return [BrandOrdersResponse.model_validate(b) for b in TopBrandsUseCase(uow).execute()]
+
+
+@router.get("/entry-reasons", response_model=list[EntryReasonCountResponse])
+def entry_reasons(uow: UowDep, _: AdminUser):
+    """Work orders per entry reason, the most first (Órdenes → Estadística)."""
+    return [EntryReasonCountResponse.model_validate(r) for r in EntryReasonsUseCase(uow).execute()]

@@ -40,6 +40,38 @@ export interface LowStockProduct {
   faltante: number;
 }
 
+/** Product and what was sold of it in confirmed sales. */
+export interface TopProduct {
+  id: number;
+  sku: string;
+  nombre: string;
+  /** Units sold. */
+  cantidad: number;
+  monto: Money;
+}
+
+/** Value of the total stock of every product. */
+export interface StockValue {
+  /** Sum of PVP × total stock. */
+  activo_neto: Money;
+  /** Sum of cost × total stock. */
+  activo_bruto: Money;
+}
+
+/** Brand and the work orders received of its phones. */
+export interface BrandOrders {
+  id: number;
+  nombre: string;
+  ordenes: number;
+}
+
+/** Work orders with an entry reason (an order with several reasons counts in each). */
+export interface EntryReasonCount {
+  motivo: string;
+  etiqueta: string;
+  ordenes: number;
+}
+
 export const DASHBOARD_KEY = 'dashboard';
 
 export const dashboardApi = {
@@ -50,4 +82,9 @@ export const dashboardApi = {
   lowStock: () => http.get<LowStockProduct[]>('/dashboard/low-stock').then((r) => r.data),
   /** Work orders not finalized whose delivery time already passed, the most overdue first. */
   overdueOrders: () => http.get<WorkOrderListItem[]>('/dashboard/overdue-orders').then((r) => r.data),
+  // Statistics: only the ADMIN role.
+  topProducts: () => http.get<TopProduct[]>('/dashboard/top-products').then((r) => r.data),
+  stockValue: () => http.get<StockValue>('/dashboard/stock-value').then((r) => r.data),
+  topBrands: () => http.get<BrandOrders[]>('/dashboard/top-brands').then((r) => r.data),
+  entryReasons: () => http.get<EntryReasonCount[]>('/dashboard/entry-reasons').then((r) => r.data),
 };
