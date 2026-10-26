@@ -158,7 +158,9 @@ describe('NewSalePage', () => {
     expect(within(grid).getByText('Pantalla A')).toBeInTheDocument();
     expect(within(grid).getByText('Pantalla B')).toBeInTheDocument();
     expect(within(grid).getByRole('img', { name: 'Pantalla A' })).toBeInTheDocument();
-    expect(within(grid).queryByText('PAN-A')).not.toBeInTheDocument(); // only name and image
+    expect(within(grid).queryByText('PAN-A')).not.toBeInTheDocument(); // only name, image and price
+    expect(within(grid).getByText('Pantalla A').closest('button')).toHaveTextContent('10,00');
+    expect(within(grid).getByText('Pantalla B').closest('button')).toHaveTextContent('25,00');
 
     await userEvent.type(within(dialog).getByLabelText('Filtrar'), 'b');
     await within(dialog).findByText('Pantalla B');

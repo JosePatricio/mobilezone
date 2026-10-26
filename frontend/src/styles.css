@@ -619,6 +619,7 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .product-picker button:disabled { opacity: 0.6; cursor: not-allowed; }
 .product-picker .thumb-lg { width: 96px; height: 96px; object-fit: contain; }
 .product-picker-empty { margin-top: 12px; }
+.product-picker-price { color: var(--primary); }
 .qty-stepper { display: inline-flex; align-items: center; gap: 4px; }
 .qty-stepper .input-qty { width: 64px; text-align: center; }
 .thumb-button { padding: 0; border: none; background: none; cursor: zoom-in; border-radius: 8px; }

@@ -4,6 +4,7 @@ import { inventoryApi } from '@/modules/inventory/services/inventoryApi';
 import type { InventoryItem } from '@/modules/inventory/types';
 import { Button, ErrorState, Loading, Modal, ProductThumb } from '@/shared/components';
 import { useDebounce } from '@/shared/hooks/useDebounce';
+import { formatMoney } from '@/shared/utils/money';
 
 /** Products listed at once (the filter narrows them down). */
 const PICKER_SIZE = 100;
@@ -16,7 +17,7 @@ interface Props {
 }
 
 /**
- * Products of the sale branch shown by name and image; the text filters them while typing.
+ * Products of the sale branch shown by name, image and retail price (PVP); the text filters them while typing.
  * Clicking one selects it (products without stock cannot be selected).
  */
 export function ProductPickerModal({ branchId, branchName, onClose, onSelect }: Props) {
@@ -76,6 +77,7 @@ export function ProductPickerModal({ branchId, branchName, onClose, onSelect }: 
               >
                 <ProductThumb src={item.product.imagen_url} alt={item.product.nombre} size="lg" />
                 <span>{item.product.nombre}</span>
+                <strong className="product-picker-price">{formatMoney(item.product.precio_venta)}</strong>
                 {item.stock <= 0 && <small className="text-danger">Sin stock</small>}
               </button>
             </li>
