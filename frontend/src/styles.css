@@ -90,6 +90,7 @@ code { font-size: 0.85em; background: var(--surface-alt); padding: 1px 5px; bord
 .text-right { text-align: right; }
 .text-center { text-align: center; }
 .text-danger { color: var(--danger) !important; }
+.text-warning { color: var(--warning) !important; }
 .text-success { color: var(--success); }
 .pre-line { white-space: pre-line; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

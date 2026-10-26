@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from app.application.use_cases.dashboard import (
     DashboardChartsUseCase,
     DayOrdersUseCase,
+    DueSoonOrdersUseCase,
     EntryReasonsUseCase,
     Grouping,
     LowStockUseCase,
@@ -74,6 +75,13 @@ def low_stock(uow: UowDep, _: Annotated[User, Depends(require_permissions(Perm.P
 def overdue_orders(uow: UowDep, _: Annotated[User, Depends(require_permissions(Perm.WORK_ORDERS_VIEW))]):
     """Work orders not finalized whose ``fecha_entrega`` already passed (atrasadas), the most overdue first."""
     return [WorkOrderListItem.model_validate(o) for o in OverdueOrdersUseCase(uow).execute()]
+
+
+@router.get("/due-soon-orders", response_model=list[WorkOrderListItem])
+def due_soon_orders(uow: UowDep, _: Annotated[User, Depends(require_permissions(Perm.WORK_ORDERS_VIEW))]):
+    """Work orders not finalized whose ``fecha_entrega`` is within the next 24 hours (a punto de
+    atrasarse), the soonest first."""
+    return [WorkOrderListItem.model_validate(o) for o in DueSoonOrdersUseCase(uow).execute()]
 
 
 # Statistics: only the ADMIN role (not a permission other roles could be granted).

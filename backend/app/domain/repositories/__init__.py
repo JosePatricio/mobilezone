@@ -320,6 +320,10 @@ class WorkOrderRepository(Repository[WorkOrder]):
         """Orders not finalized whose ``fecha_entrega`` already passed, the most overdue first."""
 
     @abstractmethod
+    def due_soon(self, *, now: datetime, until: datetime) -> list[WorkOrder]:
+        """Orders not finalized whose ``fecha_entrega`` is in ``[now, until)``, the soonest first."""
+
+    @abstractmethod
     def reception_dates(self, *, desde: date, hasta: date) -> list[date]:
         """Reception date of every order received between ``desde`` and ``hasta`` (inclusive)."""
 

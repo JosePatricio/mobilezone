@@ -210,3 +210,14 @@ class OverdueOrdersUseCase(UseCase):
 
     def execute(self, now: datetime | None = None) -> list[WorkOrder]:
         return self.uow.work_orders.overdue(now=now or datetime.now(timezone.utc))
+
+
+class DueSoonOrdersUseCase(UseCase):
+    """Work orders not finalized whose promised delivery time comes within the next day, so they are
+    about to be overdue (notifications bell)."""
+
+    WINDOW = timedelta(days=1)
+
+    def execute(self, now: datetime | None = None) -> list[WorkOrder]:
+        now = now or datetime.now(timezone.utc)
+        return self.uow.work_orders.due_soon(now=now, until=now + self.WINDOW)

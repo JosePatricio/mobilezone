@@ -540,6 +540,15 @@ class SqlAlchemyWorkOrderRepository(SqlAlchemyRepository[WorkOrder], ports.WorkO
         )
         return list(self.session.scalars(stmt.order_by(c.fecha_entrega, c.num_orden)))
 
+    def due_soon(self, *, now, until):
+        c = work_orders_table.c
+        stmt = select(WorkOrder).where(
+            c.estado != int(WorkOrderStatus.FINALIZADO),
+            c.fecha_entrega >= _utc_naive(now),
+            c.fecha_entrega < _utc_naive(until),
+        )
+        return list(self.session.scalars(stmt.order_by(c.fecha_entrega, c.num_orden)))
+
     def top_brands(self, *, limit):
         b = brands_table.c
         ordenes = func.count(work_orders_table.c.id).label("ordenes")

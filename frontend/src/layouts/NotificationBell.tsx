@@ -12,8 +12,9 @@ const REFRESH = 60_000;
 
 /**
  * Notifications bell of the header: work orders not finalized whose delivery time already passed
- * (atrasadas) and products below their "Mínimo recomendado" (the same data as the dashboard alert).
- * Each kind is only checked with its permission; the badge is the total of both.
+ * (atrasadas) or comes within the next day (a punto de atrasarse), and products below their
+ * "Mínimo recomendado" (the same data as the dashboard alert).
+ * Each kind is only checked with its permission; the badge is the total of all.
  */
 export function NotificationBell() {
   const { hasPermission } = useAuth();
@@ -28,6 +29,12 @@ export function NotificationBell() {
   const orders = useQuery({
     queryKey: [DASHBOARD_KEY, 'overdue-orders'],
     queryFn: dashboardApi.overdueOrders,
+    refetchInterval: REFRESH,
+    enabled: canOrders,
+  });
+  const soonOrders = useQuery({
+    queryKey: [DASHBOARD_KEY, 'due-soon-orders'],
+    queryFn: dashboardApi.dueSoonOrders,
     refetchInterval: REFRESH,
     enabled: canOrders,
   });
@@ -62,8 +69,9 @@ export function NotificationBell() {
   if (!canOrders && !canProducts) return null;
 
   const overdue = orders.data ?? [];
+  const dueSoon = soonOrders.data ?? [];
   const lowStock = products.data ?? [];
-  const count = overdue.length + lowStock.length;
+  const count = overdue.length + dueSoon.length + lowStock.length;
   const now = Date.now();
 
   return (
@@ -106,6 +114,31 @@ export function NotificationBell() {
                       </small>
                       {o.fecha_entrega && (
                         <small className="text-danger">{deliveryCountdown(o.fecha_entrega, now).text}</small>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {dueSoon.length > 0 && (
+            <section aria-label="Órdenes por atrasarse">
+              <header className="notif-section">
+                <strong>Órdenes por atrasarse ({dueSoon.length})</strong>
+                <Link to="/work-orders">Ver órdenes</Link>
+              </header>
+              <ul className="notif-list">
+                {dueSoon.map((o) => (
+                  <li key={o.id}>
+                    <Link to={`/work-orders/${o.id}`} className="notif-item">
+                      <span>
+                        <strong>Orden #{o.num_orden}</strong> · {o.marca.nombre} {o.modelo.nombre}
+                      </span>
+                      <small className="muted">
+                        {fullName(o.cliente)} · {o.estado_label}
+                      </small>
+                      {o.fecha_entrega && (
+                        <small className="text-warning">{deliveryCountdown(o.fecha_entrega, now).text}</small>
                       )}
                     </Link>
                   </li>

@@ -82,6 +82,8 @@ export const dashboardApi = {
   lowStock: () => http.get<LowStockProduct[]>('/dashboard/low-stock').then((r) => r.data),
   /** Work orders not finalized whose delivery time already passed, the most overdue first. */
   overdueOrders: () => http.get<WorkOrderListItem[]>('/dashboard/overdue-orders').then((r) => r.data),
+  /** Work orders not finalized whose delivery time is within the next 24 hours, the soonest first. */
+  dueSoonOrders: () => http.get<WorkOrderListItem[]>('/dashboard/due-soon-orders').then((r) => r.data),
   // Statistics: only the ADMIN role.
   topProducts: () => http.get<TopProduct[]>('/dashboard/top-products').then((r) => r.data),
   stockValue: () => http.get<StockValue>('/dashboard/stock-value').then((r) => r.data),

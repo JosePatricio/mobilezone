@@ -60,3 +60,32 @@ def test_overdue_orders_requires_work_orders_view(client, factory):
         can_view = client.get(f"{API}/work-orders", headers=headers).status_code == 200
         expected = 200 if can_view else 403
         assert client.get(f"{API}/dashboard/overdue-orders", headers=headers).status_code == expected
+
+
+def test_due_soon_orders_lists_not_finalized_orders_due_within_a_day(client, admin_headers, factory):
+    _create(client, admin_headers, factory, fecha_entrega=_iso(timedelta(hours=-2)))  # already overdue
+    later = _create(client, admin_headers, factory, fecha_entrega=_iso(timedelta(hours=20)))
+    sooner = _create(client, admin_headers, factory, fecha_entrega=_iso(timedelta(hours=3)))
+    _create(client, admin_headers, factory, fecha_entrega=_iso(timedelta(days=2)))  # still far
+    _create(client, admin_headers, factory)  # no delivery date
+    finalized = _create(client, admin_headers, factory, fecha_entrega=_iso(timedelta(hours=5)))
+    done = client.post(
+        f"{API}/work-orders/{finalized['id']}/finalize",
+        json={"branch_id": factory.default_branch.id, "metodo_pago": "TRANSFERENCIA"},
+        headers=admin_headers,
+    )
+    assert done.status_code == 200, done.text
+
+    response = client.get(f"{API}/dashboard/due-soon-orders", headers=admin_headers)
+    assert response.status_code == 200, response.text
+    assert [o["id"] for o in response.json()] == [sooner["id"], later["id"]]
+
+
+def test_due_soon_orders_requires_work_orders_view(client, factory):
+    tech = factory.user(SystemRole.TECNICO)
+    seller = factory.user(SystemRole.VENDEDOR)
+    for user in (tech, seller):
+        headers = auth_headers(client, user.email)
+        can_view = client.get(f"{API}/work-orders", headers=headers).status_code == 200
+        expected = 200 if can_view else 403
+        assert client.get(f"{API}/dashboard/due-soon-orders", headers=headers).status_code == expected
