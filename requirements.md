@@ -1,3 +1,2 @@
-Modulo de ventas
-EN Nueva ventan
-En buscar productos, en en modal de productos en ver productos, agregar el precio
+En la parte de notificacion en la parte superior
+debajo de las ordenes atrasadas, tambien necesito notificaiones de ordenes que estan ha 1 dia proximo a atrasarse
