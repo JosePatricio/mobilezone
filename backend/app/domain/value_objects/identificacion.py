@@ -15,10 +15,9 @@ import re
 
 from app.domain.exceptions import ValidationError
 
-# TEMPORARY: disabled while legacy users/clients without a real cédula / RUC are
-# loaded (any value such as "11" or "2" is accepted). Set back to True to restore
-# the Ecuadorian validation (keep frontend/src/shared/utils/identification.ts in sync).
-IDENTIFICACION_VALIDATION_ENABLED = False
+# Ecuadorian cédula / RUC validation. Set to False only to load legacy users/clients
+# without a real cédula / RUC (keep frontend/src/shared/utils/identification.ts in sync).
+IDENTIFICACION_VALIDATION_ENABLED = True
 IDENTIFICACION_MAX_LENGTH = 13  # users.identificacion column size
 
 

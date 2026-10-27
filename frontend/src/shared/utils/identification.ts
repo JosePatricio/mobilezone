@@ -9,11 +9,10 @@ import { z } from 'zod';
  */
 
 /**
- * TEMPORARY: disabled while legacy users/clients without a real cédula / RUC are loaded
- * (any value such as "11" or "2" is accepted). Set back to true to restore the Ecuadorian
- * validation; keep in sync with IDENTIFICACION_VALIDATION_ENABLED in the backend.
+ * Ecuadorian cédula / RUC validation. Set to false only to load legacy users/clients without a
+ * real cédula / RUC; keep in sync with IDENTIFICACION_VALIDATION_ENABLED in the backend.
  */
-export const IDENTIFICACION_VALIDATION_ENABLED = false;
+export const IDENTIFICACION_VALIDATION_ENABLED = true;
 const IDENTIFICACION_MAX_LENGTH = 13;
 
 /** Removes spaces and dashes. */

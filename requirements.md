@@ -1,2 +1,2 @@
-En la parte de notificacion en la parte superior
-debajo de las ordenes atrasadas, tambien necesito notificaiones de ordenes que estan ha 1 dia proximo a atrasarse
+En el modulo de usuarios y modulo de ordenes
+En el ya existente registro de usuarios, habiamos quitado temporalmente la validacion de cedulas, necesito esa validacion de nuevo

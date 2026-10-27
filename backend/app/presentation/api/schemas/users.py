@@ -14,7 +14,7 @@ Identificacion = Annotated[
     str,
     StringConstraints(strip_whitespace=True, pattern=r"^\d{10}(\d{3})?$")
     if IDENTIFICACION_VALIDATION_ENABLED
-    # Temporarily any value (legacy users without cédula); spaces / dashes are removed by the domain.
+    # Validation disabled: any value (legacy users without cédula); spaces / dashes are removed by the domain.
     else StringConstraints(strip_whitespace=True, min_length=1, max_length=IDENTIFICACION_MAX_LENGTH + 5),
     Field(description="Cédula (10) o RUC (13), validados con el algoritmo ecuatoriano"),
 ]
