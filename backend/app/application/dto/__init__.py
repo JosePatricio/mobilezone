@@ -243,6 +243,7 @@ class FinalizeWorkOrderData:
     observacion: str | None = None
     supplier_id: int | None = None  # proveedor of the repair
     costo_repuesto: Decimal | None = None  # cost of the spare part: profit of the sale = total - costo
+    garantia_dias: int | None = None  # tiempo de garantía (days), chosen when finalizing; None = keep
 
 
 @dataclass(frozen=True)

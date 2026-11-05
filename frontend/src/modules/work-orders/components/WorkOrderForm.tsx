@@ -16,12 +16,12 @@ import { calculateBalance, formatMoney, isValidMoney, toCents } from '@/shared/u
 import { type FormShape, zodForm, applyServerErrors, zMoney, zOptionalEmail, zOptionalId, zOptionalText, zRequiredId, zText } from '@/shared/utils/validation';
 import { useWorkOrderCatalogs } from '../hooks/useWorkOrderCatalogs';
 import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
-import { DISPLAY_CHANGE, type LockType, type WorkOrder, type WorkOrderRequest } from '../types';
+import { DISPLAY_CHANGE, MAX_WARRANTY_DAYS, type LockType, type WorkOrder, type WorkOrderRequest } from '../types';
 import { ColorPalette } from './ColorPalette';
 import { MIN_PATTERN_DOTS, parsePattern, PatternLock } from './PatternLock';
 import { photoChanges, PhotoSlots, type PhotoChanges } from './PhotoSlots';
 
-export const MAX_WARRANTY_DAYS = 3650;
+export { MAX_WARRANTY_DAYS };
 
 /** Location preselected when registering a new client from a work order. */
 const DEFAULT_CUSTOMER_LOCATION = { provincia: 'Pichincha', ciudad: 'Quito' };
@@ -59,7 +59,6 @@ export const workOrderSchema = z
     fecha_entrega: z.string().optional(),
     branch_id: zOptionalId,
     supplier_id: zOptionalId,
-    fecha_hora: z.string().min(1, 'Ingrese la fecha y hora de ingreso'),
   })
   .superRefine((v, ctx) => {
     if (toCents(v.anticipo) > toCents(v.presupuesto)) {
@@ -74,9 +73,6 @@ export const workOrderSchema = z
     if (v.bloqueo_tipo === 'PIN' && !/^\d{4,12}$/.test(v.pin ?? '')) {
       ctx.addIssue({ code: 'custom', path: ['pin'], message: 'El PIN debe tener entre 4 y 12 dígitos' });
     }
-    if (!fromDateTimeLocal(v.fecha_hora)) {
-      ctx.addIssue({ code: 'custom', path: ['fecha_hora'], message: 'Fecha y hora inválidas' });
-    }
     if (v.fecha_entrega && !fromDateTimeLocal(v.fecha_entrega)) {
       ctx.addIssue({ code: 'custom', path: ['fecha_entrega'], message: 'Fecha de entrega inválida' });
     }
@@ -86,7 +82,6 @@ export const workOrderSchema = z
     tipo_display: v.motivo_ingreso.includes(DISPLAY_CHANGE) ? v.tipo_display : null,
     bloqueo_valor: v.bloqueo_tipo === 'PATRON' ? (patron ?? null) : v.bloqueo_tipo === 'PIN' ? (pin ?? null) : null,
     fecha_entrega: fromDateTimeLocal(v.fecha_entrega),
-    fecha_hora: fromDateTimeLocal(v.fecha_hora),
   }));
 type FormInput = FormShape<typeof workOrderSchema>;
 type FormOutput = z.output<typeof workOrderSchema>;
@@ -94,12 +89,11 @@ type FormOutput = z.output<typeof workOrderSchema>;
 interface Props {
   order?: WorkOrder;
   onSubmit: (body: WorkOrderRequest, photos: PhotoChanges) => Promise<void>;
-  onCancel: () => void;
 }
 
 type ClientLookup = 'idle' | 'searching' | 'found' | 'missing';
 
-export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
+export function WorkOrderForm({ order, onSubmit }: Props) {
   const { user } = useAuth();
   const { catalogs } = useWorkOrderCatalogs();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -143,9 +137,8 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
       anticipo: order?.anticipo ?? '0.00',
       // New order: delivery today (now) by default.
       fecha_entrega: toDateTimeLocal(order ? order.fecha_entrega : new Date().toISOString()),
-      // Reception: now for a new order (editable), the registered one when editing.
-      fecha_hora: toDateTimeLocal(order?.fecha_hora ?? new Date().toISOString()),
       branch_id: order ? (order.branch_id ?? '') : (user?.branches[0]?.id ?? ''),
+      // Supplier and warranty are chosen when the order is finalized; an edited order keeps its values.
       supplier_id: order?.supplier_id ?? '',
     },
   });
@@ -167,13 +160,7 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
   const motivos = useWatch({ control, name: 'motivo_ingreso' }) as string[] | undefined;
   const bloqueo = useWatch({ control, name: 'bloqueo_tipo' }) as LockType;
   const [presupuesto, anticipo] = useWatch({ control, name: ['presupuesto', 'anticipo'] });
-  // Suppliers (proveedores) can be added from another tab: queried again every time the selector is opened.
-  const suppliers = useQuery({
-    queryKey: [WORK_ORDERS_KEY, 'suppliers'],
-    queryFn: workOrderApi.suppliers,
-    staleTime: 0,
-    refetchOnMount: 'always',
-  });
+  const [modeloId, tipoDisplay, patron, pin] = useWatch({ control, name: ['modelo_id', 'tipo_display', 'patron', 'pin'] });
   const brands = useOptions(BRANDS_KEY, brandApi);
   const models = useOptions(MODELS_KEY, modelApi, { brand_id: Number(marcaId) }, Boolean(marcaId));
 
@@ -256,20 +243,32 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
     order?.modelo.nombre,
   );
 
-  const supplierOptions = [
-    { value: '', label: 'Sin proveedor' },
-    ...withCurrent(
-      (suppliers.data ?? []).map((s) => ({ value: s.id, label: s.nombre })),
-      order?.supplier?.id,
-      order?.supplier?.nombre,
-    ),
-  ];
   // "Pantalla" is no longer offered; an older order that has it keeps it.
   const reasonOptions =
     order?.motivo_ingreso.includes('PANTALLA') && !catalogs.motivos_ingreso.some((o) => o.value === 'PANTALLA')
       ? [...catalogs.motivos_ingreso, { value: 'PANTALLA', label: 'Pantalla' }]
       : catalogs.motivos_ingreso;
   const showDisplayType = Boolean(motivos?.includes(DISPLAY_CHANGE));
+
+  // Required fields: the progress bar advances as they are filled and the submit button is
+  // enabled once all of them are (the schema still validates the values on submit).
+  const requiredFields = [
+    { label: 'Cliente', done: lookup === 'found' },
+    { label: 'Marca', done: Boolean(marcaId) },
+    { label: 'Modelo', done: Boolean(modeloId) },
+    { label: 'Motivo de ingreso', done: Boolean(motivos?.length) },
+    ...(showDisplayType ? [{ label: 'Tipo de display', done: Boolean(tipoDisplay) }] : []),
+    ...(bloqueo === 'PATRON'
+      ? [{ label: 'Patrón', done: parsePattern(patron as string | undefined).length >= MIN_PATTERN_DOTS }]
+      : bloqueo === 'PIN'
+        ? [{ label: 'PIN', done: /^\d{4,12}$/.test(String(pin ?? '')) }]
+        : []),
+    { label: 'Costo de reparación', done: typeof presupuesto === 'string' && isValidMoney(presupuesto) },
+  ];
+  const filled = requiredFields.filter((f) => f.done).length;
+  const progress = Math.round((filled / requiredFields.length) * 100);
+  const complete = filled === requiredFields.length;
+  const missing = requiredFields.filter((f) => !f.done).map((f) => f.label);
 
   const submit = handleSubmit(async (values) => {
     setServerError(null);
@@ -365,32 +364,6 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
                 {...register('tipo_display')}
               />
             )}
-            <Controller
-              control={control}
-              name="supplier_id"
-              render={({ field, fieldState }) => (
-                <Combobox
-                  label="Proveedor"
-                  placeholder="Sin proveedor"
-                  options={supplierOptions}
-                  value={field.value as string | number}
-                  onChange={field.onChange}
-                  onOpen={() => void suppliers.refetch({ cancelRefetch: false })}
-                  error={fieldState.error?.message}
-                />
-              )}
-            />
-            <Input
-              label="Tiempo de garantía (días)"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={MAX_WARRANTY_DAYS}
-              step={1}
-              hint="0 = sin garantía"
-              error={errors.garantia_dias?.message}
-              {...register('garantia_dias')}
-            />
           </div>
         </Card>
 
@@ -440,6 +413,32 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
             />
           </div>
         </Card>
+
+        {/* Below the client; it stays visible (sticky) while scrolling through the rest of the form. */}
+        <div className="order-submit-column">
+          <div className="order-submit-panel">
+            <div className="order-progress-label">
+              <span>Campos obligatorios</span>
+              <span>
+                {filled}/{requiredFields.length}
+              </span>
+            </div>
+            <div
+              className="order-progress"
+              role="progressbar"
+              aria-label="Campos obligatorios completados"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+            >
+              <div className={`order-progress-bar ${complete ? 'is-complete' : ''}`} style={{ width: `${progress}%` }} />
+            </div>
+            {!complete && <p className="field-hint">Falta: {missing.join(', ')}</p>}
+            <Button type="submit" className="btn-block" loading={isSubmitting} disabled={!complete}>
+              {order ? 'Guardar cambios' : 'Crear orden'}
+            </Button>
+          </div>
+        </div>
 
         {/* Left column: lock, work and amounts; the right column stays empty (page background). */}
         <div className="form-columns-first">
@@ -498,16 +497,7 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
           <Card title="Trabajo">
             <PhotoSlots value={photos} onChange={setPhotos} />
             <Textarea label="Observaciones" rows={4} error={errors.observacion?.message} {...register('observacion')} />
-            {/* Reception and delivery on the same row. */}
             <div className="form-grid">
-              <Input
-                label="Fecha y hora de ingreso"
-                type="datetime-local"
-                required
-                hint="Por defecto, la fecha y hora actuales"
-                error={errors.fecha_hora?.message}
-                {...register('fecha_hora')}
-              />
               <Input
                 label="Fecha de entrega"
                 type="datetime-local"
@@ -532,15 +522,6 @@ export function WorkOrderForm({ order, onSubmit, onCancel }: Props) {
             <p className="field-hint">El saldo definitivo es calculado por el sistema al guardar.</p>
           </Card>
         </div>
-      </div>
-
-      <div className="form-actions">
-        <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
-          Cancelar
-        </Button>
-        <Button type="submit" loading={isSubmitting}>
-          {order ? 'Guardar cambios' : 'Crear orden'}
-        </Button>
       </div>
 
       <Modal open={registering !== null} title="Nuevo cliente" onClose={() => setRegistering(null)} size="lg">

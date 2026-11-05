@@ -198,3 +198,8 @@ class UserUsageResponse(Schema):
         description="Historial de estados, repuestos de órdenes, movimientos de stock y repuestos de afiliados"
     )
     has_records: bool
+
+
+class CelularCheckResponse(Schema):
+    existe: bool
+    message: str | None = None

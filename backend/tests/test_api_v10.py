@@ -21,7 +21,7 @@ def _affiliate(client, admin_headers, email="afiliado@example.com", direccion="A
         "email": email,
         "password": "Secret1234",
         "rol_id": roles[0]["id"],
-        "celular": "0991234567",
+        "celular": f"099{sum(map(ord, email)):07d}",  # one phone per user
         "provincia": "Pichincha",
         "ciudad": "Quito",
         "direccion": direccion,

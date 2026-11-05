@@ -11,6 +11,7 @@ import {
   NO_IMAGE_CHANGE,
   type ImageSelection,
 } from '@/shared/components';
+import { useCelularCheck } from '@/shared/hooks/useCelularCheck';
 import { getErrorMessage } from '@/shared/services/apiError';
 import { zCelular, zIdentificacion } from '@/shared/utils/identification';
 import { type FormShape, zodForm, applyServerErrors, zOptionalText, zText, zOptionalEmail } from '@/shared/utils/validation';
@@ -66,9 +67,15 @@ export function ClientFormModal({ client, onClose, onSubmit, withPhoto = true }:
   });
 
   const provincia = useWatch({ control, name: 'provincia' }) as string;
+  // A phone belongs to one cédula / RUC only: warn while typing.
+  const celularTaken = useCelularCheck(useWatch({ control, name: 'celular' }), client?.id);
 
   const submit = handleSubmit(async (values) => {
     setServerError(null);
+    if (celularTaken) {
+      setError('celular', { type: 'server', message: celularTaken });
+      return;
+    }
     try {
       await onSubmit(values, image);
     } catch (err) {
@@ -125,7 +132,7 @@ export function ClientFormModal({ client, onClose, onSubmit, withPhoto = true }:
           {...register('identificacion')}
         />
         <Input label="Email" type="email" hint="Opcional" error={errors.email?.message} {...register('email')} />
-        <Input label="Celular" type="tel" inputMode="tel" error={errors.celular?.message} {...register('celular')} />
+        <Input label="Celular" type="tel" inputMode="tel" error={errors.celular?.message ?? celularTaken ?? undefined} {...register('celular')} />
         <LocationFields register={register} setValue={setValue} errors={errors} provincia={provincia} />
         <Checkbox label="Activo" toggle {...register('estado')} />
       </form>

@@ -5,12 +5,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response, UploadFile, status
 
 from app.application.dto import ClientData, UserData
-from app.application.use_cases.users import ClientUseCases, UserUseCases
+from app.application.use_cases.users import ClientUseCases, UserUseCases, celular_owner, celular_taken_message
 from app.domain.entities import User
+from app.domain.exceptions import ValidationError
 from app.domain.value_objects.enums import SystemRole
 from app.domain.value_objects.pagination import MAX_PAGE_SIZE, PageRequest
 from app.domain.value_objects.permissions import Perm
 from app.presentation.api.dependencies import (
+    CurrentUser,
     HasherDep,
     PageDep,
     StorageDep,
@@ -21,6 +23,7 @@ from app.presentation.api.dependencies import (
 from app.presentation.api.schemas.common import PageResponse, StatusUpdateRequest
 from app.presentation.api.schemas.users import (
     ClientRequest,
+    CelularCheckResponse,
     ClientResponse,
     UserRequest,
     UserResponse,
@@ -64,6 +67,26 @@ def list_technicians(
     staff = [r.nombre for r in uow.roles.list(PageRequest(1, MAX_PAGE_SIZE)).items if r.nombre != SystemRole.CLIENTE.value]
     result = UserUseCases(uow, hasher).list(PageRequest(1, MAX_PAGE_SIZE), search, estado=True, roles=staff)
     return [UserSummary.model_validate(u) for u in result.items]
+
+
+@router.get("/celular-check", response_model=CelularCheckResponse)
+def check_celular(
+    celular: str,
+    uow: UowDep,
+    _: CurrentUser,
+    exclude_id: Annotated[int | None, Query(description="Usuario que se está editando")] = None,
+):
+    """Whether the phone is already registered to another user (a phone belongs to one cédula / RUC).
+
+    Used by the user, client, sale and work order forms while typing; an invalid number is reported
+    as available (the format is validated by the form)."""
+    try:
+        owner = celular_owner(uow, celular, exclude_id)
+    except ValidationError:
+        owner = None
+    if owner is None:
+        return CelularCheckResponse(existe=False)
+    return CelularCheckResponse(existe=True, message=celular_taken_message(owner))
 
 
 @router.get("/{user_id}", response_model=UserResponse)

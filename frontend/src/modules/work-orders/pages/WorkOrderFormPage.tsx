@@ -27,7 +27,6 @@ export function WorkOrderFormPage() {
       <WorkOrderForm
         key={query.data?.updated_at ?? 'new'}
         order={query.data}
-        onCancel={() => navigate(id ? `/work-orders/${id}` : '/work-orders')}
         onSubmit={async (body, photos) => {
           const saved = id ? await workOrderApi.update(id, body) : await workOrderApi.create(body);
           // Photos need the order id: they are applied once the order is saved.

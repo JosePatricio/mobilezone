@@ -16,6 +16,7 @@ from app.application.dto import (
 from app.application.services.files import FileStorage, validate_image
 from app.application.use_cases.base import UseCase
 from app.application.use_cases.branch_access import ensure_branch_access
+from app.application.use_cases.users import celular_owner, ensure_celular_available
 from app.domain.entities import Branch, Sale, User, WorkOrder, WorkOrderPhoto, WorkOrderSparePart, calculate_balance
 from app.domain.exceptions import ConflictError, NotFoundError, ValidationError
 from app.domain.repositories import UnitOfWork
@@ -86,11 +87,12 @@ class _WorkOrderValidation(UseCase):
                 )
             if not existing.estado:
                 raise ValidationError("El cliente está inactivo.", code="CLIENT_INACTIVE")
-            if data.celular and not existing.celular:
+            if data.celular and not existing.celular and celular_owner(self.uow, data.celular, existing.id) is None:
                 existing.celular = normalize_celular(data.celular)
             if data.email and not existing.email:
                 existing.email = self._unique_email(data.email)
             return existing
+        ensure_celular_available(self.uow, data.celular, field="cliente.celular")
         role = self.uow.roles.get_by_nombre(SystemRole.CLIENTE.value)
         client = User(
             nombre=data.nombre,
@@ -265,6 +267,8 @@ class FinalizeWorkOrderUseCase(UseCase):
             )
             sale.apply_payment(data.metodo_pago, data.monto_recibido, pagado_previo=order.anticipo)
             self.uow.sales.add(sale)
+            if data.garantia_dias is not None:
+                order.garantia_dias = validate_warranty_days(data.garantia_dias)
             order.finalize(actor.id, data.observacion, data.supplier_id)  # type: ignore[arg-type]
             self.uow.flush()
         return order, sale

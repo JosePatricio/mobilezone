@@ -8,8 +8,15 @@ import { UserFormModal } from './UserFormModal';
 // Provinces load after the form opens (like the real API).
 vi.mock('@/shared/services/httpClient', () => ({
   http: {
-    get: (url: string) =>
-      url === '/locations/provinces'
+    get: (url: string, config?: { params?: { celular?: string } }) =>
+      url === '/users/celular-check'
+        ? Promise.resolve({
+            data:
+              config?.params?.celular === '0991112233'
+                ? { existe: true, message: 'El número de celular ya existe: está registrado a Ana Mora (1712345675).' }
+                : { existe: false, message: null },
+          })
+        : url === '/locations/provinces'
         ? new Promise((resolve) =>
             setTimeout(
               () =>
@@ -97,5 +104,24 @@ describe('UserFormModal password and branches', () => {
     renderWithProviders(<UserFormModal user={null} roles={roles} onClose={() => undefined} onSubmit={vi.fn()} />);
     await userEvent.selectOptions(screen.getByLabelText(/^Rol/), 'ADMIN');
     expect(screen.getByText('Sucursales asignadas')).toBeInTheDocument();
+  });
+});
+
+describe('UserFormModal celular', () => {
+  it('shows below the field that the phone already exists and does not submit', async () => {
+    const onSubmit = vi.fn((_body: UserRequest) => Promise.resolve());
+    renderWithProviders(<UserFormModal user={null} roles={roles} onClose={() => undefined} onSubmit={onSubmit} />);
+    await userEvent.type(screen.getByLabelText(/^Nombre/), 'Luis');
+    await userEvent.type(screen.getByLabelText(/^Apellido/), 'Mora');
+    await userEvent.type(screen.getByLabelText(/Cédula o RUC/), '1712345675');
+    await userEvent.type(screen.getByLabelText(/^Celular/), '0991112233');
+
+    expect(await screen.findByText(/El número de celular ya existe/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await userEvent.clear(screen.getByLabelText(/^Celular/));
+    await userEvent.type(screen.getByLabelText(/^Celular/), '0991112244');
+    await waitFor(() => expect(screen.queryByText(/El número de celular ya existe/)).not.toBeInTheDocument());
   });
 });

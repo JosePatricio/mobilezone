@@ -105,6 +105,10 @@ class UserRepository(Repository[User]):
     def get_by_identificacion(self, identificacion: str) -> User | None: ...
 
     @abstractmethod
+    def find_by_celular(self, celular: str) -> list[User]:
+        """Users with the same (normalized) phone, in its local or international form."""
+
+    @abstractmethod
     def find_same_person(self, identificacion: str) -> list[User]:
         """Users with the same cédula / RUC, including the cédula ↔ natural-person RUC
         relation (``1712345675`` and ``1712345675001`` belong to the same person)."""

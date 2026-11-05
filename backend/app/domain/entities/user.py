@@ -14,7 +14,9 @@ from app.domain.value_objects.locations import validate_location
 if TYPE_CHECKING:
     from app.domain.entities.branch import Branch
 
-__all__ = ["Permission", "Role", "User", "normalize_celular", "normalize_identificacion"]
+__all__ = ["Permission", "Role", "User", "celular_variants", "normalize_celular", "normalize_identificacion"]
+
+ECUADOR_CODE = "593"
 
 
 def normalize_celular(value: str | None) -> str | None:
@@ -26,6 +28,19 @@ def normalize_celular(value: str | None) -> str | None:
             "El número de celular no es válido.", code="INVALID_PHONE", details={"field": "celular"}
         )
     return text
+
+
+def celular_variants(celular: str) -> list[str]:
+    """Ways the same (normalized) phone can be stored: local ``0991234567`` and international
+    ``+593991234567`` / ``593991234567`` are the same number."""
+    digits = celular.lstrip("+")
+    if digits.startswith("0"):
+        national = digits[1:]
+    elif digits.startswith(ECUADOR_CODE) and len(digits) > 10:
+        national = digits[len(ECUADOR_CODE):]
+    else:
+        return sorted({celular, digits, "+" + digits})
+    return sorted({celular, "0" + national, ECUADOR_CODE + national, "+" + ECUADOR_CODE + national})
 
 
 @dataclass(eq=False)

@@ -4,6 +4,7 @@ import type { z } from 'zod';
 import { clientSchema } from '@/modules/clients/components/ClientFormModal';
 import type { Client, ClientRequest } from '@/modules/clients/types';
 import { Button, Input, LocationFields, useProvinces } from '@/shared/components';
+import { useCelularCheck } from '@/shared/hooks/useCelularCheck';
 import { getErrorMessage } from '@/shared/services/apiError';
 import { type FormShape, zodForm, applyServerErrors } from '@/shared/utils/validation';
 import { saleApi } from '../services/saleApi';
@@ -57,6 +58,8 @@ export function NewCustomerForm({
     },
   });
   const provincia = useWatch({ control, name: 'provincia' }) as string;
+  // A phone belongs to one cédula / RUC only: warn while typing.
+  const celularTaken = useCelularCheck(useWatch({ control, name: 'celular' }));
   const provincesLoaded = useProvinces().isSuccess;
   const defaultProvincia = defaultLocation?.provincia;
   const defaultCiudad = defaultLocation?.ciudad;
@@ -70,6 +73,10 @@ export function NewCustomerForm({
 
   const submit = handleSubmit(async (values) => {
     setServerError(null);
+    if (celularTaken) {
+      setError('celular', { type: 'server', message: celularTaken });
+      return;
+    }
     try {
       onCreated(await create(values));
     } catch (err) {
@@ -104,7 +111,7 @@ export function NewCustomerForm({
         {...register('identificacion')}
       />
       <Input label="Email" type="email" hint="Opcional" error={errors.email?.message} {...register('email')} />
-      <Input label="Celular" type="tel" inputMode="tel" error={errors.celular?.message} {...register('celular')} />
+      <Input label="Celular" type="tel" inputMode="tel" error={errors.celular?.message ?? celularTaken ?? undefined} {...register('celular')} />
       {showRole && (
         <div className="field">
           <span className="field-label">Rol</span>

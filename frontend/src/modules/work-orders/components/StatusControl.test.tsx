@@ -112,7 +112,7 @@ describe('StatusControl', () => {
     await vi.waitFor(() => expect(finalizeCalls).toHaveLength(1));
     expect(finalizeCalls[0]).toEqual({
       id: 5,
-      body: { metodo_pago: 'TRANSFERENCIA', monto_recibido: null, branch_id: 1, supplier_id: 4, costo_repuesto: null },
+      body: { metodo_pago: 'TRANSFERENCIA', monto_recibido: null, branch_id: 1, supplier_id: 4, costo_repuesto: null, garantia_dias: 0 },
     });
     expect(await screen.findByText(/Venta #77 registrada en Ventas/)).toBeInTheDocument();
   });
@@ -148,6 +148,31 @@ describe('StatusControl', () => {
     await userEvent.click(confirm);
     await vi.waitFor(() => expect(finalizeCalls).toHaveLength(1));
     expect(finalizeCalls[0]).toMatchObject({ body: { supplier_id: 4 } });
+  });
+
+  it('Finalizado asks the warranty (preselected with the order value)', async () => {
+    const withSupplier = { ...order(1), garantia_dias: 30, supplier_id: 4, supplier: { id: 4, nombre: 'Partes Guayaquil' } };
+    renderWithProviders(<StatusControl order={withSupplier} canUpdate />, { auth });
+    await screen.findByRole('option', { name: 'Finalizado' });
+    await userEvent.selectOptions(screen.getByRole('combobox'), '2');
+    const dialog = await screen.findByRole('alertdialog');
+    const warranty = within(dialog).getByLabelText(/Tiempo de garantía/);
+    expect(warranty).toHaveValue(30);
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Transferencia' }));
+    const confirm = within(dialog).getByRole('button', { name: 'Finalizar y registrar venta' });
+    await vi.waitFor(() => expect(confirm).toBeEnabled());
+
+    await userEvent.clear(warranty);
+    await userEvent.type(warranty, '1.5');
+    await userEvent.click(confirm);
+    expect(await within(dialog).findByText(/Ingrese un número entero de días/)).toBeInTheDocument();
+    expect(finalizeCalls).toHaveLength(0);
+
+    await userEvent.clear(warranty);
+    await userEvent.type(warranty, '90');
+    await userEvent.click(confirm);
+    await vi.waitFor(() => expect(finalizeCalls).toHaveLength(1));
+    expect(finalizeCalls[0]).toMatchObject({ body: { supplier_id: 4, garantia_dias: 90 } });
   });
 
   it('Finalizado takes an optional spare part cost and shows the profit of the sale', async () => {

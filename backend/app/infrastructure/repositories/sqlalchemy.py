@@ -29,6 +29,7 @@ from app.domain.entities import (
     User,
     WorkOrder,
 )
+from app.domain.entities.user import celular_variants
 from app.domain.value_objects.enums import SaleStatus, WorkOrderStatus
 from app.domain.value_objects.pagination import Page, PageRequest
 from app.domain.value_objects.whatsapp import STATUS_RANK, WhatsAppMessageStatus
@@ -174,6 +175,14 @@ class SqlAlchemyUserRepository(SqlAlchemyRepository[User], ports.UserRepository)
 
     def get_by_identificacion(self, identificacion: str) -> User | None:
         return self.session.scalars(select(User).where(users_table.c.identificacion == identificacion)).first()
+
+    def find_by_celular(self, celular: str) -> list[User]:
+        # Phones saved before the normalization may keep spaces, dashes or parentheses: compare them without.
+        stored = users_table.c.celular
+        for char in (" ", "-", "(", ")"):
+            stored = func.replace(stored, char, "")
+        stmt = select(User).where(stored.in_(celular_variants(celular))).order_by(users_table.c.id)
+        return list(self.session.scalars(stmt))
 
     def find_same_person(self, identificacion: str) -> list[User]:
         c = users_table.c

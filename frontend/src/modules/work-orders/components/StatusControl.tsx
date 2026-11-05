@@ -13,7 +13,7 @@ import { formatOrderNumber, fromDateTimeLocal, toDateTimeLocal } from '@/shared/
 import { formatMoney, fromCents, isValidMoney, toCents } from '@/shared/utils/money';
 import { statusTone, useWorkOrderStatuses } from '../hooks/useWorkOrderStatuses';
 import { WORK_ORDERS_KEY, workOrderApi } from '../services/workOrderApi';
-import { WORK_ORDER_STATUS, type WorkOrderListItem } from '../types';
+import { MAX_WARRANTY_DAYS, WORK_ORDER_STATUS, type WorkOrderListItem } from '../types';
 
 type Order = Pick<
   WorkOrderListItem,
@@ -27,6 +27,7 @@ type Order = Pick<
   | 'fecha_entrega'
   | 'supplier_id'
   | 'supplier'
+  | 'garantia_dias'
 >;
 
 interface Props {
@@ -193,6 +194,11 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
     supplierOptions.push({ value: order.supplier.id, label: order.supplier.nombre }); // kept even if inactive
   }
   const [supplierError, setSupplierError] = useState<string | null>(null);
+  // Tiempo de garantía: chosen here (no longer in the order form); preselected with the order's value.
+  const [garantia, setGarantia] = useState(String(order.garantia_dias ?? 0));
+  const [garantiaError, setGarantiaError] = useState<string | null>(null);
+  const garantiaDias = /^\d+$/.test(garantia.trim()) ? Number(garantia.trim()) : null;
+  const garantiaValid = garantiaDias !== null && garantiaDias <= MAX_WARRANTY_DAYS;
   // Optional: the profit of the sale is the repair cost minus the spare part cost.
   const [costo, setCosto] = useState('');
   const [costoError, setCostoError] = useState<string | null>(null);
@@ -206,6 +212,7 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
         branch_id: selectedBranch as number,
         supplier_id: supplierId,
         costo_repuesto: costoRepuesto,
+        garantia_dias: garantiaDias,
       }),
   });
 
@@ -214,7 +221,8 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
     const badCosto = costo.trim() !== '' && !costoValid;
     if (badCosto) setCostoError('Ingrese un valor válido, por ejemplo 12.50.');
     if (supplierId === null) setSupplierError('Seleccione el proveedor.');
-    if (badCosto || supplierId === null) return;
+    if (!garantiaValid) setGarantiaError(`Ingrese un número entero de días entre 0 y ${MAX_WARRANTY_DAYS}.`);
+    if (badCosto || supplierId === null || !garantiaValid) return;
     try {
       const saved = await finalize.mutateAsync(payment);
       onDone();
@@ -284,6 +292,21 @@ function FinalizeDialog({ order, onClose, onDone }: { order: Order; onClose: () 
               error={supplierError ?? undefined}
             />
           )}
+          <Input
+            label="Tiempo de garantía (días)"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={MAX_WARRANTY_DAYS}
+            step={1}
+            hint="0 = sin garantía"
+            value={garantia}
+            onChange={(e) => {
+              setGarantia(e.target.value);
+              setGarantiaError(null);
+            }}
+            error={garantiaError ?? undefined}
+          />
           <MoneyInput
             label="Costo de repuesto $"
             hint={

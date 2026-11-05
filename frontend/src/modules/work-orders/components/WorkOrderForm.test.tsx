@@ -86,14 +86,14 @@ vi.mock('@/modules/models/services/modelApi', () => ({ MODELS_KEY: 'models', mod
 vi.mock('@/modules/users/services/userApi', () => ({ userApi: { technicians: () => Promise.resolve([]) } }));
 
 function renderForm(onSubmit = vi.fn<(body: WorkOrderRequest, photos: PhotoChanges) => Promise<void>>()) {
-  renderWithProviders(<WorkOrderForm onSubmit={onSubmit} onCancel={() => undefined} />, {
+  renderWithProviders(<WorkOrderForm onSubmit={onSubmit} />, {
     auth: fakeAuth({ permissionCodes: ['work_orders.create'] }),
   });
   return onSubmit;
 }
 
 describe('WorkOrderForm', () => {
-  it('starts with the phone data; the supplier is optional', async () => {
+  it('starts with the phone data; supplier, warranty and reception date are not asked', async () => {
     const onSubmit = renderForm();
     const titles = screen.getAllByRole('heading').map((h) => h.textContent);
     expect(titles).toEqual(['Datos del celular', 'Cliente', 'Desbloqueo del equipo', 'Trabajo', 'Valores']);
@@ -101,23 +101,32 @@ describe('WorkOrderForm', () => {
     const columns = screen.getByRole('heading', { name: 'Datos del celular' }).closest('.form-columns')!;
     expect(columns).toContainElement(screen.getByRole('heading', { name: 'Cliente' }));
     expect(columns).toContainElement(screen.getByRole('heading', { name: 'Desbloqueo del equipo' }));
-    // Trabajo: photos, then observaciones, reception and delivery dates (first column).
+    // Trabajo: photos, then observaciones and the delivery date (first column).
     const work = screen.getByRole('heading', { name: 'Trabajo' }).closest('section')!;
     const labels = within(work).getAllByText(/^(Observaciones|Fecha y hora de ingreso|Fecha de entrega)/).map((l) => l.textContent);
-    expect(labels).toEqual(['Observaciones', 'Fecha y hora de ingreso *', 'Fecha de entrega']);
+    expect(labels).toEqual(['Observaciones', 'Fecha de entrega']);
     const left = screen.getByRole('heading', { name: 'Desbloqueo del equipo' }).closest('.form-columns-first')!;
     expect(left).toContainElement(work);
     expect(left).toContainElement(screen.getByRole('heading', { name: 'Valores' }));
     // Valores: cost | advance, and the balance on its own row.
     expect(screen.getByTestId('form-saldo').closest('.field')).toHaveClass('full');
     expect(screen.getByTestId('form-saldo')).toHaveClass('saldo-value'); // white bold on dark
-    // Reception and delivery dates on the same row.
-    const dates = screen.getByLabelText(/Fecha y hora de ingreso/).closest('.form-grid')!;
-    expect(dates).toContainElement(screen.getByLabelText('Fecha de entrega'));
     // Cédula / RUC across the whole row of the client box.
     expect(screen.getByLabelText(/Cédula \/ RUC/).closest('.lookup-row')).toHaveClass('lookup-row-wide', 'full');
-    expect(screen.getByRole('button', { name: /Proveedor/ })).toHaveTextContent('Sin proveedor');
-    expect(screen.getByText('Proveedor').querySelector('.field-required')).toBeNull(); // not required
+    // Supplier and warranty are asked when the order is finalized.
+    expect(screen.queryByText('Proveedor')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Tiempo de garantía/)).not.toBeInTheDocument();
+    // No Cancelar button; Crear orden is under the client (sticky) and disabled until the required fields are filled.
+    expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument();
+    const create = screen.getByRole('button', { name: 'Crear orden' });
+    expect(create).toBeDisabled();
+    expect(create.closest('.order-submit-column')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Cliente' }).closest('section')!.nextElementSibling).toBe(
+      create.closest('.order-submit-column'),
+    );
+    // Progress bar above the button: only the repair cost (0.00) is valid at the start.
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '20');
+    expect(screen.getByText('1/5')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -136,10 +145,7 @@ describe('WorkOrderForm', () => {
     expect(delivery).toHaveAttribute('type', 'datetime-local');
     // New order: delivery defaults to today (now).
     expect(delivery.value.startsWith(todayIso())).toBe(true);
-    // Last field: reception date and time, prefilled with now.
-    const reception = screen.getByLabelText(/Fecha y hora de ingreso/) as HTMLInputElement;
-    expect(reception).toHaveAttribute('type', 'datetime-local');
-    expect(reception.value.startsWith(todayIso())).toBe(true);
+    expect(screen.queryByLabelText(/Fecha y hora de ingreso/)).not.toBeInTheDocument();
   });
 
   it('queries brands and models again every time a selector is opened', async () => {
@@ -201,19 +207,17 @@ describe('WorkOrderForm', () => {
     // The display type appears only when a display change is among the reasons.
     await userEvent.selectOptions(screen.getByLabelText(/Tipo de display/), 'OLED');
 
-    // Optional supplier (proveedor), queried again every time its selector is opened.
-    const calls = supplierList.mock.calls.length;
-    await userEvent.click(screen.getByRole('button', { name: /Proveedor/ }));
-    await vi.waitFor(() => expect(supplierList.mock.calls.length).toBeGreaterThan(calls));
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar proveedor' }), 'quito');
-    await userEvent.click(await screen.findByRole('option', { name: 'Repuestos Quito' }));
+    // Client, brand, model, reasons, display type and cost: all required fields are filled.
+    const create = screen.getByRole('button', { name: 'Crear orden' });
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
+    expect(create).toBeEnabled();
 
-    const warranty = screen.getByLabelText(/Tiempo de garantía/);
-    await userEvent.clear(warranty);
-    await userEvent.type(warranty, '90');
-
+    // A PIN lock adds a required field until it is valid.
     await userEvent.click(screen.getByRole('radio', { name: 'PIN' }));
+    expect(create).toBeDisabled();
+    expect(screen.getByText('Falta: PIN')).toBeInTheDocument();
     await userEvent.type(screen.getByRole('textbox', { name: /^PIN/ }), '12a34');
+    expect(create).toBeEnabled();
     fireEvent.change(screen.getByLabelText('Fecha de entrega'), { target: { value: '2026-10-05T16:30' } });
 
     const cost = screen.getByLabelText(/Costo de reparación/);
@@ -239,15 +243,16 @@ describe('WorkOrderForm', () => {
       motivo_ingreso: ['BATERIA', 'CAMBIO_DISPLAY'],
       tipo_display: 'OLED',
       color: 'Negro',
-      garantia_dias: 90,
+      garantia_dias: 0,
       bloqueo_tipo: 'PIN',
       bloqueo_valor: '1234',
       presupuesto: '80.00',
       anticipo: '20.00',
       fecha_entrega: new Date(2026, 9, 5, 16, 30).toISOString(),
-      supplier_id: 3,
+      supplier_id: null,
     });
     expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('tecnico_id');
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('fecha_hora');
   }, 15_000); // long scripted flow: slower when the whole suite runs in parallel
 });
 

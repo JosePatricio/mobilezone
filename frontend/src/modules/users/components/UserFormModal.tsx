@@ -13,6 +13,7 @@ import {
   Select,
   type ImageSelection,
 } from '@/shared/components';
+import { useCelularCheck } from '@/shared/hooks/useCelularCheck';
 import { getErrorMessage } from '@/shared/services/apiError';
 import type { NamedRef } from '@/shared/types/api';
 import { zCelular, zOptionalIdentificacion } from '@/shared/utils/identification';
@@ -111,10 +112,12 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
     if (!user && clientRoleId && !getValues('rol_id')) setValue('rol_id', clientRoleId);
   }, [user, clientRoleId, getValues, setValue]);
 
-  const [rolId, provincia, ciudad, branchIds] = useWatch({
+  const [rolId, provincia, ciudad, branchIds, celular] = useWatch({
     control,
-    name: ['rol_id', 'provincia', 'ciudad', 'branch_ids'],
+    name: ['rol_id', 'provincia', 'ciudad', 'branch_ids', 'celular'],
   });
+  // A phone belongs to one cédula / RUC only: warn while typing.
+  const celularTaken = useCelularCheck(celular, user?.id);
   const roleName = roleOptions.find((r) => r.id === Number(rolId))?.nombre;
   const isClient = roleName === SYSTEM_ROLES.CLIENTE;
   const isSeller = roleName === SYSTEM_ROLES.VENDEDOR;
@@ -131,6 +134,10 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
 
   const submit = handleSubmit(async ({ password, ...values }) => {
     setServerError(null);
+    if (celularTaken) {
+      setError('celular', { type: 'server', message: celularTaken });
+      return;
+    }
     try {
       await onSubmit(
         { ...values, password: password && !isClient ? password : null, branch_ids: hasBranches ? values.branch_ids : [] },
@@ -185,7 +192,7 @@ export function UserFormModal({ user, roles, onClose, onSubmit }: Props) {
           error={errors.email?.message}
           {...register('email')}
         />
-        <Input label="Celular" type="tel" inputMode="tel" error={errors.celular?.message} {...register('celular')} />
+        <Input label="Celular" type="tel" inputMode="tel" error={errors.celular?.message ?? celularTaken ?? undefined} {...register('celular')} />
         <Select
           label="Rol"
           required

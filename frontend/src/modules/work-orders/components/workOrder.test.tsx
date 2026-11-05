@@ -34,7 +34,6 @@ const valid = {
   presupuesto: '100',
   anticipo: '30',
   fecha_entrega: '',
-  fecha_hora: '2026-10-08T09:30',
 };
 
 describe('work order balance', () => {
@@ -114,11 +113,8 @@ describe('work order form validation', () => {
     expect(result.fecha_entrega).toBe(new Date(2026, 9, 5, 16, 30).toISOString());
   });
 
-  it('requires the reception date and time and converts it to ISO', () => {
-    expect(workOrderSchema.parse(valid).fecha_hora).toBe(new Date(2026, 9, 8, 9, 30).toISOString());
-    const missing = workOrderSchema.safeParse({ ...valid, fecha_hora: '' });
-    expect(missing.success).toBe(false);
-    expect(missing.error?.issues[0].path).toEqual(['fecha_hora']);
+  it('does not send the reception date and time (the server registers it)', () => {
+    expect(workOrderSchema.parse(valid)).not.toHaveProperty('fecha_hora');
   });
 
   it('validates the client email when it is entered', () => {

@@ -33,6 +33,9 @@ export interface WorkOrderClient {
   email?: string | null;
 }
 
+/** Maximum tiempo de garantía (days). */
+export const MAX_WARRANTY_DAYS = 3650;
+
 export interface WorkOrderListItem {
   id: Id;
   num_orden: number;
@@ -166,9 +169,7 @@ export interface WorkOrderRequest {
   fecha_entrega: string | null;
   /** Sucursal (local) that receives the device; null = the user's branch. */
   branch_id: Id | null;
-  /** Reception date and time (ISO 8601); defaults to now in the form. */
-  fecha_hora: string | null;
-  /** Supplier (proveedor), optional. */
+  /** Supplier (proveedor), optional: chosen when the order is finalized (an edited order keeps its own). */
   supplier_id: Id | null;
 }
 
@@ -210,6 +211,8 @@ export interface FinalizeWorkOrderRequest {
   supplier_id?: Id | null;
   /** Cost of the spare part: the profit of the sale is the repair cost minus it. */
   costo_repuesto?: Money | null;
+  /** Tiempo de garantía in days (0 = sin garantía), chosen when the order is finalized. */
+  garantia_dias?: number | null;
 }
 
 export interface AddSparePartRequest {

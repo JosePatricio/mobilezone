@@ -47,9 +47,10 @@ class TestLock:
 class TestWorkOrdersV5:
     def _payload(self, factory, cliente=None, **overrides):
         brand, model = factory.brand_and_model()
+        n = factory._next()  # each new client has its own phone: a phone belongs to one cédula only
         payload = {
             "cliente": cliente
-            or {"identificacion": valid_cedula(900 + factory._next()), "nombre": "Ana", "apellido": "Mora", "celular": "0991234567"},
+            or {"identificacion": valid_cedula(900 + n), "nombre": "Ana", "apellido": "Mora", "celular": f"099{n:07d}"},
             "marca_id": brand.id,
             "modelo_id": model.id,
             "color": "Azul",
@@ -71,7 +72,7 @@ class TestWorkOrdersV5:
         assert response.status_code == 201, response.text
         order = response.json()
         assert order["cliente"]["identificacion"] == payload["cliente"]["identificacion"]
-        assert order["cliente"]["celular"] == "0991234567"
+        assert order["cliente"]["celular"] == payload["cliente"]["celular"]
         assert (order["motivo_ingreso"], order["tipo_display"], order["motivo_ingreso_label"]) == (
             ["CAMBIO_DISPLAY"],
             "OLED",

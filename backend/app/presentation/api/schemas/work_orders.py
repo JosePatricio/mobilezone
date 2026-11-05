@@ -139,6 +139,9 @@ class FinalizeWorkOrderRequest(RequestSchema):
     costo_repuesto: Money | None = Field(
         default=None, description="Costo del repuesto; la ganancia de la venta es el costo de reparación - este costo"
     )
+    garantia_dias: int | None = Field(
+        default=None, ge=0, le=MAX_WARRANTY_DAYS, description="Tiempo de garantía en días (0 = sin garantía); vacío = se mantiene"
+    )
 
 
 class StatusChangeResponse(Schema):

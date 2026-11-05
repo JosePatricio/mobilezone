@@ -6,6 +6,7 @@ from app.application.services.security import PasswordHasher
 from app.application.use_cases.base import CrudUseCases
 from app.application.use_cases.images import replace_image
 from app.domain.entities import Branch, Role, User
+from app.domain.entities.user import normalize_celular
 from app.domain.exceptions import ConflictError, NotFoundError, ValidationError
 from app.domain.repositories import Repository, UnitOfWork, UserUsage
 from app.domain.value_objects.enums import SystemRole
@@ -14,6 +15,29 @@ from app.domain.value_objects.pagination import Page, PageRequest
 
 MIN_PASSWORD_LENGTH = 8
 USER_PHOTOS_FOLDER = "users"
+
+
+def celular_owner(uow: UnitOfWork, celular: str | None, current_id: int | None = None) -> User | None:
+    """Another user that already has this phone (a phone belongs to one cédula / RUC only)."""
+    value = normalize_celular(celular)
+    if not value:
+        return None
+    return next((u for u in uow.users.find_by_celular(value) if u.id != current_id), None)
+
+
+def ensure_celular_available(
+    uow: UnitOfWork, celular: str | None, current_id: int | None = None, field: str = "celular"
+) -> None:
+    owner = celular_owner(uow, celular, current_id)
+    if owner is not None:
+        raise ConflictError(
+            celular_taken_message(owner), code="PHONE_ALREADY_EXISTS", details={"field": field}
+        )
+
+
+def celular_taken_message(owner: User) -> str:
+    suffix = f" ({owner.identificacion})" if owner.identificacion else ""
+    return f"El número de celular ya existe: está registrado a {owner.nombre_completo}{suffix}."
 
 
 def validate_password(password: str) -> str:
@@ -28,7 +52,13 @@ class _UserValidation(CrudUseCases[User]):
     def _repo(self) -> Repository[User]:
         return self.uow.users
 
-    def _ensure_unique(self, email: str | None, identificacion: str | None, current_id: int | None = None) -> None:
+    def _ensure_unique(
+        self,
+        email: str | None,
+        identificacion: str | None,
+        current_id: int | None = None,
+        celular: str | None = None,
+    ) -> None:
         existing = self.uow.users.get_by_email(email.strip().lower()) if email else None
         if existing is not None and existing.id != current_id:
             raise ConflictError(
@@ -47,6 +77,7 @@ class _UserValidation(CrudUseCases[User]):
                     code="IDENTIFICATION_ALREADY_EXISTS",
                     details={"field": "identificacion"},
                 )
+        ensure_celular_available(self.uow, celular, current_id)
 
     def _role_by_name(self, name: SystemRole) -> Role:
         role = self.uow.roles.get_by_nombre(name.value)
@@ -117,7 +148,7 @@ class UserUseCases(_UserValidation):
         with self.uow.transaction():
             role = self._get_role(data.rol_id)
             user = self._build(data)
-            self._ensure_unique(user.email, user.identificacion)
+            self._ensure_unique(user.email, user.identificacion, celular=user.celular)
             user.set_branches(self._resolve_branches(role, data.branch_ids))
             # Clients never log in (no password). Email is optional for every role, but a user
             # without email cannot log in until one is added.
@@ -152,7 +183,7 @@ class UserUseCases(_UserValidation):
             user = self.get(user_id)
             role = self._get_role(data.rol_id) if data.rol_id != user.rol_id else user.role
             changes = self._build(data)
-            self._ensure_unique(changes.email, changes.identificacion, current_id=user.id)
+            self._ensure_unique(changes.email, changes.identificacion, current_id=user.id, celular=changes.celular)
             if user.id == actor.id and not data.estado:
                 raise ValidationError("No puede desactivar su propio usuario.", code="CANNOT_DEACTIVATE_SELF")
             if user.id == actor.id and data.rol_id != user.rol_id:
@@ -244,7 +275,7 @@ class UserUseCases(_UserValidation):
                 direccion=data.direccion,
             )
             self._require_email(changes)
-            self._ensure_unique(changes.email, None, current_id=user.id)
+            self._ensure_unique(changes.email, None, current_id=user.id, celular=changes.celular)
             for attr in ("nombre", "apellido", "email", "celular", "provincia", "ciudad", "direccion"):
                 setattr(user, attr, getattr(changes, attr))
         return user
@@ -303,7 +334,7 @@ class ClientUseCases(_UserValidation):
     def create(self, data: ClientData) -> User:
         with self.uow.transaction():
             client = self._build(data, self._role_by_name(SystemRole.CLIENTE).id)  # type: ignore[arg-type]
-            self._ensure_unique(client.email, client.identificacion)
+            self._ensure_unique(client.email, client.identificacion, celular=client.celular)
             self.uow.users.add(client)
         return client
 
@@ -311,7 +342,7 @@ class ClientUseCases(_UserValidation):
         with self.uow.transaction():
             client = self.get(client_id)
             changes = self._build(data, client.rol_id)  # type: ignore[arg-type]
-            self._ensure_unique(changes.email, changes.identificacion, current_id=client.id)
+            self._ensure_unique(changes.email, changes.identificacion, current_id=client.id, celular=changes.celular)
             for attr in ("nombre", "apellido", "email", "identificacion", "celular", "provincia", "ciudad", "estado"):
                 setattr(client, attr, getattr(changes, attr))
         return client
